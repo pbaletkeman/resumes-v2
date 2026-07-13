@@ -204,6 +204,10 @@ You are the Resume Rewrite Agent.
 - You may add reasonable metrics only if implied (e.g., “managed a team” → “managed a team of 5”).
 - Produce clean, professional formatting.
 - Maintain chronological order.
+- Do not use the extended character set:
+  - " instead of “ or ”
+  - → becomes ->
+  - etc
 
 Inputs:
 {parsed_resume}

@@ -4,31 +4,33 @@ A simple example of using the Ollama API to create an agent that responds to use
 """
 
 import asyncio
-import ollama
-from ollama import ChatResponse
+import os
+
+from client.model_client import ModelClient
+from client.ollama_client import OllamaClient
+from client.open_ai_client import OpenAIClient
 
 class SimpleAgent:
-    """A simple agent that uses the Ollama API to respond to user prompts."""
-    def __init__(self, model: str):
-        self.model = model
+    """A simple agent that uses a ModelClient to respond to user prompts."""
+    def __init__(self, client: ModelClient):
+        self.client = client
 
     async def run(self, prompt: str) -> str:
-        """Run the agent with the given prompt and return the response."""
-        client = ollama.AsyncClient()
-
-        response: ChatResponse = await client.chat(
-            model="qwen3.5",
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-
-        return response["message"]["content"]
+        return await self.client.chat(prompt)
 
 
 async def main() -> None:
     """Main function to run the simple agent."""
-    agent = SimpleAgent("qwen3.5")
+
+    provider = "ollama"  # or "openai"
+
+    if provider == "ollama":
+        client = OllamaClient("qwen3.5")
+    else:
+        client = OpenAIClient("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY") or "")
+
+    agent = SimpleAgent(client)
+
     result = await agent.run("What is the capital of France?")
     print("Agent:", result)
 
