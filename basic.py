@@ -15,8 +15,9 @@ class SimpleAgent:
     def __init__(self, client: ModelClient):
         self.client = client
 
-    async def run(self, prompt: str) -> str:
-        return await self.client.chat(prompt)
+    async def run(self, purpose: str, prompt: str, output: list[str],  rules: list[str], inputs: list[str]) -> str:
+        """Run the agent with the given prompt and return the response."""
+        return await self.client.chat(purpose, prompt, output, rules, inputs)
 
 
 async def main() -> None:
@@ -30,8 +31,13 @@ async def main() -> None:
         client = OpenAIClient("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY") or "")
 
     agent = SimpleAgent(client)
+    purpose: str = "Answer questions about geography."
+    prompt: str = "What is the capital of France?"
+    output: list[str] = ["geography knowledge"]
+    rules: list[str] = ["Provide accurate and concise answers.", "Do not provide personal opinions."]
+    inputs: list[str] = ["question for the user"]
 
-    result = await agent.run("What is the capital of France?")
+    result = await agent.run(purpose, prompt, output,  rules, inputs)
     print("Agent:", result)
 
 asyncio.run(main())
