@@ -386,7 +386,9 @@ Rules:
 - Do not invent employment history.
 - You may add reasonable metrics only if implied (e.g., "managed a team" → "managed a team of 5").
 - Produce clean, professional formatting.
-- Maintain chronological order.
+- All experiences MUST be listed in proper chronological order (most recent first).
+- No new experiences can be added - use the input resume as the reference for all experience entries.
+- All certifications from the input resume MUST be included - use the input resume as the reference for certifications.
 - Do not use the extended character set:
   - " instead of " or "
   - → becomes ->
@@ -417,8 +419,11 @@ class RewriteOutput(BaseModel):
 2. Build prompt combining both inputs
 3. Call LLM
 4. Parse and validate JSON
-5. On failure: retry with explicit instruction "Output a JSON object matching this exact schema: ..."
-6. On second failure: return the parsed resume unchanged with a warning logged
+5. Validate experiences are in chronological order (most recent first)
+6. Validate no new experiences were added (compare with input resume experience count)
+7. Validate all certifications from input resume are present in output
+8. On failure: retry with explicit instruction "Output a JSON object matching this exact schema: ..."
+9. On second failure: return the parsed resume unchanged with a warning logged
 
 **Files changed:** new file `client/agents/resume_rewrite.py`
 
@@ -445,6 +450,9 @@ Rules:
 - Ensure keyword coverage.
 - Remove ATS-unfriendly elements (tables, images, symbols).
 - Improve clarity and consistency.
+- Verify all certifications from the input resume are present in the output.
+- Verify experiences are in chronological order (most recent first).
+- Do not add any new experiences - use the input resume as the reference.
 ```
 
 **Input schema:**
@@ -469,7 +477,9 @@ class ATSComplianceOutput(BaseModel):
 2. Call LLM
 3. Parse and validate JSON
 4. Validate `ats_score` is between 0 and 100
-5. On failure: retry; on second failure, return a default low-score result with the resume unchanged
+5. Validate all certifications from input resume are present in the final resume
+6. Validate experiences are in chronological order (most recent first)
+7. On failure: retry; on second failure, return a default low-score result with the resume unchanged
 
 **Critical fix:** Currently only sends `rewritten[:300]` — must send the FULL resume text so the agent can evaluate keyword coverage, formatting, and section structure across the entire document.
 
@@ -770,7 +780,10 @@ def format_cover_letter(text: str) -> str:
 6. Assert `ats_optimized_resume` is not empty
 7. Assert `polished_resume` is not empty
 8. Assert `cover_letter` is 250-350 words
-9. Print summary of results
+9. Assert experiences are in chronological order (most recent first)
+10. Assert no new experiences were added (compare with input resume)
+11. Assert all certifications from input resume are present in output
+12. Print summary of results
 
 **Files changed:** `test_real_files.py`
 
