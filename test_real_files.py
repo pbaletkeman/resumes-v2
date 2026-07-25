@@ -1,10 +1,11 @@
 """
 test_real_files.py
-Test with actual GitHub job description and resume.
+Integration test that fetches a real job description and resume from GitHub,
+then runs the full resume optimization pipeline.
 """
 
 import asyncio
-import os
+import urllib.error
 import urllib.request
 
 from client.ollama_client import OllamaClient
@@ -12,21 +13,37 @@ from client.resume_processor import ResumeProcessor
 
 
 async def main() -> None:
-    """Test resume processing with real job description and resume."""
+    """Fetch remote documents and run the resume optimization pipeline.
 
-    # Load real files from GitHub
-    jd_url = "https://raw.githubusercontent.com/pbaletkeman/java-resumes/master/sample/PointClickCare-Software%20Engineer.txt"
-    resume_url = "https://raw.githubusercontent.com/pbaletkeman/java-resumes/master/sample/resume.md"
+    Downloads a sample job description and resume from the
+    ``pbaletkeman/java-resumes`` GitHub repository, then processes
+    them through ``ResumeProcessor.optimize_resume``.
+    """
+    jd_url = (
+        "https://raw.githubusercontent.com/pbaletkeman/java-resumes/"
+        "master/sample/PointClickCare-Software%20Engineer.txt"
+    )
+    resume_url = (
+        "https://raw.githubusercontent.com/pbaletkeman/java-resumes/"
+        "master/sample/resume.md"
+    )
 
-    print("Loading job description...")
-    with urllib.request.urlopen(jd_url) as response:
-        job_description = response.read().decode('utf-8')
+    try:
+        print("Loading job description...")
+        with urllib.request.urlopen(jd_url) as response:
+            job_description = response.read().decode("utf-8")
+    except urllib.error.URLError as e:
+        print(f"Failed to load job description: {e}")
+        return
 
-    print("Loading resume...")
-    with urllib.request.urlopen(resume_url) as response:
-        resume = response.read().decode('utf-8')
+    try:
+        print("Loading resume...")
+        with urllib.request.urlopen(resume_url) as response:
+            resume = response.read().decode("utf-8")
+    except urllib.error.URLError as e:
+        print(f"Failed to load resume: {e}")
+        return
 
-    # Initialize client
     client = OllamaClient("qwen3.5")
     processor = ResumeProcessor(client)
 

@@ -1,17 +1,50 @@
-from typing import Dict, Any
+"""
+pipeline.py
+Multi-agent resume optimization pipeline.
+
+Defines ``AgentRunner`` (a placeholder for agent orchestration) and
+``run_resume_pipeline``, which chains 7 specialized agents to transform
+a raw job description and resume into an ATS-optimized resume and
+tailored cover letter.
+"""
+
+from typing import Any
 
 
 class AgentRunner:
-    """
-    Minimal abstraction for running agents by name.
-    Replace internals with your actual Agent Foundry integration.
+    """Dispatches named agents with input dictionaries.
+
+    This is a minimal abstraction intended to be replaced with a real
+    agent orchestration backend (e.g. Azure AI Foundry, LangGraph).
+
+    Args:
+        agents: Mapping of agent names to agent instances or callables.
     """
 
-    def __init__(self, agents: Dict[str, Any]):
+    def __init__(self, agents: dict[str, Any]) -> None:
+        """Initialize the runner with a set of named agents.
+
+        Args:
+            agents: Dictionary mapping agent names to agent objects.
+        """
         self.agents = agents
 
-    def run_agent(self, name: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        agent = self.agents[name]
+    def run_agent(self, name: str, inputs: dict[str, Any]) -> dict[str, Any]:
+        """Run a named agent with the given inputs.
+
+        Args:
+            name: The agent name (must exist in ``self.agents``).
+            inputs: Dictionary of input data for the agent.
+
+        Returns:
+            The agent's output dictionary.
+
+        Raises:
+            KeyError: If the agent name is not registered.
+            NotImplementedError: Always (placeholder for real integration).
+        """
+        if name not in self.agents:
+            raise KeyError(f"Agent '{name}' not found")
         # Pseudocode: adapt to your SDK
         # result = agent.run(inputs=inputs)
         # return result
@@ -22,13 +55,28 @@ def run_resume_pipeline(
     runner: AgentRunner,
     job_description: str,
     resume: str,
-) -> Dict[str, Any]:
-    """
-    Orchestrates all 7 agents:
-    - Returns parsed JD, parsed resume, tailoring strategy,
-      rewritten resume, ATS resume, polished resume, cover letter.
-    """
+) -> dict[str, Any]:
+    """Run the full 7-agent resume optimization pipeline.
 
+    Pipeline stages:
+        1. **JD Parsing** — Extract structured data from the job description.
+        2. **Resume Parsing** — Extract structured data from the resume.
+        3. **Gap Analysis** — Compare JD vs resume, produce a tailoring strategy.
+        4. **Resume Rewrite** — Rewrite the resume using the tailoring strategy.
+        5. **ATS Compliance** — Optimize for applicant tracking systems.
+        6. **Tone Polishing** — Improve professional tone and clarity.
+        7. **Cover Letter** — Generate a tailored cover letter.
+
+    Args:
+        runner: An ``AgentRunner`` instance with all 7 agents registered.
+        job_description: Raw job description text.
+        resume: Raw resume text.
+
+    Returns:
+        Dictionary with keys: ``parsed_job_description``, ``parsed_resume``,
+        ``tailoring_strategy``, ``rewritten_resume``, ``ats_optimized_resume``,
+        ``polished_resume``, ``cover_letter``.
+    """
     # 1. JD Parsing Agent
     jd_result = runner.run_agent(
         "jd_parsing_agent",
