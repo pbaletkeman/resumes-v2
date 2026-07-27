@@ -10,6 +10,7 @@ import asyncio
 import os
 
 from client.model_client import ModelClient
+from client.model_registry import ModelClientRegistry
 from client.ollama_client import OllamaClient
 from client.open_ai_client import OpenAIClient
 
@@ -77,4 +78,46 @@ async def main() -> None:
     print("Agent:", result)
 
 
-asyncio.run(main())
+async def per_agent_model_example() -> None:
+    """Demonstrate using different models for different agents.
+
+    This example shows how to use the ``ModelClientRegistry`` to assign
+    different LLM models to different agents in a pipeline.
+    """
+    # Create a registry
+    registry = ModelClientRegistry()
+
+    # Register different models for different use cases
+    registry.register("fast", OllamaClient("qwen3.5"))
+    # registry.register("smart", OpenAIClient("gpt-4o", api_key="..."))
+
+    # Set a default model for all agents
+    registry.set_default_client("fast")
+
+    # Override specific agents with different models
+    # registry.set_agent_client("cover_letter_agent", "smart")
+    # registry.set_agent_client("tone_polishing_agent", "smart")
+
+    # Create agents using the registry
+    fast_client = registry.get_client_for_agent("jd_parsing_agent")
+    agent1 = SimpleAgent(fast_client)
+
+    # All agents use "fast" by default
+    agent2 = SimpleAgent(registry.get_client_for_agent("resume_parsing_agent"))
+
+    # Run a simple test
+    purpose = "Answer a question."
+    prompt = "What is 2 + 2?"
+    output = ["math knowledge"]
+    rules = ["Be concise."]
+    inputs = ["basic math"]
+
+    result1 = await agent1.run(purpose, prompt, output, rules, inputs)
+    print("Agent 1 (fast):", result1)
+
+    result2 = await agent2.run(purpose, prompt, output, rules, inputs)
+    print("Agent 2 (fast):", result2)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
