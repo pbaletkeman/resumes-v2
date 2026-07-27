@@ -15,12 +15,78 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Protocol
 
 from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
+from config.agents import build_registry
 
 logger = logging.getLogger(__name__)
+
+class Agent(Protocol):
+    """Structural type for any agent usable with ``AgentRunner``.
+
+    Any object implementing ``run(inputs) -> Any`` satisfies this protocol.
+    ``PipelineAgent`` is the built-in implementation; custom agents (e.g.
+    thin wrappers around ``SimpleAgent``) can be used as long as they
+    conform to this signature.
+    """
+
+    async def run(self, inputs: dict[str, Any]) -> Any:
+        """Execute the agent with the given inputs.
+
+        Args:
+            inputs: Dictionary of input data for the agent.  Keys and
+                values depend on the concrete implementation.
+
+        Returns:
+            Agent-specific output; typically a dict with result fields.
+        """
+
+
+class PipelineAgent:
+    """Agent that delegates to a ``ModelClient`` with a fixed purpose.
+
+    Conforms to the ``Agent`` Protocol so it can be used with ``AgentRunner``.
+
+    Args:
+        client: An LLM client implementing ``ModelClient.chat``.
+        purpose: System-level role or persona for this agent.
+    """
+
+    def __init__(self, client: ModelClient, purpose: str) -> None:
+        """Initialize the agent with a model client and fixed purpose.
+
+        Args:
+            client: An LLM client implementing ``ModelClient.chat``.
+            purpose: System-level role or persona used for every ``chat``
+                call this agent makes.
+        """
+        self.client = client
+        self.purpose = purpose
+
+    async def run(self, inputs: dict[str, Any]) -> Any:
+        """Execute the agent by forwarding inputs to the model client.
+
+        The ``inputs`` dict is split into structured LLM parameters
+        (``prompt``, ``output``, ``rules``) and domain-specific context
+        keys, which are serialised into a list of ``"key: value"`` strings.
+
+        Args:
+            inputs: Must contain at least ``"prompt"``.  Optional keys:
+                ``"output"`` (list of expected field names),
+                ``"rules"`` (list of constraints), plus any additional
+                domain-specific keys that become context strings.
+
+        Returns:
+            The raw text response from the model client.
+        """
+        prompt = inputs.get("prompt", "")
+        output = inputs.get("output", [])
+        rules = inputs.get("rules", [])
+        context = [f"{k}: {v}" for k, v in inputs.items() if k not in ("prompt", "output", "rules")]
+        return await self.client.chat(self.purpose, prompt, output, rules, context)
 
 
 class AgentRunner:
@@ -42,7 +108,7 @@ class AgentRunner:
 
     def __init__(
         self,
-        agents: dict[str, Any],
+        agents: Mapping[str, Agent | None],
         registry: ModelClientRegistry | None = None,
     ) -> None:
         """Initialize the runner with a set of named agents.
@@ -52,7 +118,7 @@ class AgentRunner:
                 agent classes (if ``registry`` is provided).
             registry: Optional registry for per-agent model assignment.
         """
-        self.agents = agents
+        self.agents = dict(agents)
         self.registry = registry
 
     def run_agent(self, name: str, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -73,6 +139,8 @@ class AgentRunner:
             raise KeyError(f"Agent '{name}' not found")
 
         agent = self.agents[name]
+        if agent is None:
+            raise TypeError(f"Agent '{name}' is None (not instantiated)")
         logger.info("Running agent: %s", name)
         start = time.monotonic()
 
@@ -83,7 +151,7 @@ class AgentRunner:
             self.agents[name] = agent  # Cache the instance
 
         try:
-            result = asyncio.run(agent.run(inputs))
+            result: dict[str, Any] = asyncio.run(agent.run(inputs))
             elapsed = time.monotonic() - start
             logger.info("Agent %s completed in %.1fs", name, elapsed)
             return result
@@ -112,15 +180,6 @@ def run_resume_pipeline(
 ) -> dict[str, Any]:
     """Run the full 7-agent resume optimization pipeline.
 
-    Pipeline stages:
-        1. **JD Parsing** — Extract structured data from the job description.
-        2. **Resume Parsing** — Extract structured data from the resume.
-        3. **Gap Analysis** — Compare JD vs resume, produce a tailoring strategy.
-        4. **Resume Rewrite** — Rewrite the resume using the tailoring strategy.
-        5. **ATS Compliance** — Optimize for applicant tracking systems.
-        6. **Tone Polishing** — Improve professional tone and clarity.
-        7. **Cover Letter** — Generate a tailored cover letter.
-
     Args:
         runner: An ``AgentRunner`` instance with all 7 agents registered.
         job_description: Raw job description text.
@@ -134,14 +193,24 @@ def run_resume_pipeline(
     # 1. JD Parsing Agent
     jd_result = runner.run_agent(
         "jd_parsing_agent",
-        {"job_description": job_description},
+        {
+            "prompt": "Extract structured data from this job description.",
+            "output": ["parsed_job_description"],
+            "rules": ["Return valid JSON"],
+            "job_description": job_description,
+        },
     )
     parsed_job_description = jd_result["parsed_job_description"]
 
     # 2. Resume Parsing Agent
     resume_result = runner.run_agent(
         "resume_parsing_agent",
-        {"resume": resume},
+        {
+            "prompt": "Extract structured data from this resume.",
+            "output": ["parsed_resume"],
+            "rules": ["Return valid JSON"],
+            "resume": resume,
+        },
     )
     parsed_resume = resume_result["parsed_resume"]
 
@@ -149,6 +218,9 @@ def run_resume_pipeline(
     gap_result = runner.run_agent(
         "gap_analysis_agent",
         {
+            "prompt": "Compare the job description and resume. Produce a tailoring strategy.",
+            "output": ["tailoring_strategy"],
+            "rules": ["Be specific and actionable"],
             "parsed_job_description": parsed_job_description,
             "parsed_resume": parsed_resume,
         },
@@ -159,6 +231,9 @@ def run_resume_pipeline(
     rewrite_result = runner.run_agent(
         "resume_rewrite_agent",
         {
+            "prompt": "Rewrite the resume to match the job requirements using this strategy.",
+            "output": ["rewritten_resume"],
+            "rules": ["Keep formatting", "Use strong action verbs"],
             "parsed_resume": parsed_resume,
             "tailoring_strategy": tailoring_strategy,
         },
@@ -168,7 +243,12 @@ def run_resume_pipeline(
     # 5. ATS Compliance Agent
     ats_result = runner.run_agent(
         "ats_compliance_agent",
-        {"rewritten_resume": rewritten_resume},
+        {
+            "prompt": "Check and optimize this resume for ATS systems.",
+            "output": ["ats_optimized_resume"],
+            "rules": ["Maintain content accuracy", "Optimize keywords"],
+            "rewritten_resume": rewritten_resume,
+        },
     )
     ats_optimized_resume = ats_result.get("ats_optimized_resume") or ats_result.get(
         "final_resume"
@@ -177,7 +257,12 @@ def run_resume_pipeline(
     # 6. Tone Polishing Agent
     tone_result = runner.run_agent(
         "tone_polishing_agent",
-        {"ats_optimized_resume": ats_optimized_resume},
+        {
+            "prompt": "Polish the tone and clarity of this resume.",
+            "output": ["polished_resume"],
+            "rules": ["Maintain professional tone", "Be concise"],
+            "ats_optimized_resume": ats_optimized_resume,
+        },
     )
     polished_resume = tone_result["polished_resume"]
 
@@ -185,6 +270,9 @@ def run_resume_pipeline(
     cover_result = runner.run_agent(
         "cover_letter_agent",
         {
+            "prompt": "Generate a tailored cover letter for this job application.",
+            "output": ["cover_letter"],
+            "rules": ["Match the resume tone", "Address key requirements"],
             "parsed_job_description": parsed_job_description,
             "parsed_resume": parsed_resume,
             "tailoring_strategy": tailoring_strategy,
@@ -239,68 +327,46 @@ def create_runner_from_config(
         }
         runner = AgentRunner(agents, registry=registry)
     """
-    from config.agents import build_registry
-
     registry = build_registry()
     return AgentRunner(agent_classes or {}, registry=registry)
 
 
-if __name__ == "__main__":
-    # Example: Per-agent model configuration
-    #
-    # Set environment variables to assign different models to different agents:
-    #
-    #   # Default model for all agents
-    #   set MODEL_PROVIDER=ollama
-    #   set MODEL_NAME=qwen3.5
-    #
-    #   # Use a stronger model for creative tasks
-    #   set COVER_LETTER_AGENT_PROVIDER=openai
-    #   set COVER_LETTER_AGENT_MODEL=gpt-4o
-    #   set TONE_POLISHING_AGENT_PROVIDER=openai
-    #   set TONE_POLISHING_AGENT_MODEL=gpt-4o-mini
-    #
-    #   # Use a fast model for parsing
-    #   set JD_PARSING_AGENT_PROVIDER=ollama
-    #   set JD_PARSING_AGENT_MODEL=llama3
+def sample_run() -> None:
+    """Demonstrate the full resume optimization pipeline end-to-end.
 
-    # Example 1: Manual setup with different clients
+    Creates a ``PipelineAgent`` for each of the 7 pipeline stages, all backed
+    by a single Ollama ``qwen3.5`` client.  The agents are wired into an
+    ``AgentRunner`` and executed sequentially via ``run_resume_pipeline``.
+
+    Replace the placeholder JD and resume text with real content to see
+    meaningful output.
+    """
     from client.ollama_client import OllamaClient
 
-    fast_client = OllamaClient("qwen3.5")
-    # smart_client = OpenAIClient("gpt-4o", api_key=os.getenv("OPENAI_API_KEY") or "")
+    client = OllamaClient("qwen3.5")
 
-    agents = {
-        "jd_parsing_agent": None,  # Replace with real agent class
-        "resume_parsing_agent": None,
-        "gap_analysis_agent": None,
-        "resume_rewrite_agent": None,
-        "ats_compliance_agent": None,
-        "tone_polishing_agent": None,
-        "cover_letter_agent": None,
+    agents_map = {
+        "jd_parsing_agent": PipelineAgent(client, "Extract structured data from job descriptions"),
+        "resume_parsing_agent": PipelineAgent(client, "Extract structured data from resumes"),
+        "gap_analysis_agent": PipelineAgent(client, "Compare JD vs resume, produce a tailoring strategy"),
+        "resume_rewrite_agent": PipelineAgent(client, "Rewrite resume to match job requirements"),
+        "ats_compliance_agent": PipelineAgent(client, "Check and optimize resume for ATS systems"),
+        "tone_polishing_agent": PipelineAgent(client, "Polish resume tone and clarity"),
+        "cover_letter_agent": PipelineAgent(client, "Generate tailored cover letters"),
     }
 
-    runner = AgentRunner(agents)
+    runner_instance = AgentRunner(agents_map)
 
-    # Example 2: Use config-based registry (uncomment to use)
-    # runner = create_runner_from_config(agents)
+    jd_text = "Paste JD here..."
+    resume_text = "Paste resume here..."
 
-    # Show which model is assigned to each agent
-    if runner.registry:
-        from config.agents import get_model_summary
+    results = run_resume_pipeline(runner_instance, jd_text, resume_text)
 
-        print("Agent Model Assignments:")
-        for entry in get_model_summary():
-            print(f"  {entry['agent']}: {entry['provider']}/{entry['model']}")
-
-    job_description = "Paste JD here..."
-    resume = "Paste resume here..."
-
-    # Once AgentRunner.run_agent is implemented, this will run end-to-end.
-    results = run_resume_pipeline(runner, job_description, resume)
-
-    # Example: print final artifacts
     print("=== Polished Resume ===")
     print(results["polished_resume"])
     print("\n=== Cover Letter ===")
     print(results["cover_letter"])
+
+
+if __name__ == "__main__":
+    sample_run()

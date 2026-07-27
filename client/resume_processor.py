@@ -6,8 +6,8 @@ Orchestrates format detection, gap analysis, resume rewriting, and
 ATS compliance checking using an LLM client and the FormatDetector.
 """
 
-from client.model_client import ModelClient
 from client.format_detector import FormatDetector
+from client.model_client import ModelClient
 
 
 class ResumeProcessor:
@@ -30,6 +30,12 @@ class ResumeProcessor:
             client: An LLM client implementing ``ModelClient.chat``.
         """
         self.client = client
+
+    @staticmethod
+    def _to_str(value: str | list[str]) -> str:
+        if isinstance(value, list):
+            return "\n".join(value)
+        return value
 
     async def optimize_resume(
         self, job_description: str, resume: str
@@ -90,7 +96,7 @@ JD requirements: {', '.join(jd['requirements'][:10])}"""
             prompt=prompt,
             output=["missing_skills", "weak_areas", "keywords", "recommendation"],
             rules=["Be concise", "Focus on job match"],
-            inputs=[resume.get("raw", ""), jd.get("raw", "")],
+            inputs=[self._to_str(resume.get("raw", "")), self._to_str(jd.get("raw", ""))],
         )
         return result
 
