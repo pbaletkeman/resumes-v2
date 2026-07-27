@@ -645,6 +645,12 @@ class CoverLetterOutput(BaseModel):
        "tone_polishing_agent": TonePolishingAgent(client),
        "cover_letter_agent": CoverLetterAgent(client),
    }
+
+   # Example with candidate and company names for output file naming
+   results = run_resume_pipeline(
+       runner, job_description, resume,
+       candidate_name="JohnSmith", company_name="AcmeCorp",
+   )
    ```
 
 3. Update `run_resume_pipeline` to pass structured data between agents (not raw strings):
@@ -654,6 +660,8 @@ class CoverLetterOutput(BaseModel):
    - Agent 4 output → Agent 5 input (`rewritten_resume`)
    - Agent 5 output → Agent 6 input (`ats_optimized_resume`)
    - Agents 1+2+3 output → Agent 7 input
+   - Add `candidate_name: str` and `company_name: str` parameters to `run_resume_pipeline()`
+   - Pass these to `ResumeRenderer.render_all()` for file naming
 
 **Files changed:** `pipeline.py`, `client/agents/__init__.py`
 
@@ -768,6 +776,108 @@ def format_cover_letter(text: str) -> str:
 
 ---
 
+### 6.3 Add template-based resume output (`client/templates/`)
+
+**Purpose:** Generate the final resume in multiple formats from structured agent output. Templates ensure consistent, ATS-safe formatting rather than relying on raw LLM output.
+
+**What to do:**
+
+1. Create directory `client/templates/` with `__init__.py`
+
+2. Define a `ResumeRenderer` class:
+   ```python
+   from pathlib import Path
+   from client.models import RewriteOutput, CoverLetterOutput
+
+   class ResumeRenderer:
+       def __init__(self, template_dir: Path | None = None) -> None: ...
+
+       def render_plaintext(self, resume: RewriteOutput) -> str: ...
+       def render_markdown(self, resume: RewriteOutput) -> str: ...
+       def render_docx(self, resume: RewriteOutput, output_path: Path) -> Path: ...
+       def render_pdf(self, resume: RewriteOutput, output_path: Path) -> Path: ...
+       def render_cover_letter_plaintext(self, letter: CoverLetterOutput) -> str: ...
+       def render_cover_letter_markdown(self, letter: CoverLetterOutput) -> str: ...
+
+       @staticmethod
+       def build_output_path(
+           output_dir: Path, candidate_name: str, company_name: str,
+           doc_type: str, ext: str,
+       ) -> Path:
+           """Build a file path like: 20260727_1430_JohnSmith_AcmeCorp_Resume.pdf"""
+           ...
+
+       def render_all(
+           self, resume: RewriteOutput, letter: CoverLetterOutput,
+           candidate_name: str, company_name: str, output_dir: Path,
+       ) -> dict[str, Path]: ...
+   ```
+
+3. **Plaintext template:**
+   - Section headers as `UPPERCASE` followed by a blank line
+   - Bullet points as `- item`
+   - No Markdown syntax, no special characters
+   - ATS-safe: no tables, no columns, no images
+
+4. **Markdown template:**
+   - Section headers as `## Section Name`
+   - Bullet points as `- item`
+   - Bold for company names and job titles
+   - Clean, GitHub-flavored Markdown
+
+5. **DOCX generation:**
+   - Use `python-docx` library
+   - Professional font (Calibri or Arial), 10-11pt body, 14pt name
+   - Section headers in bold, slightly larger
+   - 1-inch margins, single spacing
+   - Save to `.docx` file
+
+6. **PDF generation:**
+   - Use `weasyprint` or `pdfkit` (HTML → PDF pipeline)
+   - Render Markdown to HTML first, then convert to PDF
+   - Same professional styling as DOCX
+   - Save to `.pdf` file
+
+7. **Cover letter rendering:**
+   - Plaintext: plain paragraphs with proper spacing
+   - Markdown: wrapped in a blockquote or plain paragraphs
+   - DOCX/PDF: same professional styling as resume
+
+8. **`render_all` convenience method:**
+   - Takes a `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and output directory
+   - Generates all 4 formats for resume + cover letter
+   - File names follow the pattern: `{date}_{candidate_name}_{company_name}_{document_type}.{ext}`
+   - Date format: `YYYYMMDD_HHMM`
+   - Example: `20260727_1430_JohnSmith_AcmeCorp_Resume.pdf`
+   - Returns a dict mapping format name to file path:
+      ```python
+      {
+          "plaintext": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.txt",
+          "markdown": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.md",
+          "docx": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.docx",
+          "pdf": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.pdf",
+          "cover_letter_plaintext": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.txt",
+          "cover_letter_markdown": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.md",
+          "cover_letter_docx": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.docx",
+          "cover_letter_pdf": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.pdf",
+      }
+      ```
+
+9. **Add to `requirements.txt`:**
+   ```
+   python-docx>=1.0.0
+   weasyprint>=60.0
+   markdown>=3.5
+   ```
+
+10. **Wire into pipeline:**
+    - `run_resume_pipeline` gains two new parameters: `candidate_name: str` and `company_name: str`
+    - These are passed through to `ResumeRenderer.render_all()` for file naming
+    - After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()`
+    - Store output paths in the pipeline result dict
+
+**Files changed:** new directory `client/templates/`, new files `client/templates/__init__.py`, `client/templates/renderer.py`, `requirements.txt`, `pipeline.py`
+
 ## Phase 7: Testing & Docs
 
 ### 7.1 Update `test_real_files.py`
@@ -783,7 +893,9 @@ def format_cover_letter(text: str) -> str:
 9. Assert experiences are in chronological order (most recent first)
 10. Assert no new experiences were added (compare with input resume)
 11. Assert all certifications from input resume are present in output
-12. Print summary of results
+12. Call pipeline with candidate name and company name
+13. Assert output files are created with correct naming pattern
+14. Print summary of results
 
 **Files changed:** `test_real_files.py`
 
@@ -841,6 +953,9 @@ client/
   resume_processor.py        # MODIFIED - deprecated
   models.py                  # NEW - Pydantic schemas
   formatter.py               # NEW - output formatting
+  templates/                 # NEW - resume rendering
+    __init__.py
+    renderer.py              # NEW - multi-format resume output
   agents/
     __init__.py              # NEW - agent exports
     base.py                  # NEW - BaseAgent ABC
@@ -892,6 +1007,7 @@ requirements.txt             # MODIFIED - clean deps
 | 15 | Phase 5.3: Deprecate resume_processor | Step 14 | 2 |
 | 16 | Phase 6.1: Pydantic models | Steps 6-12 | 1 |
 | 17 | Phase 6.2: Output formatter | Step 16 | 1 |
-| 18 | Phase 7.1: Update test_real_files | Steps 14, 17 | 1 |
-| 19 | Phase 7.2: Unit tests | Steps 16, 17 | 3 |
-| 20 | Phase 7.3: Documentation | All | 4 |
+| 18 | Phase 6.3: Template renderer | Steps 16, 17 | 4 |
+| 19 | Phase 7.1: Update test_real_files | Steps 14, 18 | 1 |
+| 20 | Phase 7.2: Unit tests | Steps 16, 17, 18 | 3 |
+| 21 | Phase 7.3: Documentation | All | 4 |
