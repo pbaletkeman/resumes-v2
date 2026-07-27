@@ -1,0 +1,54 @@
+Zafin is an AI platform company helping regulated institutions modernize how critical work is designed, governed, and delivered. Our technology enables organizations to move faster while maintaining the governance, accountability, and control required in highly regulated environments.
+
+Our portfolio includes Zafin AIOS, an agent orchestration platform for governed AI work; the Zafin Banking Platform, which helps banks modernize product, pricing, offers, billing, loyalty, and relationship management; and Zafin IO, an integration platform that connects data, systems, and workflows across complex enterprise environments.
+
+Headquartered in Toronto, Canada, Zafin partners with leading financial institutions across North America, Europe, the Middle East, Africa, and Asia-Pacific. As AI transforms the future of financial services, we're building the platforms that help regulated organizations adopt AI responsibly and at scale.
+
+What's the Opportunity?
+
+As a Software Engineer at Zafin, you will design, build, test, and maintain software that powers our products and platform capabilities and on Zafin's AI Operating System (AIOS). Working within an agile engineering team, you will contribute to the delivery of scalable, reliable, and secure solutions while continuously improving the quality, performance, and maintainability of our software.
+
+This role is ideal for an engineer who enjoys solving technical problems, collaborating with teammates, and building software that delivers meaningful customer value.
+
+What Will You Do?
+
+Design, develop, test, and maintain software components and services.
+Write clean, maintainable, and well-tested code following engineering best practices.
+Participate in design discussions, code reviews, and technical planning activities.
+Troubleshoot and resolve software defects and production issues.
+Collaborate with product managers, architects, designers, and engineers throughout the software development lifecycle.
+Contribute to continuous improvement of engineering practices, development processes, and code quality.
+Participate in testing, deployment, and release activities.
+Create and maintain technical documentation where appropriate.
+Continuously learn and apply new technologies, tools, and engineering practices.
+
+What Do You Need to Succeed?
+
+Must Haves
+
+Experience developing software using modern programming languages and frameworks.
+Strong understanding of object-oriented design, software engineering principles, and development best practices.
+Experience building or supporting APIs, services, or enterprise applications.
+Familiarity with version control systems such as Git.
+Understanding of testing methodologies and software quality practices.
+Strong analytical and problem-solving skills.
+Ability to work effectively within Agile software development teams.
+Excellent communication and collaboration skills.
+
+Nice to Have
+
+Experience with cloud platforms and modern software architectures.
+Familiarity with CI/CD pipelines, containers, and DevOps practices.
+Experience with AI-enabled applications, distributed systems, or enterprise SaaS platforms.
+Experience in banking, financial services, or other regulated industries.
+
+Additional Job Details
+
+Expected Salary Range: $90,000 - $130,000; we hire into multiple career levels for this role based on a candidate's experience, skills and demonstrated capabilities.
+Vacancy Status: Open position(s) to be filled
+Mode of Work: Hybrid
+Use of AI: Zafin may use Artificial Intelligence (AI) and/or other forms of automated technology to screen and/or assess applicants for this position. Zafin will not utilize AI for conducting interviews and/or making hiring decisions.
+
+What's in it for you
+
+Joining our team means being part of a culture that values diversity, teamwork, and high-quality work. We offer competitive salaries, annual bonus potential, generous paid time off, paid volunteering days, wellness benefits, and robust opportunities for professional growth and career advancement. Want to learn more about what you can look forward to during your career with us? Visit our careers site and our openings: zafin.com/careers

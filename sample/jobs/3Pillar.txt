@@ -1,0 +1,58 @@
+
+3Pillar is an AI transformation partner on a mission to help enterprises build the AI-native products and intelligent agents that will define the next era of business. With teams across North America, Europe, Latin America, and Asia, we work with the most ambitious companies in financial services, healthcare, media, and technology — helping them move faster, modernize boldly, and compete on their own terms. Our HelixAI platform and Helix Pods delivery model put our engineers at the center of real agentic transformation — doing work that is open, portable, and built to last. We are building the future of enterprise AI.
+
+👋 Greetings, future tech savant:
+
+Embark on an exciting journey into the realm of software development with 3Pillar! We extend an invitation for you to join our team and gear up for a thrilling adventure. At 3Pillar, our focus is on crafting cutting-edge technologies that revolutionize industries. As a Software Engineer, you'll play a vital role in our dynamic team, contributing to exciting projects that redefine urban living, establish new media channels for enterprise companies, or drive innovation in healthcare. This opportunity goes beyond code – it's about creating epic solutions that leave a lasting impression in the market. If your passion for programming fuels your drive to make a real-world impact, consider this your pass to the captivating world of Product Development! 🚀💻
+
+Key Responsibilities
+
+Craft client code that is not just efficient but also performant, testable, scalable, secure, and of the highest quality.
+Ensure code is secure through Software Composition Analysis (SCA), and drive remediation through triaging, prioritization, remediation and verification.
+Provide accurate status tracking, reporting, and estimation using project methods and tools.
+Gather requirements, validate their understanding amongst the team, and create and maintain relevant documentation.
+Execute activities within the current methodology and uphold the highest quality standards.
+Foster collaboration with fellow engineers, designers, and managers to comprehend user pain points and iterate on solutions that drive client success.
+Take ownership of projects, from technical design to a successful launch.
+Participating in code reviews to maintain code quality and consistency.
+
+Minimum Qualifications
+
+Demonstrated expertise with at least 8+ years of experience in Python, REST API and SQL
+Expertise with Git source control tools (Github, Gitlab or others)
+Experience with unit testing (Pytest).
+Intermediate level design proficiency following UML / C4 / ArchiMate.
+Experience in engineering software systems of medium-to-large scope and complexity.
+Familiarity with Agile software development methodologies.
+Proficiency with relational databases.
+Experience in building frontend/backend applications at scale.
+Proficiency in the English language.
+
+Additional Experience Desired
+
+Knowledge of Python web frameworks (Flask or others)
+Knowledge of workflow orchestration platforms (Apache Airflow, Automic Automation or others)
+Knowledge of Python package management (UV, Conda or others)
+Knowledge of protocols like HTTP, and serialization formats like JSON and XML.
+Knowledge of SCA platforms (Github Advanced Security, Snyk, Checkmarx or others)
+Understanding of AI coding agents (Claude Code, Copilot, Cursor or others)
+Understanding of Software Development Life Cycle (SDLC).
+Proficiency in Object-Oriented Programming (inheritance, polymorphism, classes, instances, properties).
+
+Benefits
+
+Medical & dental insurance - with employee contributions
+LTD, Life & AD&D insurance - employee paid
+Paid time off
+10 Paid Holidays
+RRSP with Employer Matching
+Flexible work policy
+
+What is it like working for 3Pillar Global?
+
+At 3Pillar, we create an environment where people can do their best work while maintaining a healthy work-life balance.
+
+Flexibility & Well-being – Our remote-first approach gives you the flexibility to work where you perform best, while prioritizing your well-being and personal commitments.
+Global Community – Collaborate with talented colleagues across the globe in a culture built on connection, support, and shared success.
+Your Voice Matters – We foster open communication and multiple feedback channels, ensuring every employee has the opportunity to be heard and make an impact.
+Growth & Development – Gain exposure to diverse clients, industries, and challenges that accelerate learning and career growth.
