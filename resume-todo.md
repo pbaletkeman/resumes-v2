@@ -6,49 +6,46 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
 
 ---
 
+## Current Architecture
+
+The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompts) orchestrated by `AgentRunner`. Per-agent model assignment is handled by `ModelClientRegistry` + `config/agents.py`. The 7 agents are wired in `pipeline.py` via `run_resume_pipeline()`.
+
+### What exists now:
+- `client/model_client.py` — Proper ABC for LLM clients
+- `client/ollama_client.py` — Ollama client with error handling
+- `client/open_ai_client.py` — OpenAI client (no error handling yet)
+- `client/errors.py` — Custom LLM exceptions
+- `client/format_detector.py` — Regex-based document parser with LLM fallback
+- `client/models.py` — `ParsedResume` and `ParsedJobDescription` Pydantic models
+- `client/model_registry.py` — Per-agent model assignment registry
+- `client/templates/` — Jinja2 resume/cover letter templates (no renderer class)
+- `config/agents.py` — Environment-based agent-to-model configuration
+- `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
+- `basic.py` — Single-agent demo
+- `TESTING.md` — Testing guide
+- `sample/` — Sample JDs and resume for testing
+
+---
+
 ## Phase 1: Core Infrastructure
 
 ### 1.1 Refactor `client/model_client.py`
 
-**What exists now:**
-- Abstract `chat()` method with manual `raise NotImplementedError`
-- 8 orphaned pipeline state fields (`_job_description`, `_resume`, etc.) stored as instance attributes with property getters/setters — none are used anywhere
+**Status:** ✅ DONE
 
-**What to do:**
-1. Remove all 8 pipeline state fields and their properties from `ModelClient`. The `chat()` method takes everything it needs as parameters; these attributes are dead code.
-2. Convert to a proper ABC:
-   ```python
-   from abc import ABC, abstractmethod
-
-   class ModelClient(ABC):
-       @abstractmethod
-       async def chat(self, purpose: str, prompt: str, output: list[str], rules: list[str], inputs: list[str]) -> str:
-           ...
-   ```
-3. Keep the class docstring explaining the interface contract.
-4. Remove the `__init__` entirely — subclasses handle their own initialization.
-
-**Files changed:** `client/model_client.py`
+The file is already a clean ABC with `@abstractmethod async def chat(...)`. No orphaned fields or dead code.
 
 ---
 
 ### 1.2 Add error handling to LLM clients
 
-**`client/ollama_client.py`:**
-1. Import `ollama` exceptions: `ollama.ResponseError`, `ollama.ConnectionError`
-2. Wrap the `self.client.chat()` call in try/except:
-   - `ollama.ConnectionError` → raise a custom `LLMConnectionError` with a message like "Cannot connect to Ollama. Is the server running?"
-   - `ollama.ResponseError` → raise `LLMResponseError` with the model name and error detail
-   - `asyncio.TimeoutError` → raise `LLMTimeoutError` with the model name and 90s timeout info
-3. Create a `client/errors.py` module defining these custom exceptions:
-   ```python
-   class LLMError(Exception): ...
-   class LLMConnectionError(LLMError): ...
-   class LLMResponseError(LLMError): ...
-   class LLMTimeoutError(LLMError): ...
-   ```
+**Status:** ⚠️ PARTIAL
 
-**`client/open_ai_client.py`:**
+**`client/errors.py`:** ✅ Done — defines `LLMError`, `LLMConnectionError`, `LLMResponseError`, `LLMTimeoutError`
+
+**`client/ollama_client.py`:** ✅ Done — wraps `ollama.RequestError`, `ollama.ResponseError`, `asyncio.TimeoutError`
+
+**`client/open_ai_client.py`:** ❌ Still needs error handling:
 1. Import `openai` exceptions: `openai.APIError`, `openai.AuthenticationError`, `openai.RateLimitError`, `openai.APIConnectionError`
 2. Wrap the `self.client.chat.completions.create()` call:
    - `openai.AuthenticationError` → raise `LLMError("Invalid OpenAI API key")`
@@ -57,11 +54,13 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
    - `openai.APIError` → raise `LLMResponseError` with the error message
    - `asyncio.TimeoutError` → raise `LLMTimeoutError`
 
-**Files changed:** `client/ollama_client.py`, `client/open_ai_client.py`, new file `client/errors.py`
+**Files to change:** `client/open_ai_client.py`
 
 ---
 
 ### 1.3 Clean up `requirements.txt`
+
+**Status:** ❌ NOT DONE
 
 **What exists now:** A `pip freeze` dump of 128 packages, most unused.
 
@@ -71,6 +70,7 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
    ollama>=0.4.0
    openai>=1.0.0
    pydantic>=2.0.0
+   python-dotenv>=1.0.0
    ```
 2. Create a separate `requirements-dev.txt` for dev/test dependencies if needed later.
 
@@ -82,9 +82,11 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
 
 ### 2.1 Expand `client/format_detector.py`
 
-**What exists now:** Markdown-only regex parser. Extracts: name, title, summary, skills, experience, education from resumes; title, responsibilities, requirements, nice-to-have from JDs.
+**Status:** ⚠️ PARTIAL
 
-**What to add:**
+**What exists now:** Regex-based parser with LLM fallback. Extracts: name, title, summary, skills, experience, education, certifications from resumes; title, responsibilities, requirements, nice_to_have from JDs.
+
+**What's still missing:**
 
 1. **Projects section extraction:**
    ```python
@@ -93,14 +95,7 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
        # Match "## Projects" heading, extract bullet points
    ```
 
-2. **Certifications section extraction:**
-   ```python
-   @staticmethod
-   def _extract_certifications(content: str) -> list[str]:
-       # Match "## Certifications" or "## Certificates" heading
-   ```
-
-3. **Metric extraction from experience bullets:**
+2. **Metric extraction from experience bullets:**
    ```python
    @staticmethod
    def _extract_metrics(text: str) -> list[str]:
@@ -112,7 +107,7 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
        # Returns list of metric strings found in the text
    ```
 
-4. **Keyword extraction (frequency-based):**
+3. **Keyword extraction (frequency-based):**
    ```python
    @staticmethod
    def _extract_keywords(content: str, top_n: int = 20) -> list[str]:
@@ -121,84 +116,53 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
        # Count frequency, return top N meaningful terms
    ```
 
-5. **Plain-text support:**
+4. **Plain-text support:**
    - Detect if content is Markdown (has `## ` patterns) or plain text
    - For plain text: split on blank lines to find sections, look for lines ending with `:` as section headers
    - Add a `_detect_format(content: str) -> str` method returning `"markdown"` or `"plain"`
 
-6. **Update `parse_resume()` return type** to include new fields:
+5. **Update `parse_resume()` return type** to include new fields:
    ```python
-   return {
-       "name": ...,
-       "title": ...,
-       "summary": ...,
-       "skills": ...,
-       "experience": ...,
-       "education": ...,
-       "projects": FormatDetector._extract_projects(content),  # NEW
-       "certifications": FormatDetector._extract_certifications(content),  # NEW
-       "keywords": FormatDetector._extract_keywords(content),  # NEW
-       "raw": content,
-   }
+   return ParsedResume(
+       ...,
+       projects=FormatDetector._extract_projects(content),  # NEW
+       keywords=FormatDetector._extract_keywords(content),  # NEW
+   )
    ```
 
-**Files changed:** `client/format_detector.py`
+**Files changed:** `client/format_detector.py`, `client/models.py` (add `projects` and `keywords` fields to `ParsedResume`)
 
 ---
 
-### 2.2 Create Agent Base Class (`client/agents/base.py`)
+### 2.2 Agent Infrastructure
+
+**Status:** ✅ DONE (different approach than originally planned)
+
+The original plan called for `client/agents/base.py` with a `BaseAgent` ABC. Instead, the codebase uses:
+
+- `PipelineAgent` in `pipeline.py` — generic LLM wrapper with a fixed `purpose` (system prompt)
+- `Agent` Protocol in `pipeline.py` — structural type for any agent with `async run(inputs)`
+- `AgentRunner` in `pipeline.py` — orchestrates named agents with timing/logging
+- `ModelClientRegistry` in `client/model_registry.py` — per-agent model assignment
+- `config/agents.py` — environment-based configuration
+
+**No further work needed** for this phase. The 7 agents will be implemented as `PipelineAgent` instances with specific system prompts, rather than individual agent classes.
+
+---
+
+### 2.3 JD Parsing Agent
+
+**Status:** ❌ NOT DONE (currently uses generic `PipelineAgent`)
+
+**Current state:** `pipeline.py` line 194-203 runs a generic `PipelineAgent` with a basic prompt. This should be enhanced with structured output validation.
 
 **What to do:**
 
-1. Create directory `client/agents/` with `__init__.py`
-
-2. Define `BaseAgent` ABC:
-   ```python
-   from abc import ABC, abstractmethod
-   from typing import Any
-   from client.model_client import ModelClient
-
-   class BaseAgent(ABC):
-       """Base class for all pipeline agents."""
-
-       def __init__(self, client: ModelClient) -> None:
-           self.client = client
-
-       @property
-       @abstractmethod
-       def name(self) -> str:
-           """Agent name for logging."""
-           ...
-
-       @property
-       @abstractmethod
-       def system_prompt(self) -> str:
-           """System prompt sent as the model's role."""
-           ...
-
-       @abstractmethod
-       async def run(self, inputs: dict[str, Any]) -> dict[str, Any]:
-           """Execute the agent and return structured output."""
-           ...
-
-       async def _chat(self, prompt: str, output: list[str], rules: list[str], inputs: list[str]) -> str:
-           """Helper to call the LLM with the agent's system prompt."""
-           return await self.client.chat(
-               purpose=self.system_prompt,
-               prompt=prompt,
-               output=output,
-               rules=rules,
-               inputs=inputs,
-           )
-   ```
-
-**Files changed:** new file `client/agents/base.py`, new file `client/agents/__init__.py`
-
----
-
-### 2.3 Create JD Parsing Agent (`client/agents/jd_parsing.py`)
-
-**Purpose:** Extract structured data from a job description using LLM.
+1. Create `client/agents/jd_parsing.py` with a dedicated agent that:
+   - Uses the system prompt from `bots.md` (see below)
+   - Parses LLM response as JSON
+   - Validates against a `JDParsingOutput` Pydantic model
+   - Falls back to `FormatDetector.parse_job_description()` on failure
 
 **System prompt (from `bots.md`):**
 ```
@@ -250,9 +214,17 @@ class JDParsingOutput(BaseModel):
 
 ---
 
-### 2.4 Create Resume Parsing Agent (`client/agents/resume_parsing.py`)
+### 2.4 Resume Parsing Agent
 
-**Purpose:** Convert a resume into structured JSON.
+**Status:** ❌ NOT DONE (currently uses generic `PipelineAgent`)
+
+**What to do:**
+
+1. Create `client/agents/resume_parsing.py` with a dedicated agent that:
+   - Uses the system prompt from `bots.md`
+   - Parses LLM response as JSON
+   - Validates against a `ResumeParsingOutput` Pydantic model
+   - Falls back to `FormatDetector.parse_resume()` on failure
 
 **System prompt (from `bots.md`):**
 ```
@@ -313,6 +285,8 @@ class ResumeParsingOutput(BaseModel):
 
 ### 3.1 Create Gap Analysis Agent (`client/agents/gap_analysis.py`)
 
+**Status:** ❌ NOT DONE
+
 **Purpose:** Compare parsed JD vs parsed resume, produce a tailoring strategy.
 
 **System prompt (from `bots.md`):**
@@ -365,6 +339,8 @@ class GapAnalysisOutput(BaseModel):
 ---
 
 ### 3.2 Create Resume Rewrite Agent (`client/agents/resume_rewrite.py`)
+
+**Status:** ❌ NOT DONE
 
 **Purpose:** Rewrite the resume using the tailoring strategy.
 
@@ -431,6 +407,8 @@ class RewriteOutput(BaseModel):
 
 ### 3.3 Create ATS Compliance Agent (`client/agents/ats_compliance.py`)
 
+**Status:** ❌ NOT DONE
+
 **Purpose:** Evaluate the rewritten resume for ATS compatibility and fix issues.
 
 **System prompt (from `bots.md`):**
@@ -481,8 +459,6 @@ class ATSComplianceOutput(BaseModel):
 6. Validate experiences are in chronological order (most recent first)
 7. On failure: retry; on second failure, return a default low-score result with the resume unchanged
 
-**Critical fix:** Currently only sends `rewritten[:300]` — must send the FULL resume text so the agent can evaluate keyword coverage, formatting, and section structure across the entire document.
-
 **Files changed:** new file `client/agents/ats_compliance.py`
 
 ---
@@ -490,6 +466,8 @@ class ATSComplianceOutput(BaseModel):
 ## Phase 4: Polish & Cover Letter (Agents 6-7)
 
 ### 4.1 Create Tone Polishing Agent (`client/agents/tone_polishing.py`)
+
+**Status:** ❌ NOT DONE
 
 **Purpose:** Improve tone and professionalism without changing facts.
 
@@ -535,6 +513,8 @@ class TonePolishingOutput(BaseModel):
 ---
 
 ### 4.2 Create Cover Letter Agent (`client/agents/cover_letter.py`)
+
+**Status:** ❌ NOT DONE
 
 **Purpose:** Generate a tailored cover letter.
 
@@ -587,101 +567,43 @@ class CoverLetterOutput(BaseModel):
 
 ### 5.1 Implement `AgentRunner` in `pipeline.py`
 
-**What exists now:** Stub that raises `NotImplementedError`.
+**Status:** ✅ DONE
 
-**What to do:**
+The `AgentRunner` class is fully implemented with:
+- Named agent dispatch with input dictionaries
+- Async execution via `asyncio.run()`
+- Per-agent timing and logging
+- Registry-based agent instantiation
+- Error propagation with logging
 
-1. Store a `ModelClient` instance alongside the agents dict
-2. Implement `run_agent()`:
-   ```python
-   def run_agent(self, name: str, inputs: dict[str, Any]) -> dict[str, Any]:
-       if name not in self.agents:
-           raise KeyError(f"Agent '{name}' not found")
-       agent = self.agents[name]
-       try:
-           result = asyncio.run(agent.run(inputs))
-           return result
-       except Exception as e:
-           logging.error(f"Agent '{name}' failed: {e}")
-           raise
-   ```
-3. Since `run_resume_pipeline` is sync but agents are async, change `run_resume_pipeline` to `async def run_resume_pipeline(...)` and use `await agent.run(inputs)` directly
-4. Add `import logging` and a logger at module level
-5. Add timing: log how long each agent takes
-
-**Files changed:** `pipeline.py`
+**No further work needed.**
 
 ---
 
 ### 5.2 Wire up the 7-agent pipeline
 
-1. Update `client/agents/__init__.py` to export all agents:
-   ```python
-   from client.agents.jd_parsing import JDParsingAgent
-   from client.agents.resume_parsing import ResumeParsingAgent
-   from client.agents.gap_analysis import GapAnalysisAgent
-   from client.agents.resume_rewrite import ResumeRewriteAgent
-   from client.agents.ats_compliance import ATSComplianceAgent
-   from client.agents.tone_polishing import TonePolishingAgent
-   from client.agents.cover_letter import CoverLetterAgent
-   ```
+**Status:** ✅ DONE
 
-2. Update `pipeline.py` `__main__` block to instantiate real agents:
-   ```python
-   from client.ollama_client import OllamaClient
-   from client.agents import (
-       JDParsingAgent, ResumeParsingAgent, GapAnalysisAgent,
-       ResumeRewriteAgent, ATSComplianceAgent, TonePolishingAgent,
-       CoverLetterAgent,
-   )
+`run_resume_pipeline()` chains all 7 agents sequentially:
+1. JD Parsing → `parsed_job_description`
+2. Resume Parsing → `parsed_resume`
+3. Gap Analysis → `tailoring_strategy`
+4. Resume Rewrite → `rewritten_resume`
+5. ATS Compliance → `ats_optimized_resume`
+6. Tone Polishing → `polished_resume`
+7. Cover Letter → `cover_letter`
 
-   client = OllamaClient("qwen3.5")
-   agents = {
-       "jd_parsing_agent": JDParsingAgent(client),
-       "resume_parsing_agent": ResumeParsingAgent(client),
-       "gap_analysis_agent": GapAnalysisAgent(client),
-       "resume_rewrite_agent": ResumeRewriteAgent(client),
-       "ats_compliance_agent": ATSComplianceAgent(client),
-       "tone_polishing_agent": TonePolishingAgent(client),
-       "cover_letter_agent": CoverLetterAgent(client),
-   }
+The pipeline currently uses generic `PipelineAgent` instances. Once individual agent classes are created (Phases 2.3-4.2), they can be swapped in.
 
-   # Example with candidate and company names for output file naming
-   results = run_resume_pipeline(
-       runner, job_description, resume,
-       candidate_name="JohnSmith", company_name="AcmeCorp",
-   )
-   ```
-
-3. Update `run_resume_pipeline` to pass structured data between agents (not raw strings):
-   - Agent 1 output → Agent 3 input (`parsed_job_description`)
-   - Agent 2 output → Agent 3 input (`parsed_resume`)
-   - Agent 3 output → Agent 4 input (`tailoring_strategy`)
-   - Agent 4 output → Agent 5 input (`rewritten_resume`)
-   - Agent 5 output → Agent 6 input (`ats_optimized_resume`)
-   - Agents 1+2+3 output → Agent 7 input
-   - Add `candidate_name: str` and `company_name: str` parameters to `run_resume_pipeline()`
-   - Pass these to `ResumeRenderer.render_all()` for file naming
-
-**Files changed:** `pipeline.py`, `client/agents/__init__.py`
+**Optional improvement:** Add `candidate_name` and `company_name` parameters to `run_resume_pipeline()` for output file naming (see Phase 6.3).
 
 ---
 
 ### 5.3 Deprecate `client/resume_processor.py`
 
-**What to do:**
-1. Add a deprecation warning at the top of `optimize_resume()`:
-   ```python
-   import warnings
-   warnings.warn(
-       "ResumeProcessor is deprecated. Use pipeline.run_resume_pipeline() instead.",
-       DeprecationWarning, stacklevel=2,
-   )
-   ```
-2. Keep it functional for backward compatibility but do not extend it further.
-3. Update `test_real_files.py` to use `pipeline.py` instead.
+**Status:** N/A
 
-**Files changed:** `client/resume_processor.py`, `test_real_files.py`
+`client/resume_processor.py` does not exist. No deprecation needed.
 
 ---
 
@@ -689,7 +611,11 @@ class CoverLetterOutput(BaseModel):
 
 ### 6.1 Add Pydantic models (`client/models.py`)
 
-Create a shared models module with all schemas:
+**Status:** ⚠️ PARTIAL
+
+**What exists now:** `ParsedResume` and `ParsedJobDescription` models.
+
+**What's missing:** All 7 agent output schemas. Add these to `client/models.py`:
 
 ```python
 from pydantic import BaseModel, Field
@@ -753,11 +679,13 @@ class CoverLetterOutput(BaseModel):
     cover_letter: str
 ```
 
-**Files changed:** new file `client/models.py`
+**Files changed:** `client/models.py`
 
 ---
 
 ### 6.2 Add output formatting utilities (`client/formatter.py`)
+
+**Status:** ❌ NOT DONE
 
 Create a formatter that converts structured output to clean documents:
 
@@ -765,7 +693,7 @@ Create a formatter that converts structured output to clean documents:
 def format_resume_markdown(rewrite: RewriteOutput) -> str:
     """Convert structured resume to clean Markdown."""
 
-def format_resume_plain ATS(ats: ATSComplianceOutput) -> str:
+def format_resume_plain(ats: ATSComplianceOutput) -> str:
     """Convert to plain-text ATS-friendly format (no Markdown)."""
 
 def format_cover_letter(text: str) -> str:
@@ -778,13 +706,19 @@ def format_cover_letter(text: str) -> str:
 
 ### 6.3 Add template-based resume output (`client/templates/`)
 
-**Purpose:** Generate the final resume in multiple formats from structured agent output. Templates ensure consistent, ATS-safe formatting rather than relying on raw LLM output.
+**Status:** ⚠️ PARTIAL
+
+**What exists now:** `client/templates/` has 4 Jinja2 template files:
+- `modern.py` — clean lines, bold section headers
+- `classic.py` — traditional format with underlined headers
+- `minimal.py` — whitespace-focused, no decorative elements
+- `cover_letter.py` — professional cover letter format
+
+**What's missing:** A `ResumeRenderer` class to render templates with data.
 
 **What to do:**
 
-1. Create directory `client/templates/` with `__init__.py`
-
-2. Define a `ResumeRenderer` class:
+1. Create `client/templates/renderer.py` with:
    ```python
    from pathlib import Path
    from client.models import RewriteOutput, CoverLetterOutput
@@ -792,8 +726,8 @@ def format_cover_letter(text: str) -> str:
    class ResumeRenderer:
        def __init__(self, template_dir: Path | None = None) -> None: ...
 
-       def render_plaintext(self, resume: RewriteOutput) -> str: ...
-       def render_markdown(self, resume: RewriteOutput) -> str: ...
+       def render_plaintext(self, resume: RewriteOutput, template: str = "modern") -> str: ...
+       def render_markdown(self, resume: RewriteOutput, template: str = "modern") -> str: ...
        def render_docx(self, resume: RewriteOutput, output_path: Path) -> Path: ...
        def render_pdf(self, resume: RewriteOutput, output_path: Path) -> Path: ...
        def render_cover_letter_plaintext(self, letter: CoverLetterOutput) -> str: ...
@@ -813,37 +747,20 @@ def format_cover_letter(text: str) -> str:
        ) -> dict[str, Path]: ...
    ```
 
-3. **Plaintext template:**
-   - Section headers as `UPPERCASE` followed by a blank line
-   - Bullet points as `- item`
-   - No Markdown syntax, no special characters
-   - ATS-safe: no tables, no columns, no images
-
-4. **Markdown template:**
-   - Section headers as `## Section Name`
-   - Bullet points as `- item`
-   - Bold for company names and job titles
-   - Clean, GitHub-flavored Markdown
-
-5. **DOCX generation:**
+2. **DOCX generation:**
    - Use `python-docx` library
    - Professional font (Calibri or Arial), 10-11pt body, 14pt name
    - Section headers in bold, slightly larger
    - 1-inch margins, single spacing
    - Save to `.docx` file
 
-6. **PDF generation:**
+3. **PDF generation:**
    - Use `weasyprint` or `pdfkit` (HTML → PDF pipeline)
    - Render Markdown to HTML first, then convert to PDF
    - Same professional styling as DOCX
    - Save to `.pdf` file
 
-7. **Cover letter rendering:**
-   - Plaintext: plain paragraphs with proper spacing
-   - Markdown: wrapped in a blockquote or plain paragraphs
-   - DOCX/PDF: same professional styling as resume
-
-8. **`render_all` convenience method:**
+4. **`render_all` convenience method:**
    - Takes a `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and output directory
    - Generates all 4 formats for resume + cover letter
    - File names follow the pattern: `{date}_{candidate_name}_{company_name}_{document_type}.{ext}`
@@ -863,45 +780,54 @@ def format_cover_letter(text: str) -> str:
       }
       ```
 
-9. **Add to `requirements.txt`:**
+5. **Add to `requirements.txt`:**
    ```
    python-docx>=1.0.0
    weasyprint>=60.0
    markdown>=3.5
    ```
 
-10. **Wire into pipeline:**
-    - `run_resume_pipeline` gains two new parameters: `candidate_name: str` and `company_name: str`
-    - These are passed through to `ResumeRenderer.render_all()` for file naming
-    - After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()`
-    - Store output paths in the pipeline result dict
+6. **Wire into pipeline:**
+   - `run_resume_pipeline` gains two new parameters: `candidate_name: str` and `company_name: str`
+   - These are passed through to `ResumeRenderer.render_all()` for file naming
+   - After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()`
+   - Store output paths in the pipeline result dict
 
-**Files changed:** new directory `client/templates/`, new files `client/templates/__init__.py`, `client/templates/renderer.py`, `requirements.txt`, `pipeline.py`
+**Files changed:** new file `client/templates/renderer.py`, `requirements.txt`, `pipeline.py`
+
+---
 
 ## Phase 7: Testing & Docs
 
-### 7.1 Update `test_real_files.py`
+### 7.1 Create `test_real_files.py`
 
-1. Switch from `ResumeProcessor` to `pipeline.run_resume_pipeline()`
-2. Assert all 7 output keys are present
-3. Assert `parsed_job_description` has `role_title` and `required_skills`
-4. Assert `parsed_resume` has `experience` as a list
-5. Assert `tailoring_strategy` has `missing_skills`
-6. Assert `ats_optimized_resume` is not empty
-7. Assert `polished_resume` is not empty
-8. Assert `cover_letter` is 250-350 words
-9. Assert experiences are in chronological order (most recent first)
-10. Assert no new experiences were added (compare with input resume)
-11. Assert all certifications from input resume are present in output
-12. Call pipeline with candidate name and company name
-13. Assert output files are created with correct naming pattern
-14. Print summary of results
+**Status:** ❌ NOT DONE
 
-**Files changed:** `test_real_files.py`
+Create an integration test that runs the full pipeline against real files:
+
+1. Read `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt`
+2. Run `run_resume_pipeline()` with both files
+3. Assert all 7 output keys are present
+4. Assert `parsed_job_description` has `role_title` and `required_skills`
+5. Assert `parsed_resume` has `experience` as a list
+6. Assert `tailoring_strategy` has `missing_skills`
+7. Assert `ats_optimized_resume` is not empty
+8. Assert `polished_resume` is not empty
+9. Assert `cover_letter` is 250-350 words
+10. Assert experiences are in chronological order (most recent first)
+11. Assert no new experiences were added (compare with input resume)
+12. Assert all certifications from input resume are present in output
+13. Call pipeline with candidate name and company name
+14. Assert output files are created with correct naming pattern
+15. Print summary of results
+
+**Files changed:** new file `test_real_files.py`
 
 ---
 
 ### 7.2 Add unit tests (`tests/`)
+
+**Status:** ❌ NOT DONE
 
 Create `tests/` directory with:
 
@@ -931,83 +857,93 @@ Create `tests/` directory with:
 
 ### 7.3 Populate `docs/`
 
+**Status:** ❌ NOT DONE
+
+`docs/` directory exists but is empty. Create:
+
 1. **`docs/architecture.md`:** System overview, data flow diagram, agent chain
 2. **`docs/agents.md`:** Each agent's purpose, prompt, input/output schema
 3. **`docs/usage.md`:** How to run the pipeline, configure models, add custom agents
-4. **`docs/api.md`:** `ModelClient`, `BaseAgent`, `AgentRunner` interfaces
+4. **`docs/api.md`:** `ModelClient`, `PipelineAgent`, `AgentRunner` interfaces
 
 **Files changed:** new files `docs/architecture.md`, `docs/agents.md`, `docs/usage.md`, `docs/api.md`
 
 ---
 
-## File Structure (Target)
+## File Structure (Current → Target)
 
 ```
 client/
-  __init__.py
-  errors.py                  # NEW - custom exceptions
-  model_client.py            # MODIFIED - proper ABC
-  ollama_client.py           # MODIFIED - error handling
-  open_ai_client.py          # MODIFIED - error handling
-  format_detector.py         # MODIFIED - expanded parsing
-  resume_processor.py        # MODIFIED - deprecated
-  models.py                  # NEW - Pydantic schemas
-  formatter.py               # NEW - output formatting
-  templates/                 # NEW - resume rendering
-    __init__.py
-    renderer.py              # NEW - multi-format resume output
-  agents/
-    __init__.py              # NEW - agent exports
-    base.py                  # NEW - BaseAgent ABC
-    jd_parsing.py            # NEW - Agent 1
-    resume_parsing.py        # NEW - Agent 2
-    gap_analysis.py          # NEW - Agent 3
-    resume_rewrite.py        # NEW - Agent 4
-    ats_compliance.py        # NEW - Agent 5
-    tone_polishing.py        # NEW - Agent 6
-    cover_letter.py          # NEW - Agent 7
+  __init__.py                      # EXISTS (empty)
+  errors.py                        # EXISTS ✅
+  model_client.py                  # EXISTS ✅
+  model_registry.py                # EXISTS ✅ (not in original todo)
+  ollama_client.py                 # EXISTS ✅
+  open_ai_client.py                # EXISTS ⚠️ needs error handling
+  format_detector.py               # EXISTS ⚠️ needs expansion
+  models.py                        # EXISTS ⚠️ needs agent output schemas
+  templates/                       # EXISTS ⚠️ needs renderer.py
+    __init__.py                    # EXISTS
+    modern.py                      # EXISTS
+    classic.py                     # EXISTS
+    minimal.py                     # EXISTS
+    cover_letter.py                # EXISTS
+    renderer.py                    # NEW - multi-format resume output
+  agents/                          # NEW - dedicated agent classes
+    __init__.py                    # NEW - agent exports
+    jd_parsing.py                  # NEW - Agent 1
+    resume_parsing.py              # NEW - Agent 2
+    gap_analysis.py                # NEW - Agent 3
+    resume_rewrite.py              # NEW - Agent 4
+    ats_compliance.py              # NEW - Agent 5
+    tone_polishing.py              # NEW - Agent 6
+    cover_letter.py                # NEW - Agent 7
+  formatter.py                     # NEW - output formatting
+config/
+  __init__.py                      # EXISTS (empty)
+  agents.py                        # EXISTS ✅ (not in original todo)
 tests/
-  __init__.py                # NEW
-  test_format_detector.py    # NEW
-  test_agents.py             # NEW
-  test_pipeline.py           # NEW
+  __init__.py                      # NEW
+  test_format_detector.py          # NEW
+  test_agents.py                   # NEW
+  test_pipeline.py                 # NEW
 docs/
-  architecture.md            # NEW
-  agents.md                  # NEW
-  usage.md                   # NEW
-  api.md                     # NEW
-pipeline.py                  # MODIFIED - working orchestration
-basic.py                     # UNCHANGED
-test_real_files.py           # MODIFIED - uses pipeline
-resume-todo.md               # THIS FILE
-bots.md                      # UNCHANGED (reference)
-requirements.txt             # MODIFIED - clean deps
+  architecture.md                  # NEW
+  agents.md                        # NEW
+  usage.md                         # NEW
+  api.md                           # NEW
+pipeline.py                        # EXISTS ✅
+basic.py                           # EXISTS ✅
+test_real_files.py                 # NEW
+resume-todo.md                     # THIS FILE
+bots.md                            # UNCHANGED (reference)
+requirements.txt                   # ⚠️ needs cleanup
+sample/                            # EXISTS ✅
+  jobs/                            # 2 sample JDs
+  resume/                          # 1 sample resume
+TESTING.md                         # EXISTS ✅
 ```
 
 ---
 
 ## Execution Order
 
-| Step | Phase | Depends On | Estimated Files Changed |
-|------|-------|------------|------------------------|
-| 1 | Phase 1.1: Refactor ModelClient | None | 1 |
-| 2 | Phase 1.2: Error handling + errors.py | Step 1 | 4 |
-| 3 | Phase 1.3: Clean requirements.txt | None | 1 |
-| 4 | Phase 2.1: Expand FormatDetector | None | 1 |
-| 5 | Phase 2.2: BaseAgent + agents/ | Step 1 | 2 |
-| 6 | Phase 2.3: JD Parsing Agent | Steps 4, 5 | 1 |
-| 7 | Phase 2.4: Resume Parsing Agent | Steps 4, 5 | 1 |
-| 8 | Phase 3.1: Gap Analysis Agent | Steps 5, 6, 7 | 1 |
-| 9 | Phase 3.2: Resume Rewrite Agent | Steps 5, 7, 8 | 1 |
-| 10 | Phase 3.3: ATS Compliance Agent | Steps 5, 9 | 1 |
-| 11 | Phase 4.1: Tone Polishing Agent | Steps 5, 10 | 1 |
-| 12 | Phase 4.2: Cover Letter Agent | Steps 5, 6, 7, 8 | 1 |
-| 13 | Phase 5.1: Implement AgentRunner | Steps 2, 5-12 | 1 |
-| 14 | Phase 5.2: Wire up pipeline | Steps 6-12, 13 | 2 |
-| 15 | Phase 5.3: Deprecate resume_processor | Step 14 | 2 |
-| 16 | Phase 6.1: Pydantic models | Steps 6-12 | 1 |
-| 17 | Phase 6.2: Output formatter | Step 16 | 1 |
-| 18 | Phase 6.3: Template renderer | Steps 16, 17 | 4 |
-| 19 | Phase 7.1: Update test_real_files | Steps 14, 18 | 1 |
-| 20 | Phase 7.2: Unit tests | Steps 16, 17, 18 | 3 |
-| 21 | Phase 7.3: Documentation | All | 4 |
+| Step | Phase | Status | Depends On | Estimated Files Changed |
+|------|-------|--------|------------|------------------------|
+| 1 | Phase 1.2: OpenAI error handling | ❌ TODO | None | 1 |
+| 2 | Phase 1.3: Clean requirements.txt | ❌ TODO | None | 1 |
+| 3 | Phase 2.1: Expand FormatDetector | ⚠️ PARTIAL | None | 2 |
+| 4 | Phase 6.1: Agent output models | ❌ TODO | None | 1 |
+| 5 | Phase 2.3: JD Parsing Agent | ❌ TODO | Steps 3, 4 | 1 |
+| 6 | Phase 2.4: Resume Parsing Agent | ❌ TODO | Steps 3, 4 | 1 |
+| 7 | Phase 3.1: Gap Analysis Agent | ❌ TODO | Steps 4, 5, 6 | 1 |
+| 8 | Phase 3.2: Resume Rewrite Agent | ❌ TODO | Steps 4, 6, 7 | 1 |
+| 9 | Phase 3.3: ATS Compliance Agent | ❌ TODO | Steps 4, 8 | 1 |
+| 10 | Phase 4.1: Tone Polishing Agent | ❌ TODO | Steps 4, 9 | 1 |
+| 11 | Phase 4.2: Cover Letter Agent | ❌ TODO | Steps 4, 5, 6, 7 | 1 |
+| 12 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 5-11 | 1 |
+| 13 | Phase 6.2: Output formatter | ❌ TODO | Step 4 | 1 |
+| 14 | Phase 6.3: Template renderer | ❌ TODO | Steps 4, 13 | 2 |
+| 15 | Phase 7.1: test_real_files.py | ❌ TODO | Steps 12, 14 | 1 |
+| 16 | Phase 7.2: Unit tests | ❌ TODO | Steps 4, 13, 14 | 3 |
+| 17 | Phase 7.3: Documentation | ❌ TODO | All | 4 |
