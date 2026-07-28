@@ -68,6 +68,7 @@ Replaced 128-line pip freeze dump with 3 direct dependencies: `ollama`, `openai`
 **Status:** ✅ DONE
 
 **Implemented:**
+
 - `_extract_projects()` — extracts bullet points from `## Projects` section
 - `_extract_metrics()` — regex for percentages, dollar amounts, team sizes, timeframes
 - `_extract_keywords()` — frequency-based keyword extraction with stopword filtering (top 20)
@@ -111,7 +112,8 @@ The original plan called for `client/agents/base.py` with a `BaseAgent` ABC. Ins
    - Falls back to `FormatDetector.parse_job_description()` on failure
 
 **System prompt (from `bots.md`):**
-```
+
+```plaintext
 You are the Job Description Parsing Agent. Your task is to extract structured, machine-readable information from a job description.
 Produce a JSON object with the following fields:
 - role_title
@@ -131,11 +133,13 @@ Follow these rules:
 ```
 
 **Input schema:**
+
 ```python
 inputs = {"job_description": str}
 ```
 
 **Output schema (Pydantic model):**
+
 ```python
 class JDParsingOutput(BaseModel):
     role_title: str
@@ -151,6 +155,7 @@ class JDParsingOutput(BaseModel):
 ```
 
 **Implementation:**
+
 1. Build user prompt: `f"Extract structured data from this job description:\n\n{inputs['job_description']}"`
 2. Call `self._chat(prompt, output=["json"], rules=["Output only valid JSON", "Do not add information not present in the JD"], inputs=[inputs["job_description"]])`
 3. Parse LLM response as JSON
@@ -175,7 +180,8 @@ class JDParsingOutput(BaseModel):
    - Falls back to `FormatDetector.parse_resume()` on failure
 
 **System prompt (from `bots.md`):**
-```
+
+```plaintext
 You are the Resume Parsing Agent. Your job is to convert a resume into structured JSON.
 Extract the following fields:
 - summary
@@ -193,11 +199,13 @@ Rules:
 ```
 
 **Input schema:**
+
 ```python
 inputs = {"resume": str}
 ```
 
 **Output schema (Pydantic model):**
+
 ```python
 class ExperienceEntry(BaseModel):
     title: str
@@ -218,6 +226,7 @@ class ResumeParsingOutput(BaseModel):
 ```
 
 **Implementation:**
+
 1. Pre-process with `FormatDetector.parse_resume()` to get a rough structure
 2. Build user prompt with the full resume text
 3. Call LLM with the system prompt
@@ -239,7 +248,8 @@ class ResumeParsingOutput(BaseModel):
 **Purpose:** Compare parsed JD vs parsed resume, produce a tailoring strategy.
 
 **System prompt (from `bots.md`):**
-```
+
+```plaintext
 You are the Gap Analysis Agent.
 Using the parsed job description and parsed resume, produce a Tailoring Strategy with:
 - missing_skills
@@ -257,6 +267,7 @@ Rules:
 ```
 
 **Input schema:**
+
 ```python
 inputs = {
     "parsed_job_description": JDParsingOutput,  # serialized dict
@@ -265,6 +276,7 @@ inputs = {
 ```
 
 **Output schema (Pydantic model):**
+
 ```python
 class GapAnalysisOutput(BaseModel):
     missing_skills: list[str]
@@ -277,6 +289,7 @@ class GapAnalysisOutput(BaseModel):
 ```
 
 **Implementation:**
+
 1. Serialize both parsed inputs to JSON strings for the prompt
 2. Build prompt: combine system prompt + serialized JD + serialized resume
 3. Call LLM
@@ -294,7 +307,8 @@ class GapAnalysisOutput(BaseModel):
 **Purpose:** Rewrite the resume using the tailoring strategy.
 
 **System prompt (from `bots.md`):**
-```
+
+```plaintext
 You are the Resume Rewrite Agent.
 Rewrite the resume using the Tailoring Strategy.
 Output a full resume with:
@@ -321,6 +335,7 @@ Rules:
 ```
 
 **Input schema:**
+
 ```python
 inputs = {
     "parsed_resume": ResumeParsingOutput,
@@ -329,6 +344,7 @@ inputs = {
 ```
 
 **Output schema (Pydantic model):**
+
 ```python
 class RewriteOutput(BaseModel):
     summary: str
@@ -340,6 +356,7 @@ class RewriteOutput(BaseModel):
 ```
 
 **Implementation:**
+
 1. Serialize parsed resume and tailoring strategy to JSON
 2. Build prompt combining both inputs
 3. Call LLM
@@ -361,7 +378,8 @@ class RewriteOutput(BaseModel):
 **Purpose:** Evaluate the rewritten resume for ATS compatibility and fix issues.
 
 **System prompt (from `bots.md`):**
-```
+
+```plaintext
 You are the ATS Compliance Agent.
 Evaluate the rewritten resume for ATS compatibility.
 Output a JSON object with:
@@ -383,11 +401,13 @@ Rules:
 ```
 
 **Input schema:**
+
 ```python
 inputs = {"rewritten_resume": RewriteOutput}
 ```
 
 **Output schema (Pydantic model):**
+
 ```python
 class ATSComplianceOutput(BaseModel):
     ats_score: int  # 0-100
@@ -400,6 +420,7 @@ class ATSComplianceOutput(BaseModel):
 ```
 
 **Implementation:**
+
 1. Serialize the full rewritten resume (not truncated!) to the prompt
 2. Call LLM
 3. Parse and validate JSON
@@ -421,7 +442,8 @@ class ATSComplianceOutput(BaseModel):
 **Purpose:** Improve tone and professionalism without changing facts.
 
 **System prompt (from `bots.md`):**
-```
+
+```plaintext
 You are the Tone Polishing Agent.
 Improve the tone of the resume while preserving meaning.
 Apply:
@@ -438,17 +460,20 @@ Rules:
 ```
 
 **Input schema:**
+
 ```python
 inputs = {"ats_optimized_resume": ATSComplianceOutput.final_resume}
 ```
 
 **Output schema (Pydantic model):**
+
 ```python
 class TonePolishingOutput(BaseModel):
     polished_resume: str  # Full polished resume text
 ```
 
 **Implementation:**
+
 1. Receive the `final_resume` string from ATS compliance output
 2. Build prompt with the full resume text
 3. Call LLM
@@ -468,7 +493,8 @@ class TonePolishingOutput(BaseModel):
 **Purpose:** Generate a tailored cover letter.
 
 **System prompt (from `bots.md`):**
-```
+
+```plaintext
 You are the Cover Letter Tailoring Agent.
 Using the job description, parsed resume, and tailoring strategy, write a compelling, personalized cover letter.
 Include:
@@ -482,10 +508,11 @@ Include:
 Rules:
 - Maintain professional tone.
 - Do not fabricate achievements.
-- Keep length between 250-350 words.
+- Keep length between 450-600 words.
 ```
 
 **Input schema:**
+
 ```python
 inputs = {
     "parsed_job_description": JDParsingOutput,
@@ -495,12 +522,14 @@ inputs = {
 ```
 
 **Output schema (Pydantic model):**
+
 ```python
 class CoverLetterOutput(BaseModel):
     cover_letter: str  # 250-350 word cover letter
 ```
 
 **Implementation:**
+
 1. Serialize all three inputs to JSON strings
 2. Build prompt combining them
 3. Call LLM
@@ -519,6 +548,7 @@ class CoverLetterOutput(BaseModel):
 **Status:** ✅ DONE
 
 The `AgentRunner` class is fully implemented with:
+
 - Named agent dispatch with input dictionaries
 - Async execution via `asyncio.run()`
 - Per-agent timing and logging
@@ -534,6 +564,7 @@ The `AgentRunner` class is fully implemented with:
 **Status:** ✅ DONE
 
 `run_resume_pipeline()` chains all 7 agents sequentially:
+
 1. JD Parsing → `parsed_job_description`
 2. Resume Parsing → `parsed_resume`
 3. Gap Analysis → `tailoring_strategy`
@@ -668,6 +699,7 @@ def format_cover_letter(text: str) -> str:
 **Status:** ⚠️ PARTIAL
 
 **What exists now:** `client/templates/` has 4 Jinja2 template files:
+
 - `modern.py` — clean lines, bold section headers
 - `classic.py` — traditional format with underlined headers
 - `minimal.py` — whitespace-focused, no decorative elements
@@ -678,6 +710,7 @@ def format_cover_letter(text: str) -> str:
 **What to do:**
 
 1. Create `client/templates/renderer.py` with:
+
    ```python
    from pathlib import Path
    from client.models import RewriteOutput, CoverLetterOutput
@@ -738,6 +771,7 @@ def format_cover_letter(text: str) -> str:
    - Date format: `YYYYMMDD_HHMM`
    - Example: `20260727_1430_JohnSmith_AcmeCorp_Resume.pdf`
    - Returns a dict mapping format name to file path:
+
       ```python
       {
           "plaintext": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.txt",
@@ -755,13 +789,15 @@ def format_cover_letter(text: str) -> str:
       ```
 
 5. **Add to `requirements.txt`:**
-   ```
+
+   ```plaintext
    python-docx>=1.0.0
    weasyprint>=60.0
    markdown>=3.5
    ```
 
-6. **Wire into pipeline:**
+7. **Wire into pipeline:**
+
    - `run_resume_pipeline` gains two new parameters: `candidate_name: str` and `company_name: str`
    - These are passed through to `ResumeRenderer.render_all()` for file naming
    - After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()`
@@ -804,12 +840,14 @@ Create an integration test that runs the full pipeline against real files:
 **Status:** ⚠️ PARTIAL
 
 **What exists now:** `tests/test_format_detector.py` with 46 tests covering:
+
 - All `FormatDetector` static extraction methods (name, title, section, list, bullet points)
 - New Phase 2.1 methods (projects, metrics, keywords, format detection)
 - `_safe_json` and insufficiency checks
 - `parse_resume()` and `parse_job_description()` async flows (regex-only mode)
 
 **Still needed:**
+
 - `tests/test_agents.py` — mock `ModelClient`, verify prompts and JSON validation
 - `tests/test_pipeline.py` — end-to-end with mocked agents
 
@@ -834,7 +872,7 @@ Create an integration test that runs the full pipeline against real files:
 
 ## File Structure (Current → Target)
 
-```
+```plaintext
 client/
   __init__.py                      # EXISTS (empty)
   errors.py                        # EXISTS ✅
@@ -903,7 +941,7 @@ TESTING.md                         # EXISTS ✅
 ## Execution Order
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
-|------|-------|--------|------------|------------------------|
+| ------ | ------- | -------- | ------------ | ------------------------ |
 | 1 | Phase 1.2: OpenAI error handling | ✅ DONE | None | 1 |
 | 2 | Phase 1.3: Clean requirements.txt | ✅ DONE | None | 1 |
 | 3 | Phase 2.1: Expand FormatDetector | ✅ DONE | None | 2 |
