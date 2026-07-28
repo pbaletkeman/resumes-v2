@@ -1,4 +1,4 @@
-gitrrrrr# Testing Guide
+# Testing Guide
 
 ## Prerequisites
 
@@ -7,6 +7,7 @@ gitrrrrr# Testing Guide
    ```bash
    ollama pull qwen3.5
    ```
+3. **uv installed** — run `uv sync` to set up the venv
 
 ---
 
@@ -15,7 +16,7 @@ gitrrrrr# Testing Guide
 Test the single-agent LLM call:
 
 ```bash
-python basic.py
+uv run python basic.py
 ```
 
 Expected: prints "Agent: Paris" (or similar geography answer).
@@ -26,9 +27,8 @@ Expected: prints "Agent: Paris" (or similar geography answer).
 
 Test document parsing without LLM:
 
-```python
-# python -m lets you run inline code against the project
-python -c "
+```bash
+uv run python -c "
 import asyncio
 from client.format_detector import FormatDetector
 
@@ -46,8 +46,8 @@ print('Experience entries:', len(result.experience))
 
 Test JD parsing:
 
-```python
-python -c "
+```bash
+uv run python -c "
 import asyncio
 from client.format_detector import FormatDetector
 
@@ -69,7 +69,7 @@ print('Requirements:', result.requirements)
 Uses `PipelineAgent` wrappers around Ollama — runs all 7 agents sequentially:
 
 ```bash
-python pipeline.py
+uv run python pipeline.py
 ```
 
 This will:
@@ -140,19 +140,16 @@ Replace `jd_parsing` / `JDParsingAgent` with whichever agent you're testing.
 
 Test per-agent model assignment:
 
-```python
-from config.agents import get_model_summary
-
-for agent in get_model_summary():
-    print(f"{agent['agent']}: {agent['provider']}/{agent['model']}")
+```bash
+uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"
 ```
 
 Override a specific agent's model via environment variable:
 
 ```bash
-set COVER_LETTER_AGENT_MODEL=gpt-4o
-set COVER_LETTER_AGENT_PROVIDER=openai
-python -c "from config.agents import get_model_summary; print([a for a in get_model_summary() if 'cover' in a['agent']])"
+$env:COVER_LETTER_AGENT_MODEL = "gpt-4o"
+$env:COVER_LETTER_AGENT_PROVIDER = "openai"
+uv run python -c "from config.agents import get_model_summary; print([a for a in get_model_summary() if 'cover' in a['agent']])"
 ```
 
 ---
@@ -162,11 +159,35 @@ python -c "from config.agents import get_model_summary; print([a for a in get_mo
 If using OpenAI instead of Ollama:
 
 ```bash
-set MODEL_PROVIDER=openai
-set MODEL_NAME=gpt-4o-mini
-set OPENAI_API_KEY=sk-...
-python basic.py
+$env:MODEL_PROVIDER = "openai"
+$env:MODEL_NAME = "gpt-4o-mini"
+$env:OPENAI_API_KEY = "sk-..."
+uv run python basic.py
 ```
+
+---
+
+## 7. Unit Tests (pytest)
+
+Run the full test suite:
+
+```bash
+uv run pytest
+```
+
+Verbose output:
+
+```bash
+uv run pytest -v
+```
+
+Single file:
+
+```bash
+uv run pytest tests/test_format_detector.py
+```
+
+Currently 46 tests covering `FormatDetector` regex parsing.
 
 ---
 
@@ -174,9 +195,10 @@ python basic.py
 
 | What to test | Command |
 |---|---|
-| Basic agent | `python basic.py` |
+| Basic agent | `uv run python basic.py` |
 | Resume parsing (regex) | See section 2 |
-| Full pipeline | `python pipeline.py` |
+| Full pipeline | `uv run python pipeline.py` |
 | Individual agent | See section 4 |
 | Model config | See section 5 |
 | OpenAI provider | See section 6 |
+| Unit tests | `uv run pytest` |

@@ -8,24 +8,25 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 
 - Ollama running on `localhost:11434`
 - Model pulled: `ollama pull qwen3.5`
-- Python venv in `.venv/` (activate before running)
+- uv installed (`uv sync` to set up venv)
 
 ## Quick commands
 
 | What | Command |
 |---|---|
-| Basic agent test | `python basic.py` |
-| Full 7-agent pipeline | `python pipeline.py` |
+| Install/sync deps | `uv sync` |
+| Basic agent test | `uv run python basic.py` |
+| Full 7-agent pipeline | `uv run python pipeline.py` |
 | Regex parsing test (no LLM) | See `TESTING.md` section 2 |
-| Check which model each agent uses | `python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
-| Lint | `ruff check .` |
-| Lint (auto-fix) | `ruff check --fix .` |
-| Format check | `ruff format --check .` |
-| Format (auto-fix) | `ruff format .` |
-| Typecheck | `pyright .` |
-| Test | `pytest` |
-| Test (verbose) | `pytest -v` |
-| Test (single file) | `pytest tests/test_format_detector.py` |
+| Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
+| Lint | `uv run ruff check .` |
+| Lint (auto-fix) | `uv run ruff check --fix .` |
+| Format check | `uv run ruff format --check .` |
+| Format (auto-fix) | `uv run ruff format .` |
+| Typecheck | `uv run pyright .` |
+| Test | `uv run pytest` |
+| Test (verbose) | `uv run pytest -v` |
+| Test (single file) | `uv run pytest tests/test_format_detector.py` |
 
 No CI is configured. No `Makefile` exists.
 
@@ -74,7 +75,7 @@ All 7 agents are currently `PipelineAgent` stubs (generic LLM wrappers). Dedicat
 
 ## Testing
 
-pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/`. Currently covers `FormatDetector` regex parsing (32 tests). Sample files in `sample/jobs/` and `sample/resume/`.
+pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/`. Currently covers `FormatDetector` regex parsing (46 tests). Sample files in `sample/jobs/` and `sample/resume/`.
 
 ## Status
 
