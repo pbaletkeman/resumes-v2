@@ -6,28 +6,120 @@ Defines ``AgentRunner`` (a placeholder for agent orchestration) and
 ``run_resume_pipeline``, which chains 7 specialized agents to transform
 a raw job description and resume into an ATS-optimized resume and
 tailored cover letter.
+
+Supports per-agent model assignment via ``ModelClientRegistry``.
 """
 
-from typing import Any
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from collections.abc import Mapping
+from typing import Any, Protocol
+
+from client.model_client import ModelClient
+from client.model_registry import ModelClientRegistry
+from config.agents import build_registry
+
+logger = logging.getLogger(__name__)
+
+class Agent(Protocol):
+    """Structural type for any agent usable with ``AgentRunner``.
+
+    Any object implementing ``run(inputs) -> Any`` satisfies this protocol.
+    ``PipelineAgent`` is the built-in implementation; custom agents (e.g.
+    thin wrappers around ``SimpleAgent``) can be used as long as they
+    conform to this signature.
+    """
+
+    async def run(self, inputs: dict[str, Any]) -> Any:
+        """Execute the agent with the given inputs.
+
+        Args:
+            inputs: Dictionary of input data for the agent.  Keys and
+                values depend on the concrete implementation.
+
+        Returns:
+            Agent-specific output; typically a dict with result fields.
+        """
+
+
+class PipelineAgent:
+    """Agent that delegates to a ``ModelClient`` with a fixed purpose.
+
+    Conforms to the ``Agent`` Protocol so it can be used with ``AgentRunner``.
+
+    Args:
+        client: An LLM client implementing ``ModelClient.chat``.
+        purpose: System-level role or persona for this agent.
+    """
+
+    def __init__(self, client: ModelClient, purpose: str) -> None:
+        """Initialize the agent with a model client and fixed purpose.
+
+        Args:
+            client: An LLM client implementing ``ModelClient.chat``.
+            purpose: System-level role or persona used for every ``chat``
+                call this agent makes.
+        """
+        self.client = client
+        self.purpose = purpose
+
+    async def run(self, inputs: dict[str, Any]) -> Any:
+        """Execute the agent by forwarding inputs to the model client.
+
+        The ``inputs`` dict is split into structured LLM parameters
+        (``prompt``, ``output``, ``rules``) and domain-specific context
+        keys, which are serialised into a list of ``"key: value"`` strings.
+
+        Args:
+            inputs: Must contain at least ``"prompt"``.  Optional keys:
+                ``"output"`` (list of expected field names),
+                ``"rules"`` (list of constraints), plus any additional
+                domain-specific keys that become context strings.
+
+        Returns:
+            The raw text response from the model client.
+        """
+        prompt = inputs.get("prompt", "")
+        output = inputs.get("output", [])
+        rules = inputs.get("rules", [])
+        context = [f"{k}: {v}" for k, v in inputs.items() if k not in ("prompt", "output", "rules")]
+        return await self.client.chat(self.purpose, prompt, output, rules, context)
 
 
 class AgentRunner:
     """Dispatches named agents with input dictionaries.
 
-    This is a minimal abstraction intended to be replaced with a real
-    agent orchestration backend (e.g. Azure AI Foundry, LangGraph).
+    Supports two modes of operation:
+
+    1. **Pre-instantiated agents**: Pass agents with their ``ModelClient``
+       already assigned via constructor.
+    2. **Registry-based**: Pass agent classes and a ``ModelClientRegistry``,
+       and the runner will instantiate each agent with the correct client.
 
     Args:
         agents: Mapping of agent names to agent instances or callables.
+        registry: Optional ``ModelClientRegistry`` for per-agent model
+            assignment. If provided, agent classes can be passed as values
+            and will be instantiated with the appropriate client.
     """
 
-    def __init__(self, agents: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        agents: Mapping[str, Agent | None],
+        registry: ModelClientRegistry | None = None,
+    ) -> None:
         """Initialize the runner with a set of named agents.
 
         Args:
-            agents: Dictionary mapping agent names to agent objects.
+            agents: Dictionary mapping agent names to agent objects or
+                agent classes (if ``registry`` is provided).
+            registry: Optional registry for per-agent model assignment.
         """
-        self.agents = agents
+        self.agents = dict(agents)
+        self.registry = registry
 
     def run_agent(self, name: str, inputs: dict[str, Any]) -> dict[str, Any]:
         """Run a named agent with the given inputs.
@@ -45,10 +137,40 @@ class AgentRunner:
         """
         if name not in self.agents:
             raise KeyError(f"Agent '{name}' not found")
-        # Pseudocode: adapt to your SDK
-        # result = agent.run(inputs=inputs)
-        # return result
-        raise NotImplementedError("Integrate with Agent Foundry here.")
+
+        agent = self.agents[name]
+        if agent is None:
+            raise TypeError(f"Agent '{name}' is None (not instantiated)")
+        logger.info("Running agent: %s", name)
+        start = time.monotonic()
+
+        # If agent is a class (not instantiated), instantiate with registry client
+        if isinstance(agent, type) and self.registry is not None:
+            client = self.registry.get_client_for_agent(name)
+            agent = agent(client)
+            self.agents[name] = agent  # Cache the instance
+
+        try:
+            result: dict[str, Any] = asyncio.run(agent.run(inputs))
+            elapsed = time.monotonic() - start
+            logger.info("Agent %s completed in %.1fs", name, elapsed)
+            return result
+        except Exception as e:
+            logger.error("Agent '%s' failed: %s", name, e)
+            raise
+
+    def get_client_for_agent(self, name: str) -> ModelClient | None:
+        """Get the model client assigned to a specific agent.
+
+        Args:
+            name: The agent name.
+
+        Returns:
+            The ``ModelClient`` for this agent, or ``None`` if no registry.
+        """
+        if self.registry is None:
+            return None
+        return self.registry.get_client_for_agent(name)
 
 
 def run_resume_pipeline(
@@ -57,15 +179,6 @@ def run_resume_pipeline(
     resume: str,
 ) -> dict[str, Any]:
     """Run the full 7-agent resume optimization pipeline.
-
-    Pipeline stages:
-        1. **JD Parsing** — Extract structured data from the job description.
-        2. **Resume Parsing** — Extract structured data from the resume.
-        3. **Gap Analysis** — Compare JD vs resume, produce a tailoring strategy.
-        4. **Resume Rewrite** — Rewrite the resume using the tailoring strategy.
-        5. **ATS Compliance** — Optimize for applicant tracking systems.
-        6. **Tone Polishing** — Improve professional tone and clarity.
-        7. **Cover Letter** — Generate a tailored cover letter.
 
     Args:
         runner: An ``AgentRunner`` instance with all 7 agents registered.
@@ -80,14 +193,24 @@ def run_resume_pipeline(
     # 1. JD Parsing Agent
     jd_result = runner.run_agent(
         "jd_parsing_agent",
-        {"job_description": job_description},
+        {
+            "prompt": "Extract structured data from this job description.",
+            "output": ["parsed_job_description"],
+            "rules": ["Return valid JSON"],
+            "job_description": job_description,
+        },
     )
     parsed_job_description = jd_result["parsed_job_description"]
 
     # 2. Resume Parsing Agent
     resume_result = runner.run_agent(
         "resume_parsing_agent",
-        {"resume": resume},
+        {
+            "prompt": "Extract structured data from this resume.",
+            "output": ["parsed_resume"],
+            "rules": ["Return valid JSON"],
+            "resume": resume,
+        },
     )
     parsed_resume = resume_result["parsed_resume"]
 
@@ -95,6 +218,9 @@ def run_resume_pipeline(
     gap_result = runner.run_agent(
         "gap_analysis_agent",
         {
+            "prompt": "Compare the job description and resume. Produce a tailoring strategy.",
+            "output": ["tailoring_strategy"],
+            "rules": ["Be specific and actionable"],
             "parsed_job_description": parsed_job_description,
             "parsed_resume": parsed_resume,
         },
@@ -105,6 +231,9 @@ def run_resume_pipeline(
     rewrite_result = runner.run_agent(
         "resume_rewrite_agent",
         {
+            "prompt": "Rewrite the resume to match the job requirements using this strategy.",
+            "output": ["rewritten_resume"],
+            "rules": ["Keep formatting", "Use strong action verbs"],
             "parsed_resume": parsed_resume,
             "tailoring_strategy": tailoring_strategy,
         },
@@ -114,7 +243,12 @@ def run_resume_pipeline(
     # 5. ATS Compliance Agent
     ats_result = runner.run_agent(
         "ats_compliance_agent",
-        {"rewritten_resume": rewritten_resume},
+        {
+            "prompt": "Check and optimize this resume for ATS systems.",
+            "output": ["ats_optimized_resume"],
+            "rules": ["Maintain content accuracy", "Optimize keywords"],
+            "rewritten_resume": rewritten_resume,
+        },
     )
     ats_optimized_resume = ats_result.get("ats_optimized_resume") or ats_result.get(
         "final_resume"
@@ -123,7 +257,12 @@ def run_resume_pipeline(
     # 6. Tone Polishing Agent
     tone_result = runner.run_agent(
         "tone_polishing_agent",
-        {"ats_optimized_resume": ats_optimized_resume},
+        {
+            "prompt": "Polish the tone and clarity of this resume.",
+            "output": ["polished_resume"],
+            "rules": ["Maintain professional tone", "Be concise"],
+            "ats_optimized_resume": ats_optimized_resume,
+        },
     )
     polished_resume = tone_result["polished_resume"]
 
@@ -131,6 +270,9 @@ def run_resume_pipeline(
     cover_result = runner.run_agent(
         "cover_letter_agent",
         {
+            "prompt": "Generate a tailored cover letter for this job application.",
+            "output": ["cover_letter"],
+            "rules": ["Match the resume tone", "Address key requirements"],
             "parsed_job_description": parsed_job_description,
             "parsed_resume": parsed_resume,
             "tailoring_strategy": tailoring_strategy,
@@ -149,28 +291,82 @@ def run_resume_pipeline(
     }
 
 
-if __name__ == "__main__":
-    # Example usage: wire in your actual agents here.
-    agents = {
-        "jd_parsing_agent": None,
-        "resume_parsing_agent": None,
-        "gap_analysis_agent": None,
-        "resume_rewrite_agent": None,
-        "ats_compliance_agent": None,
-        "tone_polishing_agent": None,
-        "cover_letter_agent": None,
+def create_runner_from_config(
+    agent_classes: dict[str, Any] | None = None,
+) -> AgentRunner:
+    """Create an ``AgentRunner`` using environment-based configuration.
+
+    Reads model assignments from environment variables (see ``config.agents``
+    for details) and builds a ``ModelClientRegistry`` with per-agent clients.
+
+    Args:
+        agent_classes: Optional mapping of agent names to agent classes.
+            If ``None``, returns a runner with empty agents (for manual setup).
+
+    Returns:
+        A configured ``AgentRunner`` with the registry attached.
+
+    Example::
+
+        from config.agents import build_registry
+        from client.agents import (
+            JDParsingAgent, ResumeParsingAgent, GapAnalysisAgent,
+            ResumeRewriteAgent, ATSComplianceAgent, TonePolishingAgent,
+            CoverLetterAgent,
+        )
+
+        registry = build_registry()
+        agents = {
+            "jd_parsing_agent": JDParsingAgent,
+            "resume_parsing_agent": ResumeParsingAgent,
+            "gap_analysis_agent": GapAnalysisAgent,
+            "resume_rewrite_agent": ResumeRewriteAgent,
+            "ats_compliance_agent": ATSComplianceAgent,
+            "tone_polishing_agent": TonePolishingAgent,
+            "cover_letter_agent": CoverLetterAgent,
+        }
+        runner = AgentRunner(agents, registry=registry)
+    """
+    registry = build_registry()
+    return AgentRunner(agent_classes or {}, registry=registry)
+
+
+def sample_run() -> None:
+    """Demonstrate the full resume optimization pipeline end-to-end.
+
+    Creates a ``PipelineAgent`` for each of the 7 pipeline stages, all backed
+    by a single Ollama ``qwen3.5`` client.  The agents are wired into an
+    ``AgentRunner`` and executed sequentially via ``run_resume_pipeline``.
+
+    Replace the placeholder JD and resume text with real content to see
+    meaningful output.
+    """
+    from client.ollama_client import OllamaClient
+
+    client = OllamaClient("qwen3.5")
+
+    agents_map = {
+        "jd_parsing_agent": PipelineAgent(client, "Extract structured data from job descriptions"),
+        "resume_parsing_agent": PipelineAgent(client, "Extract structured data from resumes"),
+        "gap_analysis_agent": PipelineAgent(client, "Compare JD vs resume, produce a tailoring strategy"),
+        "resume_rewrite_agent": PipelineAgent(client, "Rewrite resume to match job requirements"),
+        "ats_compliance_agent": PipelineAgent(client, "Check and optimize resume for ATS systems"),
+        "tone_polishing_agent": PipelineAgent(client, "Polish resume tone and clarity"),
+        "cover_letter_agent": PipelineAgent(client, "Generate tailored cover letters"),
     }
 
-    runner = AgentRunner(agents)
+    runner_instance = AgentRunner(agents_map)
 
-    job_description = "Paste JD here..."
-    resume = "Paste resume here..."
+    jd_text = "Paste JD here..."
+    resume_text = "Paste resume here..."
 
-    # Once AgentRunner.run_agent is implemented, this will run end-to-end.
-    results = run_resume_pipeline(runner, job_description, resume)
+    results = run_resume_pipeline(runner_instance, jd_text, resume_text)
 
-    # Example: print final artifacts
     print("=== Polished Resume ===")
     print(results["polished_resume"])
     print("\n=== Cover Letter ===")
     print(results["cover_letter"])
+
+
+if __name__ == "__main__":
+    sample_run()

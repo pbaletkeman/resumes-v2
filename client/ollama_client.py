@@ -11,6 +11,7 @@ import asyncio
 
 import ollama
 
+from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
 from client.model_client import ModelClient
 
 
@@ -31,7 +32,7 @@ class OllamaClient(ModelClient):
             model: The Ollama model identifier.
         """
         self.model = model
-        self.client = ollama.AsyncClient()
+        self.client: ollama.AsyncClient = ollama.AsyncClient()
 
     async def chat(
         self,
@@ -57,22 +58,43 @@ class OllamaClient(ModelClient):
             The model's text response.
 
         Raises:
-            asyncio.TimeoutError: If the model does not respond within 90 seconds.
+            LLMConnectionError: If the Ollama server cannot be reached.
+            LLMResponseError: If Ollama returns an error response.
+            LLMTimeoutError: If the model does not respond within 90 seconds.
         """
         task = self._build_compact_prompt(purpose, prompt, output, rules, inputs)
 
-        response: ollama.ChatResponse = await asyncio.wait_for(
-            self.client.chat(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": purpose},
-                    {"role": "user", "content": task},
-                ],
-            ),
-            timeout=90,
-        )
+        try:
+            response = await asyncio.wait_for(
+                self.client.chat(  # pyright: ignore[reportUnknownMemberType]
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": purpose},
+                        {"role": "user", "content": task},
+                    ],
+                    stream=False,
+                ),
+                timeout=90,
+            )
+        except ollama.RequestError as e:
+            raise LLMConnectionError(
+                f"Cannot connect to Ollama. Is the server running? {e}"
+            ) from e
+        except ollama.ResponseError as e:
+            raise LLMResponseError(
+                f"Ollama returned an error for model '{self.model}': {e}"
+            ) from e
+        except asyncio.TimeoutError as e:
+            raise LLMTimeoutError(
+                f"Ollama model '{self.model}' did not respond within 90 seconds"
+            ) from e
 
-        return response["message"]["content"]
+        content = response.message.content
+        if content is None:
+            raise LLMResponseError(
+                f"Ollama model '{self.model}' returned an empty response"
+            )
+        return content
 
     def _build_compact_prompt(
         self,
