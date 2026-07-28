@@ -56,7 +56,6 @@ Projects
 Education
 {% for edu in education %}  * {{ edu }}
 {% endfor %}""",
-
     "markdown": """\
 # {{ name }}
 

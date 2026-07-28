@@ -24,6 +24,7 @@ from config.agents import build_registry
 
 logger = logging.getLogger(__name__)
 
+
 class Agent(Protocol):
     """Structural type for any agent usable with ``AgentRunner``.
 
@@ -85,7 +86,11 @@ class PipelineAgent:
         prompt = inputs.get("prompt", "")
         output = inputs.get("output", [])
         rules = inputs.get("rules", [])
-        context = [f"{k}: {v}" for k, v in inputs.items() if k not in ("prompt", "output", "rules")]
+        context = [
+            f"{k}: {v}"
+            for k, v in inputs.items()
+            if k not in ("prompt", "output", "rules")
+        ]
         return await self.client.chat(self.purpose, prompt, output, rules, context)
 
 
@@ -218,7 +223,9 @@ def run_resume_pipeline(
     gap_result = runner.run_agent(
         "gap_analysis_agent",
         {
-            "prompt": "Compare the job description and resume. Produce a tailoring strategy.",
+            "prompt": (
+                "Compare the job description and resume. Produce a tailoring strategy."
+            ),
             "output": ["tailoring_strategy"],
             "rules": ["Be specific and actionable"],
             "parsed_job_description": parsed_job_description,
@@ -231,7 +238,9 @@ def run_resume_pipeline(
     rewrite_result = runner.run_agent(
         "resume_rewrite_agent",
         {
-            "prompt": "Rewrite the resume to match the job requirements using this strategy.",
+            "prompt": (
+                "Rewrite the resume to match the job requirements using this strategy."
+            ),
             "output": ["rewritten_resume"],
             "rules": ["Keep formatting", "Use strong action verbs"],
             "parsed_resume": parsed_resume,
@@ -346,11 +355,21 @@ def sample_run() -> None:
     client = OllamaClient("qwen3.5")
 
     agents_map = {
-        "jd_parsing_agent": PipelineAgent(client, "Extract structured data from job descriptions"),
-        "resume_parsing_agent": PipelineAgent(client, "Extract structured data from resumes"),
-        "gap_analysis_agent": PipelineAgent(client, "Compare JD vs resume, produce a tailoring strategy"),
-        "resume_rewrite_agent": PipelineAgent(client, "Rewrite resume to match job requirements"),
-        "ats_compliance_agent": PipelineAgent(client, "Check and optimize resume for ATS systems"),
+        "jd_parsing_agent": PipelineAgent(
+            client, "Extract structured data from job descriptions"
+        ),
+        "resume_parsing_agent": PipelineAgent(
+            client, "Extract structured data from resumes"
+        ),
+        "gap_analysis_agent": PipelineAgent(
+            client, "Compare JD vs resume, produce a tailoring strategy"
+        ),
+        "resume_rewrite_agent": PipelineAgent(
+            client, "Rewrite resume to match job requirements"
+        ),
+        "ats_compliance_agent": PipelineAgent(
+            client, "Check and optimize resume for ATS systems"
+        ),
         "tone_polishing_agent": PipelineAgent(client, "Polish resume tone and clarity"),
         "cover_letter_agent": PipelineAgent(client, "Generate tailored cover letters"),
     }

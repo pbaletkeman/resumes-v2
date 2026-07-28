@@ -69,9 +69,7 @@ class ModelClientRegistry:
         """
         if name not in self._clients:
             available = ", ".join(self._clients.keys()) or "(none)"
-            raise KeyError(
-                f"Model client '{name}' not found. Available: {available}"
-            )
+            raise KeyError(f"Model client '{name}' not found. Available: {available}")
         return self._clients[name]
 
     def set_default_client(self, name: str) -> None:

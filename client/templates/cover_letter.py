@@ -19,7 +19,6 @@ Dear {{ hiring_manager | default('Hiring Manager') }},
 
 Sincerely,
 {{ candidate_name }}""",
-
     "markdown": """\
 # {{ candidate_name }}
 

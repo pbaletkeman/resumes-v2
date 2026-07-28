@@ -88,7 +88,7 @@ from client.ollama_client import OllamaClient
 client = OllamaClient("qwen3.5")
 
 agents = {
-    "jd_parsing_agent": None,       # stub — will raise NotImplementedError
+    "jd_parsing_agent": None,  # stub — will raise NotImplementedError
     "resume_parsing_agent": None,
     "gap_analysis_agent": None,
     "resume_rewrite_agent": None,

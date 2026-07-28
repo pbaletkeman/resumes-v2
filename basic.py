@@ -60,9 +60,7 @@ async def main() -> None:
     if provider == "ollama":
         client = OllamaClient("qwen3.5")
     else:
-        client = OpenAIClient(
-            "gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY") or ""
-        )
+        client = OpenAIClient("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY") or "")
 
     agent = SimpleAgent(client)
     purpose: str = "Answer questions about geography."

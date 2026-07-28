@@ -220,8 +220,8 @@ class FormatDetector:
         Returns:
             List of extracted bullet-point strings.
         """
-        safe_keyword = re.escape(keyword)
-        pattern = rf"(?i){safe_keyword}.*?\n((?:[-*]\s+.+?\n)*)"
+        safe_keyword = "|".join(re.escape(p) for p in keyword.split("|"))
+        pattern = rf"(?i)(?:{safe_keyword}).*?\n((?:[-*]\s+.+?\n)*)"
         match = re.search(pattern, content)
         if not match:
             return []
@@ -239,14 +239,24 @@ class FormatDetector:
     @staticmethod
     def _is_insufficient_resume(result: dict[str, Any]) -> bool:
         """Return True if regex parsing returned too little data."""
-        empty_lists = sum(1 for v in result.values() if isinstance(v, list) and len(v) == 0)
-        empty_strs = sum(1 for _, v in result.items() if isinstance(v, str) and v in ("", "Unknown"))
+        empty_lists = sum(
+            1
+            for v in result.values()
+            if isinstance(v, list) and len(v) == 0  # pyright: ignore[reportUnknownArgumentType]
+        )
+        empty_strs = sum(
+            1 for _, v in result.items() if isinstance(v, str) and v in ("", "Unknown")
+        )
         return empty_lists >= 2 or (empty_lists >= 1 and empty_strs >= 2)
 
     @staticmethod
     def _is_insufficient_jd(result: dict[str, Any]) -> bool:
         """Return True if regex parsing returned too little data."""
-        empty_lists = sum(1 for v in result.values() if isinstance(v, list) and len(v) == 0)
+        empty_lists = sum(
+            1
+            for v in result.values()
+            if isinstance(v, list) and len(v) == 0  # pyright: ignore[reportUnknownArgumentType]
+        )
         return empty_lists >= 2
 
     # ------------------------------------------------------------------
@@ -273,12 +283,25 @@ class FormatDetector:
             raw = await self.client.chat(
                 purpose="Resume parsing agent",
                 prompt=prompt,
-                output=["name", "title", "summary", "skills", "experience", "education", "certifications"],
+                output=[
+                    "name",
+                    "title",
+                    "summary",
+                    "skills",
+                    "experience",
+                    "education",
+                    "certifications",
+                ],
                 rules=["Return only valid JSON", "Do not infer missing information"],
                 inputs=[content],
             )
             return self._safe_json(raw)
-        except (NotImplementedError, LLMConnectionError, LLMResponseError, LLMTimeoutError):
+        except (
+            NotImplementedError,
+            LLMConnectionError,
+            LLMResponseError,
+            LLMTimeoutError,
+        ):
             logger.exception("LLM resume parsing failed")
             return None
 
@@ -303,11 +326,19 @@ class FormatDetector:
                 purpose="Job description parsing agent",
                 prompt=prompt,
                 output=["title", "responsibilities", "requirements", "nice_to_have"],
-                rules=["Return only valid JSON", "Do not add information not present in the JD"],
+                rules=[
+                    "Return only valid JSON",
+                    "Do not add information not present in the JD",
+                ],
                 inputs=[content],
             )
             return self._safe_json(raw)
-        except (NotImplementedError, LLMConnectionError, LLMResponseError, LLMTimeoutError):
+        except (
+            NotImplementedError,
+            LLMConnectionError,
+            LLMResponseError,
+            LLMTimeoutError,
+        ):
             logger.exception("LLM JD parsing failed")
             return None
 
@@ -327,4 +358,3 @@ class FormatDetector:
         except json.JSONDecodeError:
             logger.warning("Failed to parse LLM response as JSON")
             return None
-

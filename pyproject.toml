@@ -1,0 +1,40 @@
+[project]
+name = "resumes-v2"
+version = "0.1.0"
+description = "Multi-agent resume optimization pipeline"
+requires-python = ">=3.14"
+dependencies = [
+    "ollama>=0.4.0",
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["client", "config"]
+
+[tool.pyright]
+pythonVersion = "3.14"
+include = ["client", "config", "pipeline.py", "basic.py"]
+exclude = ["tests"]
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+

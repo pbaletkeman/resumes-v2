@@ -84,7 +84,7 @@ class OllamaClient(ModelClient):
             raise LLMResponseError(
                 f"Ollama returned an error for model '{self.model}': {e}"
             ) from e
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             raise LLMTimeoutError(
                 f"Ollama model '{self.model}' did not respond within 90 seconds"
             ) from e

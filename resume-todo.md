@@ -13,7 +13,7 @@ The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompt
 ### What exists now:
 - `client/model_client.py` — Proper ABC for LLM clients
 - `client/ollama_client.py` — Ollama client with error handling
-- `client/open_ai_client.py` — OpenAI client (no error handling yet)
+- `client/open_ai_client.py` — OpenAI client with error handling
 - `client/errors.py` — Custom LLM exceptions
 - `client/format_detector.py` — Regex-based document parser with LLM fallback
 - `client/models.py` — `ParsedResume` and `ParsedJobDescription` Pydantic models
@@ -39,42 +39,21 @@ The file is already a clean ABC with `@abstractmethod async def chat(...)`. No o
 
 ### 1.2 Add error handling to LLM clients
 
-**Status:** ⚠️ PARTIAL
+**Status:** ✅ DONE
 
 **`client/errors.py`:** ✅ Done — defines `LLMError`, `LLMConnectionError`, `LLMResponseError`, `LLMTimeoutError`
 
 **`client/ollama_client.py`:** ✅ Done — wraps `ollama.RequestError`, `ollama.ResponseError`, `asyncio.TimeoutError`
 
-**`client/open_ai_client.py`:** ❌ Still needs error handling:
-1. Import `openai` exceptions: `openai.APIError`, `openai.AuthenticationError`, `openai.RateLimitError`, `openai.APIConnectionError`
-2. Wrap the `self.client.chat.completions.create()` call:
-   - `openai.AuthenticationError` → raise `LLMError("Invalid OpenAI API key")`
-   - `openai.RateLimitError` → raise `LLMError("OpenAI rate limit exceeded")`
-   - `openai.APIConnectionError` → raise `LLMConnectionError("Cannot connect to OpenAI API")`
-   - `openai.APIError` → raise `LLMResponseError` with the error message
-   - `asyncio.TimeoutError` → raise `LLMTimeoutError`
-
-**Files to change:** `client/open_ai_client.py`
+**`client/open_ai_client.py`:** ✅ Done — wraps `openai.AuthenticationError`, `openai.RateLimitError`, `openai.APIConnectionError`, `openai.APIError`, `asyncio.TimeoutError`
 
 ---
 
 ### 1.3 Clean up `requirements.txt`
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
-**What exists now:** A `pip freeze` dump of 128 packages, most unused.
-
-**What to do:**
-1. Replace with a minimal list of direct dependencies:
-   ```
-   ollama>=0.4.0
-   openai>=1.0.0
-   pydantic>=2.0.0
-   python-dotenv>=1.0.0
-   ```
-2. Create a separate `requirements-dev.txt` for dev/test dependencies if needed later.
-
-**Files changed:** `requirements.txt`
+Replaced 128-line pip freeze dump with 3 direct dependencies: `ollama`, `openai`, `pydantic`.
 
 ---
 
@@ -199,7 +178,9 @@ class JDParsingOutput(BaseModel):
     responsibilities: list[str]
     keywords: list[str]
     industry_terms: list[str]
-    company_signals: dict[str, str]  # {"culture": "...", "values": "...", "mission": "..."}
+    company_signals: dict[
+        str, str
+    ]  # {"culture": "...", "values": "...", "mission": "..."}
 ```
 
 **Implementation:**
@@ -258,6 +239,7 @@ class ExperienceEntry(BaseModel):
     responsibilities: list[str]
     achievements: list[str]
     metrics: list[str]
+
 
 class ResumeParsingOutput(BaseModel):
     summary: str
@@ -620,6 +602,7 @@ The pipeline currently uses generic `PipelineAgent` instances. Once individual a
 ```python
 from pydantic import BaseModel, Field
 
+
 class ExperienceEntry(BaseModel):
     title: str
     company: str
@@ -627,6 +610,7 @@ class ExperienceEntry(BaseModel):
     responsibilities: list[str]
     achievements: list[str]
     metrics: list[str]
+
 
 class JDParsingOutput(BaseModel):
     role_title: str
@@ -638,6 +622,7 @@ class JDParsingOutput(BaseModel):
     industry_terms: list[str]
     company_signals: dict[str, str]
 
+
 class ResumeParsingOutput(BaseModel):
     summary: str
     skills: list[str]
@@ -645,6 +630,7 @@ class ResumeParsingOutput(BaseModel):
     projects: list[str]
     certifications: list[str]
     education: list[str]
+
 
 class GapAnalysisOutput(BaseModel):
     missing_skills: list[str]
@@ -655,6 +641,7 @@ class GapAnalysisOutput(BaseModel):
     bullet_point_improvement_plan: list[str]
     tone_guidance: str
 
+
 class RewriteOutput(BaseModel):
     summary: str
     skills: list[str]
@@ -662,6 +649,7 @@ class RewriteOutput(BaseModel):
     projects: list[str]
     certifications: list[str]
     education: list[str]
+
 
 class ATSComplianceOutput(BaseModel):
     ats_score: int = Field(ge=0, le=100)
@@ -672,8 +660,10 @@ class ATSComplianceOutput(BaseModel):
     auto_fixes_applied: list[str]
     final_resume: str
 
+
 class TonePolishingOutput(BaseModel):
     polished_resume: str
+
 
 class CoverLetterOutput(BaseModel):
     cover_letter: str
@@ -693,8 +683,10 @@ Create a formatter that converts structured output to clean documents:
 def format_resume_markdown(rewrite: RewriteOutput) -> str:
     """Convert structured resume to clean Markdown."""
 
+
 def format_resume_plain(ats: ATSComplianceOutput) -> str:
     """Convert to plain-text ATS-friendly format (no Markdown)."""
+
 
 def format_cover_letter(text: str) -> str:
     """Clean up cover letter text (normalize whitespace, fix encoding)."""
@@ -723,11 +715,16 @@ def format_cover_letter(text: str) -> str:
    from pathlib import Path
    from client.models import RewriteOutput, CoverLetterOutput
 
+
    class ResumeRenderer:
        def __init__(self, template_dir: Path | None = None) -> None: ...
 
-       def render_plaintext(self, resume: RewriteOutput, template: str = "modern") -> str: ...
-       def render_markdown(self, resume: RewriteOutput, template: str = "modern") -> str: ...
+       def render_plaintext(
+           self, resume: RewriteOutput, template: str = "modern"
+       ) -> str: ...
+       def render_markdown(
+           self, resume: RewriteOutput, template: str = "modern"
+       ) -> str: ...
        def render_docx(self, resume: RewriteOutput, output_path: Path) -> Path: ...
        def render_pdf(self, resume: RewriteOutput, output_path: Path) -> Path: ...
        def render_cover_letter_plaintext(self, letter: CoverLetterOutput) -> str: ...
@@ -735,15 +732,22 @@ def format_cover_letter(text: str) -> str:
 
        @staticmethod
        def build_output_path(
-           output_dir: Path, candidate_name: str, company_name: str,
-           doc_type: str, ext: str,
+           output_dir: Path,
+           candidate_name: str,
+           company_name: str,
+           doc_type: str,
+           ext: str,
        ) -> Path:
            """Build a file path like: 20260727_1430_JohnSmith_AcmeCorp_Resume.pdf"""
            ...
 
        def render_all(
-           self, resume: RewriteOutput, letter: CoverLetterOutput,
-           candidate_name: str, company_name: str, output_dir: Path,
+           self,
+           resume: RewriteOutput,
+           letter: CoverLetterOutput,
+           candidate_name: str,
+           company_name: str,
+           output_dir: Path,
        ) -> dict[str, Path]: ...
    ```
 
@@ -773,9 +777,12 @@ def format_cover_letter(text: str) -> str:
           "markdown": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.md",
           "docx": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.docx",
           "pdf": output_dir / "20260727_1430_JohnSmith_AcmeCorp_Resume.pdf",
-          "cover_letter_plaintext": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.txt",
-          "cover_letter_markdown": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.md",
-          "cover_letter_docx": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.docx",
+          "cover_letter_plaintext": output_dir
+          / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.txt",
+          "cover_letter_markdown": output_dir
+          / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.md",
+          "cover_letter_docx": output_dir
+          / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.docx",
           "cover_letter_pdf": output_dir / "20260727_1430_JohnSmith_AcmeCorp_CoverLetter.pdf",
       }
       ```
@@ -879,7 +886,7 @@ client/
   model_client.py                  # EXISTS ✅
   model_registry.py                # EXISTS ✅ (not in original todo)
   ollama_client.py                 # EXISTS ✅
-  open_ai_client.py                # EXISTS ⚠️ needs error handling
+  open_ai_client.py                # EXISTS ✅ (with error handling)
   format_detector.py               # EXISTS ⚠️ needs expansion
   models.py                        # EXISTS ⚠️ needs agent output schemas
   templates/                       # EXISTS ⚠️ needs renderer.py
@@ -917,7 +924,7 @@ basic.py                           # EXISTS ✅
 test_real_files.py                 # NEW
 resume-todo.md                     # THIS FILE
 bots.md                            # UNCHANGED (reference)
-requirements.txt                   # ⚠️ needs cleanup
+requirements.txt                   # EXISTS ✅ (clean deps)
 sample/                            # EXISTS ✅
   jobs/                            # 2 sample JDs
   resume/                          # 1 sample resume
@@ -930,8 +937,8 @@ TESTING.md                         # EXISTS ✅
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 |------|-------|--------|------------|------------------------|
-| 1 | Phase 1.2: OpenAI error handling | ❌ TODO | None | 1 |
-| 2 | Phase 1.3: Clean requirements.txt | ❌ TODO | None | 1 |
+| 1 | Phase 1.2: OpenAI error handling | ✅ DONE | None | 1 |
+| 2 | Phase 1.3: Clean requirements.txt | ✅ DONE | None | 1 |
 | 3 | Phase 2.1: Expand FormatDetector | ⚠️ PARTIAL | None | 2 |
 | 4 | Phase 6.1: Agent output models | ❌ TODO | None | 1 |
 | 5 | Phase 2.3: JD Parsing Agent | ❌ TODO | Steps 3, 4 | 1 |
