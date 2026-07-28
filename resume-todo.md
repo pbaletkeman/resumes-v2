@@ -15,13 +15,17 @@ The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompt
 - `client/ollama_client.py` — Ollama client with error handling
 - `client/open_ai_client.py` — OpenAI client with error handling
 - `client/errors.py` — Custom LLM exceptions
-- `client/format_detector.py` — Regex-based document parser with LLM fallback
-- `client/models.py` — `ParsedResume` and `ParsedJobDescription` Pydantic models
+- `client/format_detector.py` — Regex-based document parser with LLM fallback, projects, metrics, keywords extraction
+- `client/models.py` — `ParsedResume` (with projects, keywords) and `ParsedJobDescription` Pydantic models
 - `client/model_registry.py` — Per-agent model assignment registry
 - `client/templates/` — Jinja2 resume/cover letter templates (no renderer class)
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo
+- `tests/test_format_detector.py` — 46 tests for FormatDetector regex parsing
+- `tests/conftest.py` — Shared test fixtures
+- `pyproject.toml` — Project config (ruff, pyright, pytest)
+- `AGENTS.md` — Agent instruction file
 - `TESTING.md` — Testing guide
 - `sample/` — Sample JDs and resume for testing
 
@@ -61,55 +65,18 @@ Replaced 128-line pip freeze dump with 3 direct dependencies: `ollama`, `openai`
 
 ### 2.1 Expand `client/format_detector.py`
 
-**Status:** ⚠️ PARTIAL
+**Status:** ✅ DONE
 
-**What exists now:** Regex-based parser with LLM fallback. Extracts: name, title, summary, skills, experience, education, certifications from resumes; title, responsibilities, requirements, nice_to_have from JDs.
+**Implemented:**
+- `_extract_projects()` — extracts bullet points from `## Projects` section
+- `_extract_metrics()` — regex for percentages, dollar amounts, team sizes, timeframes
+- `_extract_keywords()` — frequency-based keyword extraction with stopword filtering (top 20)
+- `_detect_format()` — returns `"markdown"` or `"plain"` based on `##` heading presence
+- `ParsedResume` updated with `projects` and `keywords` fields
+- `parse_resume()` wired to call all new methods
+- LLM fallback prompt updated to include new fields
 
-**What's still missing:**
-
-1. **Projects section extraction:**
-   ```python
-   @staticmethod
-   def _extract_projects(content: str) -> list[str]:
-       # Match "## Projects" heading, extract bullet points
-   ```
-
-2. **Metric extraction from experience bullets:**
-   ```python
-   @staticmethod
-   def _extract_metrics(text: str) -> list[str]:
-       # Regex patterns for:
-       # - Percentages: r"\d+(\.\d+)?%"
-       # - Dollar amounts: r"\$[\d,]+([KMB])?"
-       # - Team sizes: r"team of \d+"
-       # - Timeframes: r"\d+ (months?|years?|weeks?)"
-       # Returns list of metric strings found in the text
-   ```
-
-3. **Keyword extraction (frequency-based):**
-   ```python
-   @staticmethod
-   def _extract_keywords(content: str, top_n: int = 20) -> list[str]:
-       # Split on whitespace/punctuation
-       # Filter stopwords (the, a, is, and, etc.)
-       # Count frequency, return top N meaningful terms
-   ```
-
-4. **Plain-text support:**
-   - Detect if content is Markdown (has `## ` patterns) or plain text
-   - For plain text: split on blank lines to find sections, look for lines ending with `:` as section headers
-   - Add a `_detect_format(content: str) -> str` method returning `"markdown"` or `"plain"`
-
-5. **Update `parse_resume()` return type** to include new fields:
-   ```python
-   return ParsedResume(
-       ...,
-       projects=FormatDetector._extract_projects(content),  # NEW
-       keywords=FormatDetector._extract_keywords(content),  # NEW
-   )
-   ```
-
-**Files changed:** `client/format_detector.py`, `client/models.py` (add `projects` and `keywords` fields to `ParsedResume`)
+**Files changed:** `client/format_detector.py`, `client/models.py`, `tests/test_format_detector.py`
 
 ---
 
@@ -595,7 +562,7 @@ The pipeline currently uses generic `PipelineAgent` instances. Once individual a
 
 **Status:** ⚠️ PARTIAL
 
-**What exists now:** `ParsedResume` and `ParsedJobDescription` models.
+**What exists now:** `ParsedResume` (with `projects`, `keywords` fields) and `ParsedJobDescription` models.
 
 **What's missing:** All 7 agent output schemas. Add these to `client/models.py`:
 
@@ -834,29 +801,17 @@ Create an integration test that runs the full pipeline against real files:
 
 ### 7.2 Add unit tests (`tests/`)
 
-**Status:** ❌ NOT DONE
+**Status:** ⚠️ PARTIAL
 
-Create `tests/` directory with:
+**What exists now:** `tests/test_format_detector.py` with 46 tests covering:
+- All `FormatDetector` static extraction methods (name, title, section, list, bullet points)
+- New Phase 2.1 methods (projects, metrics, keywords, format detection)
+- `_safe_json` and insufficiency checks
+- `parse_resume()` and `parse_job_description()` async flows (regex-only mode)
 
-1. **`tests/test_format_detector.py`:**
-   - Test `_extract_name()` with Markdown and plain text
-   - Test `_extract_list_section()` with various heading patterns
-   - Test `_extract_bullet_points()` with multiple keyword patterns
-   - Test `_extract_metrics()` with percentages, dollar amounts, team sizes
-   - Test `parse_resume()` with a sample Markdown resume
-   - Test `parse_job_description()` with a sample JD
-
-2. **`tests/test_agents.py`:**
-   - Test each agent's `run()` method with a mock `ModelClient`
-   - Verify the LLM is called with the correct system prompt
-   - Verify JSON parsing and Pydantic validation
-   - Test retry logic on invalid JSON
-   - Test fallback behavior on second failure
-
-3. **`tests/test_pipeline.py`:**
-   - Test `run_resume_pipeline()` end-to-end with all agents mocked
-   - Verify data flows correctly between agents
-   - Test error propagation when an agent fails
+**Still needed:**
+- `tests/test_agents.py` — mock `ModelClient`, verify prompts and JSON validation
+- `tests/test_pipeline.py` — end-to-end with mocked agents
 
 **Files changed:** new directory `tests/`, new files `tests/__init__.py`, `tests/test_format_detector.py`, `tests/test_agents.py`, `tests/test_pipeline.py`
 
@@ -884,10 +839,10 @@ client/
   __init__.py                      # EXISTS (empty)
   errors.py                        # EXISTS ✅
   model_client.py                  # EXISTS ✅
-  model_registry.py                # EXISTS ✅ (not in original todo)
+  model_registry.py                # EXISTS ✅
   ollama_client.py                 # EXISTS ✅
-  open_ai_client.py                # EXISTS ✅ (with error handling)
-  format_detector.py               # EXISTS ⚠️ needs expansion
+  open_ai_client.py                # EXISTS ✅
+  format_detector.py               # EXISTS ✅ (expanded with projects, metrics, keywords)
   models.py                        # EXISTS ⚠️ needs agent output schemas
   templates/                       # EXISTS ⚠️ needs renderer.py
     __init__.py                    # EXISTS
@@ -908,10 +863,11 @@ client/
   formatter.py                     # NEW - output formatting
 config/
   __init__.py                      # EXISTS (empty)
-  agents.py                        # EXISTS ✅ (not in original todo)
+  agents.py                        # EXISTS ✅
 tests/
-  __init__.py                      # NEW
-  test_format_detector.py          # NEW
+  __init__.py                      # EXISTS ✅
+  conftest.py                      # EXISTS ✅ (shared fixtures)
+  test_format_detector.py          # EXISTS ✅ (46 tests)
   test_agents.py                   # NEW
   test_pipeline.py                 # NEW
 docs/
@@ -922,14 +878,25 @@ docs/
 pipeline.py                        # EXISTS ✅
 basic.py                           # EXISTS ✅
 test_real_files.py                 # NEW
+pyproject.toml                     # EXISTS ✅ (ruff, pyright, pytest config)
+AGENTS.md                          # EXISTS ✅
 resume-todo.md                     # THIS FILE
 bots.md                            # UNCHANGED (reference)
-requirements.txt                   # EXISTS ✅ (clean deps)
+requirements.txt                   # EXISTS ✅
 sample/                            # EXISTS ✅
   jobs/                            # 2 sample JDs
   resume/                          # 1 sample resume
 TESTING.md                         # EXISTS ✅
 ```
+
+---
+
+## Tooling
+
+- **Lint/Format:** ruff (`ruff check .`, `ruff format .`) — rules: E, F, I, UP, B, SIM
+- **Typecheck:** pyright (strict mode, Python 3.14)
+- **Test:** pytest with pytest-asyncio (`asyncio_mode = "auto"`)
+- **Config:** all in `pyproject.toml`
 
 ---
 
@@ -939,18 +906,20 @@ TESTING.md                         # EXISTS ✅
 |------|-------|--------|------------|------------------------|
 | 1 | Phase 1.2: OpenAI error handling | ✅ DONE | None | 1 |
 | 2 | Phase 1.3: Clean requirements.txt | ✅ DONE | None | 1 |
-| 3 | Phase 2.1: Expand FormatDetector | ⚠️ PARTIAL | None | 2 |
-| 4 | Phase 6.1: Agent output models | ❌ TODO | None | 1 |
-| 5 | Phase 2.3: JD Parsing Agent | ❌ TODO | Steps 3, 4 | 1 |
-| 6 | Phase 2.4: Resume Parsing Agent | ❌ TODO | Steps 3, 4 | 1 |
-| 7 | Phase 3.1: Gap Analysis Agent | ❌ TODO | Steps 4, 5, 6 | 1 |
-| 8 | Phase 3.2: Resume Rewrite Agent | ❌ TODO | Steps 4, 6, 7 | 1 |
-| 9 | Phase 3.3: ATS Compliance Agent | ❌ TODO | Steps 4, 8 | 1 |
-| 10 | Phase 4.1: Tone Polishing Agent | ❌ TODO | Steps 4, 9 | 1 |
-| 11 | Phase 4.2: Cover Letter Agent | ❌ TODO | Steps 4, 5, 6, 7 | 1 |
-| 12 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 5-11 | 1 |
-| 13 | Phase 6.2: Output formatter | ❌ TODO | Step 4 | 1 |
-| 14 | Phase 6.3: Template renderer | ❌ TODO | Steps 4, 13 | 2 |
-| 15 | Phase 7.1: test_real_files.py | ❌ TODO | Steps 12, 14 | 1 |
-| 16 | Phase 7.2: Unit tests | ❌ TODO | Steps 4, 13, 14 | 3 |
-| 17 | Phase 7.3: Documentation | ❌ TODO | All | 4 |
+| 3 | Phase 2.1: Expand FormatDetector | ✅ DONE | None | 2 |
+| 4 | Phase 7.2: Unit tests (format_detector) | ✅ DONE | Step 3 | 1 |
+| 5 | Tooling: ruff, pyright, pytest | ✅ DONE | None | 3 |
+| 6 | Phase 6.1: Agent output models | ❌ TODO | None | 1 |
+| 7 | Phase 2.3: JD Parsing Agent | ❌ TODO | Steps 3, 6 | 1 |
+| 8 | Phase 2.4: Resume Parsing Agent | ❌ TODO | Steps 3, 6 | 1 |
+| 9 | Phase 3.1: Gap Analysis Agent | ❌ TODO | Steps 6, 7, 8 | 1 |
+| 10 | Phase 3.2: Resume Rewrite Agent | ❌ TODO | Steps 6, 8, 9 | 1 |
+| 11 | Phase 3.3: ATS Compliance Agent | ❌ TODO | Steps 6, 10 | 1 |
+| 12 | Phase 4.1: Tone Polishing Agent | ❌ TODO | Steps 6, 11 | 1 |
+| 13 | Phase 4.2: Cover Letter Agent | ❌ TODO | Steps 6, 7, 8, 9 | 1 |
+| 14 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 7-13 | 1 |
+| 15 | Phase 6.2: Output formatter | ❌ TODO | Step 6 | 1 |
+| 16 | Phase 6.3: Template renderer | ❌ TODO | Steps 6, 15 | 2 |
+| 17 | Phase 7.1: test_real_files.py | ❌ TODO | Steps 14, 16 | 1 |
+| 18 | Phase 7.2: Unit tests (agents, pipeline) | ❌ TODO | Steps 6, 15, 16 | 2 |
+| 19 | Phase 7.3: Documentation | ❌ TODO | All | 4 |

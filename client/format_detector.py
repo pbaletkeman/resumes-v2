@@ -10,6 +10,7 @@ back to an LLM when regex returns little or no data.
 import json
 import logging
 import re
+from collections import Counter
 from typing import Any
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
@@ -56,12 +57,14 @@ class FormatDetector:
             "experience": FormatDetector._extract_list_section(
                 content, r"##\s*Experience"
             ),
+            "projects": FormatDetector._extract_projects(content),
             "education": FormatDetector._extract_list_section(
                 content, r"##\s*Education"
             ),
             "certifications": FormatDetector._extract_list_section(
                 content, r"##\s*Certifications|##\s*Certification"
             ),
+            "keywords": FormatDetector._extract_keywords(content),
             "raw": content,
         }
 
@@ -233,6 +236,198 @@ class FormatDetector:
         return [b.strip() for b in bullets if b.strip()]
 
     # ------------------------------------------------------------------
+    # Extended extraction (Phase 2.1)
+    # ------------------------------------------------------------------
+
+    _STOPWORDS: set[str] = {
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "as",
+        "is",
+        "was",
+        "are",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "shall",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "we",
+        "you",
+        "he",
+        "she",
+        "it",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "my",
+        "your",
+        "his",
+        "its",
+        "our",
+        "their",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "where",
+        "when",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "about",
+        "above",
+        "after",
+        "again",
+        "also",
+        "am",
+        "any",
+        "because",
+        "before",
+        "below",
+        "between",
+        "into",
+        "through",
+        "during",
+        "out",
+        "off",
+        "over",
+        "under",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "if",
+        "nor",
+        "while",
+        "up",
+        "down",
+    }
+
+    @staticmethod
+    def _extract_projects(content: str) -> list[str]:
+        """Extract bullet-point items from a Projects section.
+
+        Args:
+            content: Raw resume text.
+
+        Returns:
+            List of project description strings.
+        """
+        return FormatDetector._extract_list_section(content, r"##\s*Projects")
+
+    @staticmethod
+    def _extract_metrics(text: str) -> list[str]:
+        """Extract quantifiable metrics from text.
+
+        Finds percentages, dollar amounts, team sizes, and timeframes.
+
+        Args:
+            text: Text to search for metrics.
+
+        Returns:
+            List of metric strings found in the text.
+        """
+        patterns = [
+            r"\d+(?:\.\d+)?%",  # percentages
+            r"\$[\d,]+(?:\.\d+)?(?:[KMB])?",  # dollar amounts
+            r"team of \d+",  # team sizes
+            r"\d+ (?:months?|years?|weeks?)",  # timeframes
+        ]
+        metrics: list[str] = []
+        for pat in patterns:
+            metrics.extend(re.findall(pat, text, re.IGNORECASE))
+        return metrics
+
+    @staticmethod
+    def _extract_keywords(content: str, top_n: int = 20) -> list[str]:
+        """Extract top frequency-based keywords from content.
+
+        Splits on whitespace and punctuation, filters stopwords, and
+        returns the most frequent meaningful terms.
+
+        Args:
+            content: Full document text.
+            top_n: Number of top keywords to return.
+
+        Returns:
+            List of the most frequent non-stopword terms.
+        """
+        words = re.findall(r"[a-zA-Z0-9#+.]+", content.lower())
+        filtered = [
+            w for w in words if w not in FormatDetector._STOPWORDS and len(w) > 1
+        ]
+        counts = Counter(filtered)
+        return [word for word, _ in counts.most_common(top_n)]
+
+    @staticmethod
+    def _detect_format(content: str) -> str:
+        """Detect whether content is Markdown or plain text.
+
+        Args:
+            content: Raw document text.
+
+        Returns:
+            ``"markdown"`` if Markdown patterns are found, else ``"plain"``.
+        """
+        if re.search(r"^##\s+", content, re.MULTILINE):
+            return "markdown"
+        return "plain"
+
+    # ------------------------------------------------------------------
     # Insufficiency checks
     # ------------------------------------------------------------------
 
@@ -273,8 +468,9 @@ class FormatDetector:
         prompt = (
             "Extract structured data from this resume. "
             "Return a JSON object with keys: name, title, summary, "
-            "skills, experience, education, certifications. "
-            "Skills, experience, and certifications must be lists. "
+            "skills, experience, projects, education, certifications, keywords. "
+            "Skills, experience, projects, and certifications must be lists. "
+            "Keywords must be a list of ATS-relevant terms. "
             "Return only valid JSON."
         )
         if self.client is None:
@@ -289,8 +485,10 @@ class FormatDetector:
                     "summary",
                     "skills",
                     "experience",
+                    "projects",
                     "education",
                     "certifications",
+                    "keywords",
                 ],
                 rules=["Return only valid JSON", "Do not infer missing information"],
                 inputs=[content],

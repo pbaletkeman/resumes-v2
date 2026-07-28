@@ -104,6 +104,72 @@ class TestExtractBulletPoints:
         assert result == ["Python", "SQL"]
 
 
+class TestExtractProjects:
+    def test_projects_section(self) -> None:
+        content = "## Projects\n- Built a CLI tool\n- Designed a dashboard"
+        assert FormatDetector._extract_projects(content) == [
+            "Built a CLI tool",
+            "Designed a dashboard",
+        ]
+
+    def test_no_projects_section(self) -> None:
+        content = "## Skills\n- Python"
+        assert FormatDetector._extract_projects(content) == []
+
+
+class TestExtractMetrics:
+    def test_percentages(self) -> None:
+        assert "30%" in FormatDetector._extract_metrics("Boosted performance by 30%")
+
+    def test_dollar_amounts(self) -> None:
+        metrics = FormatDetector._extract_metrics("Budget of $50,000")
+        assert "$50,000" in metrics
+
+    def test_team_sizes(self) -> None:
+        metrics = FormatDetector._extract_metrics("Managed a team of 12")
+        assert "team of 12" in metrics
+
+    def test_timeframes(self) -> None:
+        metrics = FormatDetector._extract_metrics("Over 3 years of experience")
+        assert "3 years" in metrics
+
+    def test_no_metrics(self) -> None:
+        assert FormatDetector._extract_metrics("No numbers here") == []
+
+    def test_multiple_metrics(self) -> None:
+        text = "Cut costs by 25% over 6 months with a team of 8"
+        metrics = FormatDetector._extract_metrics(text)
+        assert len(metrics) >= 3
+
+
+class TestExtractKeywords:
+    def test_top_keywords(self) -> None:
+        content = "python python python javascript javascript sql"
+        keywords = FormatDetector._extract_keywords(content, top_n=2)
+        assert keywords[0] == "python"
+        assert keywords[1] == "javascript"
+
+    def test_stopwords_filtered(self) -> None:
+        content = "the the the python is a good language"
+        keywords = FormatDetector._extract_keywords(content, top_n=3)
+        assert "the" not in keywords
+        assert "is" not in keywords
+
+    def test_empty_content(self) -> None:
+        assert FormatDetector._extract_keywords("") == []
+
+
+class TestDetectFormat:
+    def test_markdown(self) -> None:
+        assert FormatDetector._detect_format("## Skills\n- Python") == "markdown"
+
+    def test_plain_text(self) -> None:
+        assert FormatDetector._detect_format("Skills:\n- Python") == "plain"
+
+    def test_empty(self) -> None:
+        assert FormatDetector._detect_format("") == "plain"
+
+
 class TestSafeJson:
     def test_plain_json(self) -> None:
         raw = '{"key": "value"}'
@@ -153,6 +219,9 @@ class TestParseResumeRegex:
         assert "Python" in result.skills
         assert len(result.experience) == 2
         assert len(result.education) == 1
+        assert isinstance(result.projects, list)
+        assert isinstance(result.keywords, list)
+        assert len(result.keywords) > 0
 
     async def test_real_sample_resume(self, sample_resume: str) -> None:
         fd = FormatDetector(client=None)
@@ -162,6 +231,9 @@ class TestParseResumeRegex:
         assert isinstance(result.skills, list)
         assert isinstance(result.experience, list)
         assert isinstance(result.education, list)
+        assert isinstance(result.projects, list)
+        assert isinstance(result.keywords, list)
+        assert len(result.keywords) > 0
 
 
 @pytest.mark.asyncio
