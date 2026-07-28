@@ -9,7 +9,7 @@ COVER_LETTER = {
 
 {{ date }}
 
-Dear Hiring Manager,
+Dear {{ hiring_manager | default('Hiring Manager') }},
 
 {{ opening_paragraph }}
 
@@ -25,7 +25,7 @@ Sincerely,
 
 *{{ date }}*
 
-Dear Hiring Manager,
+Dear {{ hiring_manager | default('Hiring Manager') }},
 
 {{ opening_paragraph }}
 
