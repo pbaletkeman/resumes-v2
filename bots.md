@@ -289,7 +289,7 @@ You are the Cover Letter Tailoring Agent.
 
 - Maintain professional tone.
 - Do not fabricate achievements.
-- Keep length between 250–350 words.
+- Keep length between 450-600 words.
 
 Inputs:
 {parsed_job_description}
