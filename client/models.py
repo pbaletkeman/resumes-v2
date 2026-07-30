@@ -72,6 +72,56 @@ class ExperienceEntry(BaseModel):
     metrics: list[str] = Field(default_factory=list)
 
 
+def _coerce_experience_list(v: Any) -> list[ExperienceEntry]:
+    """Coerce a list of strings or dicts into ``ExperienceEntry`` objects.
+
+    Handles three common LLM output formats:
+    - list[str] -- each string becomes ``responsibilities``
+    - list[dict] -- missing keys default to empty strings / lists
+    - list[ExperienceEntry] -- passed through unchanged
+    """
+    if not isinstance(v, list):
+        return []
+    entries: list[ExperienceEntry] = []
+    for item in v:  # type: ignore[reportUnknownVariableType]
+        if isinstance(item, ExperienceEntry):
+            entries.append(item)
+        elif isinstance(item, str):
+            entries.append(ExperienceEntry(responsibilities=[item]))
+        elif isinstance(item, dict):
+            entries.append(
+                ExperienceEntry(
+                    title=item.get("title", ""),  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    company=item.get("company", ""),  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    dates=item.get("dates", ""),  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    responsibilities=item.get("responsibilities", []),  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    achievements=item.get("achievements", []),  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    metrics=item.get("metrics", []),  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                )
+            )
+    return entries
+
+
+def _coerce_str_list(v: Any) -> list[str]:
+    """Coerce a value into a list of strings.
+
+    Handles the LLM returning dicts, ints, or other non-string items
+    inside fields that should be ``list[str]``.
+    """
+    if not isinstance(v, list):
+        return [] if v is None else [str(v)]
+    result: list[str] = []
+    for item in v:  # type: ignore[reportUnknownVariableType]
+        if isinstance(item, str):
+            result.append(item)
+        elif isinstance(item, dict):
+            # Join all values into a single descriptive string
+            result.append(" - ".join(str(v) for v in item.values() if v))  # type: ignore[reportUnknownMemberType]
+        else:
+            result.append(str(item))  # type: ignore[reportUnknownArgumentType]
+    return result
+
+
 class ResumeParsingOutput(BaseModel):
     """Structured output from the Resume Parsing Agent."""
 
@@ -81,6 +131,16 @@ class ResumeParsingOutput(BaseModel):
     projects: list[str] = Field(default_factory=list)
     certifications: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
+
+    @field_validator("skills", "projects", "certifications", "education", mode="before")
+    @classmethod
+    def _coerce_str_lists(cls, v: Any) -> list[str]:
+        return _coerce_str_list(v)
+
+    @field_validator("experience", mode="before")
+    @classmethod
+    def _coerce_experience(cls, v: Any) -> list[ExperienceEntry]:
+        return _coerce_experience_list(v)
 
 
 class GapAnalysisOutput(BaseModel):
@@ -104,6 +164,11 @@ class RewriteOutput(BaseModel):
     projects: list[str] = Field(default_factory=list)
     certifications: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
+
+    @field_validator("experience", mode="before")
+    @classmethod
+    def _coerce_experience(cls, v: Any) -> list[ExperienceEntry]:
+        return _coerce_experience_list(v)
 
 
 class ATSComplianceOutput(BaseModel):

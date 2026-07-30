@@ -1,5 +1,5 @@
 """
-uv run python wip_testing/parsing.py
+uv run python wip_testing/test_parsing
 """
 
 import asyncio

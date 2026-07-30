@@ -181,7 +181,7 @@ class JDParsingOutput(BaseModel):
 
 ### 2.4 Resume Parsing Agent
 
-**Status:** ❌ NOT DONE (currently uses generic `PipelineAgent`)
+**Status:** ✅ DONE
 
 **What to do:**
 
@@ -955,7 +955,7 @@ wip_testing/
 | 5 | Tooling: ruff, pyright, pytest | ✅ DONE | None | 3 |
 | 6 | Phase 6.1: Agent output models | ✅ DONE | None | 1 |
 | 7 | Phase 2.3: JD Parsing Agent | ✅ DONE | Steps 3, 6 | 3 |
-| 8 | Phase 2.4: Resume Parsing Agent | ❌ TODO | Steps 3, 6 | 1 |
+| 8 | Phase 2.4: Resume Parsing Agent | ✅ DONE | Steps 3, 6 | 2 |
 | 9 | Phase 3.1: Gap Analysis Agent | ❌ TODO | Steps 6, 7, 8 | 1 |
 | 10 | Phase 3.2: Resume Rewrite Agent | ❌ TODO | Steps 6, 8, 9 | 1 |
 | 11 | Phase 3.3: ATS Compliance Agent | ❌ TODO | Steps 6, 10 | 1 |

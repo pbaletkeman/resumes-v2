@@ -1,9 +1,9 @@
 """
-debug_jd.py
+test_job_description.py
 Test the JD Parsing Agent against a sample job description.
 
 Usage:
-    uv run python wip_testing/debug_jd.py
+    uv run python wip_testing/test_job_description.py
 """
 
 import asyncio

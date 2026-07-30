@@ -1,0 +1,89 @@
+# resumes-v2
+
+Multi-agent resume optimization pipeline. 7 sequential agents transform a job description + resume into an ATS-optimized resume and tailored cover letter.
+
+## Prerequisites
+
+- Python 3.14+
+- [uv](https://docs.astral.sh/uv/) installed
+- [Ollama](https://ollama.com/) running on `localhost:11434`
+- Model pulled: `ollama pull qwen2.5:7b-instruct`
+
+## Quick start
+
+```bash
+uv sync
+uv run python pipeline.py
+```
+
+## Usage
+
+| What | Command |
+|---|---|
+| Install/sync deps | `uv sync` |
+| Full 7-agent pipeline | `uv run python pipeline.py` |
+| Single-agent demo | `uv run python basic.py` |
+| Test JD Parsing Agent | `uv run python wip_testing/debug_jd.py` |
+| Test Resume Parsing Agent | `uv run python wip_testing/test_resume_parsing.py` |
+| Regex parsing test (no LLM) | `uv run python wip_testing/parsing.py` |
+| Lint | `uv run ruff check .` |
+| Lint (auto-fix) | `uv run ruff check --fix .` |
+| Format check | `uv run ruff format --check .` |
+| Format (auto-fix) | `uv run ruff format .` |
+| Typecheck | `uv run pyright .` |
+| Test | `uv run pytest` |
+| Test (verbose) | `uv run pytest -v` |
+
+## Pipeline flow
+
+```
+JD -> [1. JD Parsing] -> [2. Resume Parsing] <- Resume
+                            |
+                    [3. Gap Analysis]
+                            |
+                    [4. Resume Rewrite]
+                            |
+                    [5. ATS Compliance]
+                            |
+                    [6. Tone Polishing] -> polished_resume
+                    [7. Cover Letter] -> cover_letter
+```
+
+## Architecture
+
+```plaintext
+pipeline.py              # AgentRunner, PipelineAgent, run_resume_pipeline()
+basic.py                 # Single-agent demo
+config/agents.py         # Env-var-based agent-to-model configuration
+client/
+  model_client.py        # ABC for LLM clients
+  ollama_client.py       # Ollama implementation (configurable timeout, default 300s)
+  open_ai_client.py      # OpenAI implementation
+  model_registry.py      # Per-agent model assignment (ModelClientRegistry)
+  format_detector.py     # Regex parser with LLM fallback (connected)
+  models.py              # All Pydantic models
+  agents/
+    jd_parsing.py        # JD Parsing Agent (Agent 1) - dedicated class
+    resume_parsing.py    # Resume Parsing Agent (Agent 2) - dedicated class
+  templates/             # Jinja2 resume/cover letter templates
+tests/
+  test_format_detector.py # FormatDetector regex parsing tests (46 tests)
+wip_testing/
+  parsing.py             # Manual parsing test script (regex + LLM)
+  debug_jd.py            # JD Parsing Agent test script
+  test_resume_parsing.py # Resume Parsing Agent test script
+```
+
+## Configuration
+
+- **Default model:** `qwen2.5:7b-instruct` on Ollama
+- **Per-agent overrides** via env vars: `COVER_LETTER_AGENT_MODEL=gpt-4o`, `COVER_LETTER_AGENT_PROVIDER=openai`
+- **Global override:** `MODEL_PROVIDER` and `MODEL_NAME`
+
+## Project structure
+
+- `sample/jobs/` - Sample job descriptions for testing
+- `sample/resume/` - Sample resume for testing
+- `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter)
+- `client/model.md` - Quick reference for all Pydantic models
+- `resume-todo.md` - Implementation plan and status tracker

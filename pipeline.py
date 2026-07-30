@@ -19,6 +19,7 @@ from collections.abc import Mapping
 from typing import Any, Protocol
 
 from client.agents.jd_parsing import JDParsingAgent
+from client.agents.resume_parsing import ResumeParsingAgent
 from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
 from client.ollama_client import OllamaClient
@@ -215,13 +216,10 @@ def run_resume_pipeline(
     resume_result = runner.run_agent(
         "resume_parsing_agent",
         {
-            "prompt": "Extract structured data from this resume.",
-            "output": ["parsed_resume"],
-            "rules": ["Return valid JSON"],
             "resume": resume,
         },
     )
-    parsed_resume = resume_result["parsed_resume"]
+    parsed_resume = resume_result
 
     # 3. Gap Analysis Agent
     gap_result = runner.run_agent(
@@ -358,9 +356,7 @@ def sample_run() -> None:
 
     agents_map = {
         "jd_parsing_agent": JDParsingAgent(client),
-        "resume_parsing_agent": PipelineAgent(
-            client, "Extract structured data from resumes"
-        ),
+        "resume_parsing_agent": ResumeParsingAgent(client),
         "gap_analysis_agent": PipelineAgent(
             client, "Compare JD vs resume, produce a tailoring strategy"
         ),
