@@ -591,19 +591,11 @@ The pipeline currently uses generic `PipelineAgent` instances. Once individual a
 
 ---
 
-### 5.3 Deprecate `client/resume_processor.py`
-
-**Status:** N/A
-
-`client/resume_processor.py` does not exist. No deprecation needed.
-
----
-
 ## Phase 6: Output & Validation
 
 ### 6.1 Add Pydantic models (`client/models.py`)
 
-**Status:** ⚠️ PARTIAL
+**Status:** ✅ DONE
 
 **What exists now:** `ParsedResume` (with `projects`, `keywords` fields) and `ParsedJobDescription` models.
 
@@ -961,7 +953,7 @@ wip_testing/
 | 3 | Phase 2.1: Expand FormatDetector | ✅ DONE | None | 2 |
 | 4 | Phase 7.2: Unit tests (format_detector) | ✅ DONE | Step 3 | 1 |
 | 5 | Tooling: ruff, pyright, pytest | ✅ DONE | None | 3 |
-| 6 | Phase 6.1: Agent output models | ✅ DONE (partial: JDParsingOutput) | None | 1 |
+| 6 | Phase 6.1: Agent output models | ✅ DONE | None | 1 |
 | 7 | Phase 2.3: JD Parsing Agent | ✅ DONE | Steps 3, 6 | 3 |
 | 8 | Phase 2.4: Resume Parsing Agent | ❌ TODO | Steps 3, 6 | 1 |
 | 9 | Phase 3.1: Gap Analysis Agent | ❌ TODO | Steps 6, 7, 8 | 1 |
