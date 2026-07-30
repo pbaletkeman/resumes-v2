@@ -38,14 +38,16 @@ basic.py             # Single-agent demo
 config/agents.py     # Env-var-based agent-to-model configuration
 client/
   model_client.py    # ABC for LLM clients
-  ollama_client.py   # Ollama implementation (90s timeout)
+  ollama_client.py   # Ollama implementation (configurable timeout, default 300s)
   open_ai_client.py  # OpenAI implementation
   model_registry.py  # Per-agent model assignment (ModelClientRegistry)
-  format_detector.py # Regex parser with LLM fallback
+  format_detector.py # Regex parser with LLM fallback (connected)
   models.py          # ParsedResume, ParsedJobDescription (Pydantic)
   templates/         # Jinja2 resume/cover letter templates (no renderer yet)
 tests/
   test_format_detector.py  # FormatDetector regex parsing tests
+wip_testing/
+  parsing.py         # Manual parsing test script (regex + LLM)
 ```
 
 ## Key conventions
@@ -54,7 +56,7 @@ tests/
 - **Model overrides** via env vars: `COVER_LETTER_AGENT_MODEL=gpt-4o`, `COVER_LETTER_AGENT_PROVIDER=openai`. Prefix is the uppercased agent name.
 - **Default model**: `qwen2.5:7b-instruct` on Ollama. Override globally with `MODEL_PROVIDER` and `MODEL_NAME`.
 - **No extended characters** in LLM output: `"` not `""`, `->` not `→`. Enforced in agent prompts.
-- **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode.
+- **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode. LLM is now connected — `wip_testing/parsing.py` demonstrates both modes.
 
 ## Pipeline flow
 

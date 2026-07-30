@@ -11,11 +11,12 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
 The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompts) orchestrated by `AgentRunner`. Per-agent model assignment is handled by `ModelClientRegistry` + `config/agents.py`. The 7 agents are wired in `pipeline.py` via `run_resume_pipeline()`.
 
 ### What exists now:
+
 - `client/model_client.py` — Proper ABC for LLM clients
 - `client/ollama_client.py` — Ollama client with error handling
 - `client/open_ai_client.py` — OpenAI client with error handling
 - `client/errors.py` — Custom LLM exceptions
-- `client/format_detector.py` — Regex-based document parser with LLM fallback, projects, metrics, keywords extraction
+- `client/format_detector.py` — Regex-based document parser with LLM fallback (connected), plain text support, projects, metrics, keywords extraction
 - `client/models.py` — `ParsedResume` (with projects, keywords) and `ParsedJobDescription` Pydantic models
 - `client/model_registry.py` — Per-agent model assignment registry
 - `client/templates/` — Jinja2 resume/cover letter templates (no renderer class)
@@ -73,11 +74,17 @@ Replaced 128-line pip freeze dump with 3 direct dependencies: `ollama`, `openai`
 - `_extract_metrics()` — regex for percentages, dollar amounts, team sizes, timeframes
 - `_extract_keywords()` — frequency-based keyword extraction with stopword filtering (top 20)
 - `_detect_format()` — returns `"markdown"` or `"plain"` based on `##` heading presence
+- `_section_pattern()` — builds regex matching both Markdown (`## Name`) and plain text (`Name:`) headings
+- `_extract_bullet_points()` — rewritten to handle plain text lines (not just `*`/`-` bullets), with heading-anchored keyword matching
+- `_extract_name()` / `_extract_title()` — fall back to first/second non-empty line for plain-text resumes; strip BOM characters
+- `_extract_section()` — detects plain text headings as section boundaries (not just `##`)
+- `_normalize_list_fields()` — flattens LLM dict responses into `list[str]` for Pydantic compatibility
+- `parse_job_description()` — expanded keyword lists: `must have`, `minimum qualifications`, `additional experience desired`, `preferred qualifications`, etc.
+- LLM fallback connected: `FormatDetector(client=OllamaClient("qwen2.5:7b-instruct"))` works end-to-end
 - `ParsedResume` updated with `projects` and `keywords` fields
 - `parse_resume()` wired to call all new methods
-- LLM fallback prompt updated to include new fields
 
-**Files changed:** `client/format_detector.py`, `client/models.py`, `tests/test_format_detector.py`
+**Files changed:** `client/format_detector.py`, `client/models.py`, `tests/test_format_detector.py`, `client/ollama_client.py`
 
 ---
 
@@ -878,7 +885,7 @@ client/
   errors.py                        # EXISTS ✅
   model_client.py                  # EXISTS ✅
   model_registry.py                # EXISTS ✅
-  ollama_client.py                 # EXISTS ✅
+  ollama_client.py                 # EXISTS ✅ (configurable timeout, default 300s)
   open_ai_client.py                # EXISTS ✅
   format_detector.py               # EXISTS ✅ (expanded with projects, metrics, keywords)
   models.py                        # EXISTS ⚠️ needs agent output schemas
@@ -925,6 +932,8 @@ sample/                            # EXISTS ✅
   jobs/                            # 2 sample JDs
   resume/                          # 1 sample resume
 TESTING.md                         # EXISTS ✅
+wip_testing/
+  parsing.py                       # EXISTS ✅ (regex + LLM parsing demo)
 ```
 
 ---
