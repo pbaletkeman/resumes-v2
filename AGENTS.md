@@ -7,7 +7,7 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 ## Prerequisites
 
 - Ollama running on `localhost:11434`
-- Model pulled: `ollama pull qwen3.5`
+- Model pulled: `ollama pull qwen2.5:7b-instruct`
 - uv installed (`uv sync` to set up venv)
 
 ## Quick commands
@@ -52,7 +52,7 @@ tests/
 
 - **Agent names** are snake_case with `_agent` suffix: `jd_parsing_agent`, `resume_parsing_agent`, etc. These are the keys used everywhere (env vars, registry, pipeline wiring).
 - **Model overrides** via env vars: `COVER_LETTER_AGENT_MODEL=gpt-4o`, `COVER_LETTER_AGENT_PROVIDER=openai`. Prefix is the uppercased agent name.
-- **Default model**: `qwen3.5` on Ollama. Override globally with `MODEL_PROVIDER` and `MODEL_NAME`.
+- **Default model**: `qwen2.5:7b-instruct` on Ollama. Override globally with `MODEL_PROVIDER` and `MODEL_NAME`.
 - **No extended characters** in LLM output: `"` not `""`, `->` not `→`. Enforced in agent prompts.
 - **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode.
 

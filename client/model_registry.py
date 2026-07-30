@@ -27,7 +27,7 @@ class ModelClientRegistry:
     Example::
 
         registry = ModelClientRegistry()
-        registry.register("fast", OllamaClient("qwen3.5"))
+        registry.register("fast", OllamaClient("qwen2.5:7b-instruct"))
         registry.register("smart", OpenAIClient("gpt-4o", api_key="..."))
         registry.set_default_client("fast")
 
@@ -149,7 +149,7 @@ class ModelClientRegistry:
 
             {
                 "clients": {
-                    "fast": {"provider": "ollama", "model": "qwen3.5"},
+                    "fast": {"provider": "ollama", "model": "qwen2.5:7b-instruct"},
                     "smart": {"provider": "openai", "model": "gpt-4o", "api_key": "..."}
                 },
                 "default": "fast",

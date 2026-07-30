@@ -3,9 +3,9 @@
 ## Prerequisites
 
 1. **Ollama running** on `localhost:11434`
-2. **Model pulled** — at minimum `qwen3.5`:
+2. **Model pulled** — at minimum `qwen2.5:7b-instruct`:
    ```bash
-   ollama pull qwen3.5
+   ollama pull qwen2.5:7b-instruct
    ```
 3. **uv installed** — run `uv sync` to set up the venv
 
@@ -85,7 +85,7 @@ import asyncio
 from pipeline import AgentRunner, run_resume_pipeline
 from client.ollama_client import OllamaClient
 
-client = OllamaClient("qwen3.5")
+client = OllamaClient("qwen2.5:7b-instruct")
 
 agents = {
     "jd_parsing_agent": None,  # stub — will raise NotImplementedError
@@ -122,7 +122,7 @@ import asyncio
 from client.ollama_client import OllamaClient
 from client.agents.jd_parsing import JDParsingAgent
 
-client = OllamaClient("qwen3.5")
+client = OllamaClient("qwen2.5:7b-instruct")
 agent = JDParsingAgent(client)
 
 with open("sample/jobs/3Pillar.txt") as f:

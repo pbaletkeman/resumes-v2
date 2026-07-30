@@ -2,9 +2,9 @@
 ollama_client.py
 Concrete ModelClient implementation for the Ollama API.
 
-Sends structured prompts to a locally-running Ollama model and
-returns the response. Supports any model available in the user's
-Ollama installation (e.g. qwen3.5, llama3, mistral).
+    Sends structured prompts to a locally-running Ollama model and
+    returns the response. Supports any model available in the user's
+    Ollama installation (e.g. qwen2.5:7b-instruct, llama3, mistral).
 """
 
 import asyncio
@@ -19,19 +19,22 @@ class OllamaClient(ModelClient):
     """LLM client that communicates with a local Ollama instance.
 
     Uses the ``ollama.AsyncClient`` for non-blocking API calls with
-    a 90-second timeout.
+    a configurable timeout (default 300 seconds).
 
     Args:
-        model: The Ollama model name to use (e.g. ``"qwen3.5"``).
+        model: The Ollama model name to use (e.g. ``"qwen2.5:7b-instruct"``).
+        timeout: Request timeout in seconds (default 300).
     """
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, timeout: int = 300) -> None:
         """Initialize the Ollama client.
 
         Args:
             model: The Ollama model identifier.
+            timeout: Request timeout in seconds (default 300).
         """
         self.model = model
+        self.timeout = timeout
         self.client: ollama.AsyncClient = ollama.AsyncClient()
 
     async def chat(
@@ -74,7 +77,7 @@ class OllamaClient(ModelClient):
                     ],
                     stream=False,
                 ),
-                timeout=90,
+                timeout=self.timeout,
             )
         except ollama.RequestError as e:
             raise LLMConnectionError(
@@ -86,7 +89,7 @@ class OllamaClient(ModelClient):
             ) from e
         except TimeoutError as e:
             raise LLMTimeoutError(
-                f"Ollama model '{self.model}' did not respond within 90 seconds"
+                f"Ollama model '{self.model}' did not respond within {self.timeout}s"
             ) from e
 
         content = response.message.content

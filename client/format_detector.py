@@ -35,6 +35,21 @@ class FormatDetector:
     def __init__(self, client: ModelClient | None = None) -> None:
         self.client = client
 
+    @staticmethod
+    def _section_pattern(name: str) -> str:
+        """Build a regex that matches a heading in Markdown or plain-text form.
+
+        Matches ``## Name`` (Markdown) or ``Name:`` (plain text).
+
+        Args:
+            name: The heading label (e.g. ``"Skills"``).
+
+        Returns:
+            Regex pattern string.
+        """
+        escaped = re.escape(name)
+        return rf"(?:##\s*{escaped}|{escaped}\s*:)"
+
     async def parse_resume(self, content: str) -> ParsedResume:
         """Parse a resume into structured fields.
 
@@ -51,18 +66,26 @@ class FormatDetector:
             "name": FormatDetector._extract_name(content),
             "title": FormatDetector._extract_title(content),
             "summary": FormatDetector._extract_section(
-                content, r"##\s*Summary|##\s*Professional Summary"
+                content,
+                FormatDetector._section_pattern("Summary")
+                + r"|"
+                + FormatDetector._section_pattern("Professional Summary"),
             ),
-            "skills": FormatDetector._extract_list_section(content, r"##\s*Skills"),
+            "skills": FormatDetector._extract_list_section(
+                content, FormatDetector._section_pattern("Skills")
+            ),
             "experience": FormatDetector._extract_list_section(
-                content, r"##\s*Experience"
+                content, FormatDetector._section_pattern("Experience")
             ),
             "projects": FormatDetector._extract_projects(content),
             "education": FormatDetector._extract_list_section(
-                content, r"##\s*Education"
+                content, FormatDetector._section_pattern("Education")
             ),
             "certifications": FormatDetector._extract_list_section(
-                content, r"##\s*Certifications|##\s*Certification"
+                content,
+                FormatDetector._section_pattern("Certifications")
+                + r"|"
+                + FormatDetector._section_pattern("Certification"),
             ),
             "keywords": FormatDetector._extract_keywords(content),
             "raw": content,
@@ -92,14 +115,18 @@ class FormatDetector:
             "title": FormatDetector._extract_job_title(content),
             "responsibilities": FormatDetector._extract_bullet_points(
                 content,
-                "responsibilities|responsibility|day to day|what you'll do",
+                "responsibilities|responsibility|day to day|what you'll do"
+                "|key responsibilities|what the role involves",
             ),
             "requirements": FormatDetector._extract_bullet_points(
                 content,
-                "qualifications|requirements|what we're looking for|what you'll bring",
+                "qualifications|requirements|what we're looking for|what you'll bring"
+                "|must have|minimum qualifications|required skills|required experience",
             ),
             "nice_to_have": FormatDetector._extract_bullet_points(
-                content, "nice to have"
+                content,
+                "nice to have|additional experience desired|preferred qualifications"
+                "|bonus|nice-to-have|optional|desirable",
             ),
             "raw": content,
         }
@@ -117,7 +144,8 @@ class FormatDetector:
         """Extract the person's name from a resume.
 
         Looks for a top-level Markdown heading (`# Name`) as the first
-        meaningful line.
+        meaningful line, or falls back to the first non-empty line for
+        plain-text resumes.
 
         Args:
             content: Raw resume text.
@@ -127,15 +155,20 @@ class FormatDetector:
         """
         lines = content.split("\n")
         for line in lines:
-            if line.startswith("# ") and len(line) > 2:
-                return line[2:].strip()
+            stripped = line.strip().lstrip("\ufeff\xef\xbb\xbf")
+            if not stripped:
+                continue
+            if stripped.startswith("# ") and len(stripped) > 2:
+                return stripped[2:].strip()
+            return stripped
         return "Unknown"
 
     @staticmethod
     def _extract_title(content: str) -> str:
         """Extract the job title from a resume.
 
-        Looks for the first `##` heading within the first 5 lines.
+        Looks for the first `##` heading within the first 5 lines, or
+        the second non-empty line for plain-text resumes.
 
         Args:
             content: Raw resume text.
@@ -144,9 +177,12 @@ class FormatDetector:
             The extracted title, or `"Unknown"` if not found.
         """
         lines = content.split("\n")
-        for i, line in enumerate(lines):
+        non_empty = [line.strip() for line in lines if line.strip()]
+        for i, line in enumerate(non_empty[:5]):
             if line.startswith("## ") and i < 5:
                 return line[3:].strip()
+        if len(non_empty) >= 2:
+            return non_empty[1]
         return "Unknown"
 
     @staticmethod
@@ -171,6 +207,9 @@ class FormatDetector:
     def _extract_section(content: str, pattern: str) -> str:
         """Extract text between a matching heading and the next heading.
 
+        Handles both Markdown headings (``## Name``) and plain-text
+        headings (``Name:``) as section boundaries.
+
         Args:
             content: Full document text.
             pattern: Regex pattern to match the section heading.
@@ -183,7 +222,13 @@ class FormatDetector:
             return ""
 
         start = match.end()
-        next_header = re.search(r"^##\s+", content[start:], re.MULTILINE)
+        # Match the next Markdown heading OR the next plain-text heading
+        # (a line starting with a Capitalised word/phrase followed by a colon).
+        next_header = re.search(
+            r"^(?:##\s+|[A-Z][\w\s/]*:\s*$)",
+            content[start:],
+            re.MULTILINE,
+        )
         end = start + next_header.start() if next_header else len(content)
         return content[start:end].strip()
 
@@ -210,10 +255,12 @@ class FormatDetector:
 
     @staticmethod
     def _extract_bullet_points(content: str, keyword: str) -> list[str]:
-        """Extract bullet points following a keyword-matching line.
+        """Extract bullet points or content lines following a keyword-matching line.
 
         Searches for a line containing any of the pipe-separated keywords,
-        then collects the bullet points that follow it.
+        then collects the bullet points or non-empty content lines that follow.
+        Handles both ``- item`` / ``* item`` bullet markers and plain text
+        lines.
 
         Args:
             content: Full document text.
@@ -221,19 +268,38 @@ class FormatDetector:
                 `"requirements|qualifications"`).
 
         Returns:
-            List of extracted bullet-point strings.
+            List of extracted item strings.
         """
         safe_keyword = "|".join(re.escape(p) for p in keyword.split("|"))
-        pattern = rf"(?i)(?:{safe_keyword}).*?\n((?:[-*]\s+.+?\n)*)"
-        match = re.search(pattern, content)
+        # Find the keyword heading line - the keyword must be the main
+        # content of the line (not just a word in a sentence).
+        heading_re = re.compile(
+            rf"(?i)^\s*(?:{safe_keyword})\s*[.:]?\s*$", re.MULTILINE
+        )
+        match = heading_re.search(content)
         if not match:
             return []
 
-        bullets_text = match.group(1)
-        if not bullets_text:
-            return []
-        bullets = re.findall(r"^[-*]\s+(.+?)$", bullets_text, re.MULTILINE)
-        return [b.strip() for b in bullets if b.strip()]
+        start = match.end()
+        # Collect lines after the heading, skipping blank lines, stopping
+        # at the next heading-like line (starts with a capital letter and
+        # ends with nothing or a colon, or matches ## Markdown heading).
+        lines = content[start:].split("\n")
+        items: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                if items:
+                    break  # blank line after content = end of section
+                continue
+            # Stop if we hit another section heading
+            if re.match(r"^(?:##\s+|[A-Z][\w\s/]*:\s*$)", stripped):
+                break
+            # Strip bullet markers
+            cleaned = re.sub(r"^[-*]\s+", "", stripped)
+            if cleaned:
+                items.append(cleaned)
+        return items
 
     # ------------------------------------------------------------------
     # Extended extraction (Phase 2.1)
@@ -367,7 +433,9 @@ class FormatDetector:
         Returns:
             List of project description strings.
         """
-        return FormatDetector._extract_list_section(content, r"##\s*Projects")
+        return FormatDetector._extract_list_section(
+            content, FormatDetector._section_pattern("Projects")
+        )
 
     @staticmethod
     def _extract_metrics(text: str) -> list[str]:
@@ -469,8 +537,9 @@ class FormatDetector:
             "Extract structured data from this resume. "
             "Return a JSON object with keys: name, title, summary, "
             "skills, experience, projects, education, certifications, keywords. "
-            "Skills, experience, projects, and certifications must be lists. "
-            "Keywords must be a list of ATS-relevant terms. "
+            "Every value must be a string or a list of flat strings. "
+            "For experience, each item must be a single descriptive string. "
+            "For projects and education, each item must be a single string. "
             "Return only valid JSON."
         )
         if self.client is None:
@@ -493,7 +562,10 @@ class FormatDetector:
                 rules=["Return only valid JSON", "Do not infer missing information"],
                 inputs=[content],
             )
-            return self._safe_json(raw)
+            result = self._safe_json(raw)
+            if result is not None:
+                result = self._normalize_list_fields(result)
+            return result
         except (
             NotImplementedError,
             LLMConnectionError,
@@ -539,6 +611,28 @@ class FormatDetector:
         ):
             logger.exception("LLM JD parsing failed")
             return None
+
+    @staticmethod
+    def _normalize_list_fields(data: dict[str, Any]) -> dict[str, Any]:
+        """Flatten list values that contain dicts into flat strings.
+
+        LLM responses sometimes return structured dicts for fields like
+        ``experience`` or ``education``.  This converts each dict to a
+        readable string so the result fits ``list[str]`` fields.
+        """
+        list_keys = ("experience", "projects", "education", "certifications")
+        for key in list_keys:
+            if key not in data or not isinstance(data[key], list):
+                continue
+            flat: list[str] = []
+            for item in data[key]:
+                if isinstance(item, str):
+                    flat.append(item)
+                elif isinstance(item, dict):
+                    # Join all values into a single descriptive string
+                    flat.append(" - ".join(str(v) for v in item.values() if v))
+            data[key] = flat
+        return data
 
     @staticmethod
     def _safe_json(raw: str) -> dict[str, Any] | None:

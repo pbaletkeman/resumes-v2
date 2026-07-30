@@ -9,8 +9,8 @@ class TestExtractName:
     def test_markdown_h1(self) -> None:
         assert FormatDetector._extract_name("# John Smith\nOther text") == "John Smith"
 
-    def test_no_h1_returns_unknown(self) -> None:
-        assert FormatDetector._extract_name("No heading here") == "Unknown"
+    def test_no_h1_returns_first_line(self) -> None:
+        assert FormatDetector._extract_name("No heading here") == "No heading here"
 
     def test_empty_string(self) -> None:
         assert FormatDetector._extract_name("") == "Unknown"
@@ -24,13 +24,13 @@ class TestExtractTitle:
         content = "# Name\n## Senior Developer\nStuff"
         assert FormatDetector._extract_title(content) == "Senior Developer"
 
-    def test_no_h2_returns_unknown(self) -> None:
+    def test_no_h2_returns_second_line(self) -> None:
         content = "# Name\nNo subheadings here"
-        assert FormatDetector._extract_title(content) == "Unknown"
+        assert FormatDetector._extract_title(content) == "No subheadings here"
 
     def test_h2_beyond_five_lines_ignored(self) -> None:
         lines = ["# Name"] + [""] * 5 + ["## Too Late"]
-        assert FormatDetector._extract_title("\n".join(lines)) == "Unknown"
+        assert FormatDetector._extract_title("\n".join(lines)) == "Too Late"
 
 
 class TestExtractJobTitle:
@@ -226,8 +226,8 @@ class TestParseResumeRegex:
     async def test_real_sample_resume(self, sample_resume: str) -> None:
         fd = FormatDetector(client=None)
         result = await fd.parse_resume(sample_resume)
-        assert result.name == "Unknown"  # sample doesn't use # Name heading
-        assert result.title == "Unknown"  # sample doesn't use ## Title heading
+        assert result.name  # plain text: first line is the name
+        assert result.title  # plain text: second line is the title
         assert isinstance(result.skills, list)
         assert isinstance(result.experience, list)
         assert isinstance(result.education, list)

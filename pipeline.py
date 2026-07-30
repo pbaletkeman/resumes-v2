@@ -344,7 +344,7 @@ def sample_run() -> None:
     """Demonstrate the full resume optimization pipeline end-to-end.
 
     Creates a ``PipelineAgent`` for each of the 7 pipeline stages, all backed
-    by a single Ollama ``qwen3.5`` client.  The agents are wired into an
+    by a single Ollama ``qwen2.5:7b-instruct`` client.  The agents are wired into an
     ``AgentRunner`` and executed sequentially via ``run_resume_pipeline``.
 
     Replace the placeholder JD and resume text with real content to see
@@ -352,7 +352,7 @@ def sample_run() -> None:
     """
     from client.ollama_client import OllamaClient
 
-    client = OllamaClient("qwen3.5")
+    client = OllamaClient("qwen2.5:7b-instruct")
 
     agents_map = {
         "jd_parsing_agent": PipelineAgent(

@@ -31,7 +31,8 @@ def get_agent_config() -> dict[str, Any]:
     Reads from environment variables with fallback defaults:
 
     - ``MODEL_PROVIDER``: ``"ollama"`` or ``"openai"`` (default: ``"ollama"``)
-    - ``MODEL_NAME``: Model name for the default provider (default: ``"qwen3.5"``)
+    - ``MODEL_NAME``: Model name for the default provider
+      (default: ``"qwen2.5:7b-instruct"``)
     - ``OPENAI_API_KEY``: API key for OpenAI provider
     - ``DEFAULT_PROVIDER``: Override the default provider for all agents
     - ``<AGENT>_PROVIDER``: Override provider for a specific agent
@@ -43,7 +44,7 @@ def get_agent_config() -> dict[str, Any]:
         Configuration dictionary ready for ``ModelClientRegistry.from_config()``.
     """
     provider = os.getenv("MODEL_PROVIDER", "ollama")
-    model = os.getenv("MODEL_NAME", "qwen3.5")
+    model = os.getenv("MODEL_NAME", "qwen2.5:7b-instruct")
     api_key = os.getenv("OPENAI_API_KEY", "")
 
     # Agent names for environment variable lookup

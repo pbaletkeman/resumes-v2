@@ -58,7 +58,7 @@ async def main() -> None:
     provider = "ollama"  # or "openai"
 
     if provider == "ollama":
-        client = OllamaClient("qwen3.5")
+        client = OllamaClient("qwen2.5:7b-instruct")
     else:
         client = OpenAIClient("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY") or "")
 
@@ -86,7 +86,7 @@ async def per_agent_model_example() -> None:
     registry = ModelClientRegistry()
 
     # Register different models for different use cases
-    registry.register("fast", OllamaClient("qwen3.5"))
+    registry.register("fast", OllamaClient("qwen2.5:7b-instruct"))
     # registry.register("smart", OpenAIClient("gpt-4o", api_key="..."))
 
     # Set a default model for all agents
