@@ -17,9 +17,10 @@ The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompt
 - `client/open_ai_client.py` — OpenAI client with error handling
 - `client/errors.py` — Custom LLM exceptions
 - `client/format_detector.py` — Regex-based document parser with LLM fallback (connected), plain text support, projects, metrics, keywords extraction
-- `client/models.py` — `ParsedResume` (with projects, keywords) and `ParsedJobDescription` Pydantic models
+- `client/models.py` — `ParsedResume` (with projects, keywords), `ParsedJobDescription`, and `JDParsingOutput` Pydantic models
 - `client/model_registry.py` — Per-agent model assignment registry
 - `client/templates/` — Jinja2 resume/cover letter templates (no renderer class)
+- `client/agents/jd_parsing.py` — JD Parsing Agent (Agent 1) with LLM + regex fallback
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo
@@ -106,17 +107,21 @@ The original plan called for `client/agents/base.py` with a `BaseAgent` ABC. Ins
 
 ### 2.3 JD Parsing Agent
 
-**Status:** ❌ NOT DONE (currently uses generic `PipelineAgent`)
+**Status:** ✅ DONE
 
-**Current state:** `pipeline.py` line 194-203 runs a generic `PipelineAgent` with a basic prompt. This should be enhanced with structured output validation.
+**Implemented:**
 
-**What to do:**
+- `client/agents/jd_parsing.py` — dedicated `JDParsingAgent` class
+- Uses system prompt from `bots.md`
+- Parses LLM response as JSON, validates against `JDParsingOutput` Pydantic model
+- Retries once with stricter rules on validation failure
+- Falls back to `FormatDetector.parse_job_description()` on second failure
+- `client/models.py` — added `JDParsingOutput` model with `@field_validator` for `company_signals` (accepts list or dict)
+- `pipeline.py` — `sample_run()` uses `JDParsingAgent`; `run_resume_pipeline()` handles both model and dict results
 
-1. Create `client/agents/jd_parsing.py` with a dedicated agent that:
-   - Uses the system prompt from `bots.md` (see below)
-   - Parses LLM response as JSON
-   - Validates against a `JDParsingOutput` Pydantic model
-   - Falls back to `FormatDetector.parse_job_description()` on failure
+**Files changed:** `client/agents/jd_parsing.py` (new), `client/agents/__init__.py` (new), `client/models.py`, `pipeline.py`
+
+**Test:** `uv run python wip_testing/debug_jd.py`
 
 **System prompt (from `bots.md`):**
 
@@ -888,7 +893,7 @@ client/
   ollama_client.py                 # EXISTS ✅ (configurable timeout, default 300s)
   open_ai_client.py                # EXISTS ✅
   format_detector.py               # EXISTS ✅ (expanded with projects, metrics, keywords)
-  models.py                        # EXISTS ⚠️ needs agent output schemas
+  models.py                        # EXISTS ✅ (ParsedResume, ParsedJobDescription, JDParsingOutput)
   templates/                       # EXISTS ⚠️ needs renderer.py
     __init__.py                    # EXISTS
     modern.py                      # EXISTS
@@ -896,9 +901,9 @@ client/
     minimal.py                     # EXISTS
     cover_letter.py                # EXISTS
     renderer.py                    # NEW - multi-format resume output
-  agents/                          # NEW - dedicated agent classes
-    __init__.py                    # NEW - agent exports
-    jd_parsing.py                  # NEW - Agent 1
+  agents/                          # EXISTS ✅ (partial — Agent 1 done)
+    __init__.py                    # EXISTS ✅
+    jd_parsing.py                  # EXISTS ✅ - Agent 1
     resume_parsing.py              # NEW - Agent 2
     gap_analysis.py                # NEW - Agent 3
     resume_rewrite.py              # NEW - Agent 4
@@ -956,8 +961,8 @@ wip_testing/
 | 3 | Phase 2.1: Expand FormatDetector | ✅ DONE | None | 2 |
 | 4 | Phase 7.2: Unit tests (format_detector) | ✅ DONE | Step 3 | 1 |
 | 5 | Tooling: ruff, pyright, pytest | ✅ DONE | None | 3 |
-| 6 | Phase 6.1: Agent output models | ❌ TODO | None | 1 |
-| 7 | Phase 2.3: JD Parsing Agent | ❌ TODO | Steps 3, 6 | 1 |
+| 6 | Phase 6.1: Agent output models | ✅ DONE (partial: JDParsingOutput) | None | 1 |
+| 7 | Phase 2.3: JD Parsing Agent | ✅ DONE | Steps 3, 6 | 3 |
 | 8 | Phase 2.4: Resume Parsing Agent | ❌ TODO | Steps 3, 6 | 1 |
 | 9 | Phase 3.1: Gap Analysis Agent | ❌ TODO | Steps 6, 7, 8 | 1 |
 | 10 | Phase 3.2: Resume Rewrite Agent | ❌ TODO | Steps 6, 8, 9 | 1 |

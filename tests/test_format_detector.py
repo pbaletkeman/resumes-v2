@@ -145,18 +145,18 @@ class TestExtractMetrics:
 class TestExtractKeywords:
     def test_top_keywords(self) -> None:
         content = "python python python javascript javascript sql"
-        keywords = FormatDetector._extract_keywords(content, top_n=2)
+        keywords = FormatDetector.extract_keywords(content, top_n=2)
         assert keywords[0] == "python"
         assert keywords[1] == "javascript"
 
     def test_stopwords_filtered(self) -> None:
         content = "the the the python is a good language"
-        keywords = FormatDetector._extract_keywords(content, top_n=3)
+        keywords = FormatDetector.extract_keywords(content, top_n=3)
         assert "the" not in keywords
         assert "is" not in keywords
 
     def test_empty_content(self) -> None:
-        assert FormatDetector._extract_keywords("") == []
+        assert FormatDetector.extract_keywords("") == []
 
 
 class TestDetectFormat:

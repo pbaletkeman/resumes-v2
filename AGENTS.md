@@ -32,7 +32,7 @@ No CI is configured. No `Makefile` exists.
 
 ## Architecture
 
-```
+```plaintext
 pipeline.py          # AgentRunner, PipelineAgent, run_resume_pipeline()
 basic.py             # Single-agent demo
 config/agents.py     # Env-var-based agent-to-model configuration
@@ -42,12 +42,15 @@ client/
   open_ai_client.py  # OpenAI implementation
   model_registry.py  # Per-agent model assignment (ModelClientRegistry)
   format_detector.py # Regex parser with LLM fallback (connected)
-  models.py          # ParsedResume, ParsedJobDescription (Pydantic)
+  models.py          # ParsedResume, ParsedJobDescription, JDParsingOutput (Pydantic)
   templates/         # Jinja2 resume/cover letter templates (no renderer yet)
+  agents/
+    jd_parsing.py    # JD Parsing Agent (Agent 1)
 tests/
   test_format_detector.py  # FormatDetector regex parsing tests
 wip_testing/
   parsing.py         # Manual parsing test script (regex + LLM)
+  debug_jd.py        # JD Parsing Agent test script
 ```
 
 ## Key conventions
@@ -73,7 +76,7 @@ JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
                     [7. Cover Letter] → cover_letter
 ```
 
-All 7 agents are currently `PipelineAgent` stubs (generic LLM wrappers). Dedicated agent classes in `client/agents/` are planned but not implemented yet (see `resume-todo.md`).
+All 7 agents are currently `PipelineAgent` stubs (generic LLM wrappers), except Agent 1 (JD Parsing) which has a dedicated `JDParsingAgent` class. Remaining dedicated agent classes in `client/agents/` are planned (see `resume-todo.md`).
 
 ## Testing
 
@@ -81,4 +84,4 @@ pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/`. Currentl
 
 ## Status
 
-Many features in `resume-todo.md` are marked NOT DONE. The pipeline runs end-to-end but agents use generic prompts. Agent output Pydantic schemas (`client/models.py`) are incomplete — only `ParsedResume` and `ParsedJobDescription` exist.
+Many features in `resume-todo.md` are marked NOT DONE. The pipeline runs end-to-end but most agents use generic prompts. Agent 1 (JD Parsing) has a dedicated class with LLM + regex fallback. Agent output Pydantic schemas (`client/models.py`) are incomplete — only `ParsedResume`, `ParsedJobDescription`, and `JDParsingOutput` exist.

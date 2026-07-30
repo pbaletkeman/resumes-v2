@@ -18,8 +18,10 @@ import time
 from collections.abc import Mapping
 from typing import Any, Protocol
 
+from client.agents.jd_parsing import JDParsingAgent
 from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
+from client.ollama_client import OllamaClient
 from config.agents import build_registry
 
 logger = logging.getLogger(__name__)
@@ -126,7 +128,7 @@ class AgentRunner:
         self.agents = dict(agents)
         self.registry = registry
 
-    def run_agent(self, name: str, inputs: dict[str, Any]) -> dict[str, Any]:
+    def run_agent(self, name: str, inputs: dict[str, Any]) -> Any:
         """Run a named agent with the given inputs.
 
         Args:
@@ -134,7 +136,7 @@ class AgentRunner:
             inputs: Dictionary of input data for the agent.
 
         Returns:
-            The agent's output dictionary.
+            The agent's output (type depends on the agent).
 
         Raises:
             KeyError: If the agent name is not registered.
@@ -156,7 +158,7 @@ class AgentRunner:
             self.agents[name] = agent  # Cache the instance
 
         try:
-            result: dict[str, Any] = asyncio.run(agent.run(inputs))
+            result: Any = asyncio.run(agent.run(inputs))
             elapsed = time.monotonic() - start
             logger.info("Agent %s completed in %.1fs", name, elapsed)
             return result
@@ -199,13 +201,15 @@ def run_resume_pipeline(
     jd_result = runner.run_agent(
         "jd_parsing_agent",
         {
-            "prompt": "Extract structured data from this job description.",
-            "output": ["parsed_job_description"],
-            "rules": ["Return valid JSON"],
             "job_description": job_description,
         },
     )
-    parsed_job_description = jd_result["parsed_job_description"]
+    # Handle both JDParsingOutput model and raw dict
+    parsed_job_description: Any = (  # pyright: ignore[reportUnknownVariableType]
+        jd_result.get("parsed_job_description", jd_result)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        if isinstance(jd_result, dict)
+        else jd_result
+    )
 
     # 2. Resume Parsing Agent
     resume_result = runner.run_agent(
@@ -350,14 +354,10 @@ def sample_run() -> None:
     Replace the placeholder JD and resume text with real content to see
     meaningful output.
     """
-    from client.ollama_client import OllamaClient
-
     client = OllamaClient("qwen2.5:7b-instruct")
 
     agents_map = {
-        "jd_parsing_agent": PipelineAgent(
-            client, "Extract structured data from job descriptions"
-        ),
+        "jd_parsing_agent": JDParsingAgent(client),
         "resume_parsing_agent": PipelineAgent(
             client, "Extract structured data from resumes"
         ),

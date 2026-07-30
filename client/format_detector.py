@@ -87,7 +87,7 @@ class FormatDetector:
                 + r"|"
                 + FormatDetector._section_pattern("Certification"),
             ),
-            "keywords": FormatDetector._extract_keywords(content),
+            "keywords": FormatDetector.extract_keywords(content),
             "raw": content,
         }
 
@@ -461,7 +461,7 @@ class FormatDetector:
         return metrics
 
     @staticmethod
-    def _extract_keywords(content: str, top_n: int = 20) -> list[str]:
+    def extract_keywords(content: str, top_n: int = 20) -> list[str]:
         """Extract top frequency-based keywords from content.
 
         Splits on whitespace and punctuation, filters stopwords, and
