@@ -7,6 +7,8 @@ via the official openai Python SDK.
 """
 
 import asyncio
+import logging
+import time
 
 from openai import (
     APIConnectionError,
@@ -15,6 +17,7 @@ from openai import (
     AuthenticationError,
     RateLimitError,
 )
+from openai.types.chat import ChatCompletion
 
 from client.errors import (
     LLMConnectionError,
@@ -22,6 +25,8 @@ from client.errors import (
     LLMTimeoutError,
 )
 from client.model_client import ModelClient
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIClient(ModelClient):
@@ -87,8 +92,15 @@ class OpenAIClient(ModelClient):
 
         task = "\n".join(parts)
 
+        logger.debug(
+            "OpenAI request: model=%s prompt_len=%d messages=2",
+            self.model,
+            len(task),
+        )
+        start = time.monotonic()
+
         try:
-            response = await asyncio.wait_for(
+            response: ChatCompletion = await asyncio.wait_for(
                 self.client.chat.completions.create(
                     model=self.model,
                     messages=[
@@ -99,29 +111,47 @@ class OpenAIClient(ModelClient):
                 timeout=90,
             )
         except AuthenticationError as e:
+            logger.warning("OpenAI auth failed: %s", e, exc_info=True)
             raise LLMResponseError(
                 f"Invalid OpenAI API key for model '{self.model}'"
             ) from e
         except RateLimitError as e:
+            logger.warning("OpenAI rate limit exceeded: %s", e, exc_info=True)
             raise LLMResponseError(
                 f"OpenAI rate limit exceeded for model '{self.model}'"
             ) from e
         except APIConnectionError as e:
+            logger.warning("OpenAI connection failed: %s", e, exc_info=True)
             raise LLMConnectionError(
                 f"Cannot connect to OpenAI API for model '{self.model}'"
             ) from e
         except APIError as e:
+            logger.warning("OpenAI API error: %s", e, exc_info=True)
             raise LLMResponseError(
                 f"OpenAI API error for model '{self.model}': {e}"
             ) from e
         except TimeoutError as e:
+            logger.warning(
+                "OpenAI timeout after 90s for model %s",
+                self.model,
+                exc_info=True,
+            )
             raise LLMTimeoutError(
                 f"OpenAI model '{self.model}' did not respond within 90 seconds"
             ) from e
 
         content = response.choices[0].message.content
         if content is None:
+            logger.warning("OpenAI returned empty response for model %s", self.model)
             raise LLMResponseError(
                 f"OpenAI model '{self.model}' returned an empty response"
             )
+
+        elapsed = time.monotonic() - start
+        logger.debug(
+            "OpenAI response: model=%s response_len=%d latency=%.1fs",
+            self.model,
+            len(content),
+            elapsed,
+        )
         return content

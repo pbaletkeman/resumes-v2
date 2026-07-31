@@ -9,12 +9,15 @@ model assignment with a configurable default fallback.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
 from client.model_client import ModelClient
 from client.ollama_client import OllamaClient
 from client.open_ai_client import OpenAIClient
+
+logger = logging.getLogger(__name__)
 
 
 class ModelClientRegistry:
@@ -54,6 +57,7 @@ class ModelClientRegistry:
         if name in self._clients:
             raise ValueError(f"Model client '{name}' is already registered")
         self._clients[name] = client
+        logger.debug("Registered model client: %s", name)
 
     def get(self, name: str) -> ModelClient:
         """Retrieve a registered model client by name.
@@ -84,6 +88,7 @@ class ModelClientRegistry:
         if name not in self._clients:
             raise KeyError(f"Model client '{name}' not found")
         self._default_client_name = name
+        logger.debug("Default model client set to: %s", name)
 
     def set_agent_client(self, agent_name: str, client_name: str) -> None:
         """Assign a specific model client to an agent.
@@ -98,6 +103,7 @@ class ModelClientRegistry:
         if client_name not in self._clients:
             raise KeyError(f"Model client '{client_name}' not found")
         self._agent_clients[agent_name] = client_name
+        logger.debug("Agent assignment: %s -> %s", agent_name, client_name)
 
     def get_client_for_agent(self, agent_name: str) -> ModelClient:
         """Get the model client assigned to a specific agent.
@@ -115,10 +121,17 @@ class ModelClientRegistry:
         """
         # Check for per-agent override first
         if agent_name in self._agent_clients:
+            name = self._agent_clients[agent_name]
+            logger.debug("Resolved agent client: %s -> %s (override)", agent_name, name)
             return self.get(self._agent_clients[agent_name])
 
         # Fall back to default
         if self._default_client_name is not None:
+            logger.debug(
+                "Resolved agent client: %s -> %s (default)",
+                agent_name,
+                self._default_client_name,
+            )
             return self.get(self._default_client_name)
 
         available = ", ".join(self._clients.keys()) or "(none)"
@@ -183,6 +196,9 @@ class ModelClientRegistry:
                     f"Supported: {', '.join(providers.keys())}"
                 )
             self.register(name, factory(client_cfg))
+            logger.debug(
+                "Registered client from config: %s (provider=%s)", name, provider
+            )
 
         # Set default
         if "default" in config:

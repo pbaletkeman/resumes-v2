@@ -13,6 +13,7 @@ from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
 from client.ollama_client import OllamaClient
 from client.open_ai_client import OpenAIClient
+from logging_config import configure_logging
 
 
 class SimpleAgent:
@@ -55,6 +56,7 @@ class SimpleAgent:
 
 async def main() -> None:
     """Run a simple geography question through the agent."""
+    configure_logging()
     provider = "ollama"  # or "openai"
 
     if provider == "ollama":

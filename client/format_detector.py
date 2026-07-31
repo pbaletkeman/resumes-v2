@@ -62,6 +62,9 @@ class FormatDetector:
         Returns:
             Validated `ParsedResume` with all fields populated.
         """
+        fmt = self._detect_format(content)
+        logger.debug("Resume format detected: %s", fmt)
+
         data: dict[str, Any] = {
             "name": FormatDetector._extract_name(content),
             "title": FormatDetector._extract_title(content),
@@ -91,6 +94,18 @@ class FormatDetector:
             "raw": content,
         }
 
+        non_empty = sum(
+            1
+            for v in data.values()
+            if (isinstance(v, str) and v not in ("", "Unknown"))
+            or (isinstance(v, list) and len(v) > 0)  # pyright: ignore[reportUnknownArgumentType]
+        )
+        logger.debug(
+            "Resume regex results: %d/%d fields populated",
+            non_empty,
+            len(data) - 1,
+        )
+
         if self._is_insufficient_resume(data) and self.client is not None:
             logger.info("Regex parsing sparse, falling back to LLM")
             llm_result = await self._llm_parse_resume(content)
@@ -111,6 +126,9 @@ class FormatDetector:
         Returns:
             Validated `ParsedJobDescription` with all fields populated.
         """
+        fmt = self._detect_format(content)
+        logger.debug("Job description format detected: %s", fmt)
+
         data: dict[str, Any] = {
             "title": FormatDetector._extract_job_title(content),
             "responsibilities": FormatDetector._extract_bullet_points(
@@ -130,6 +148,18 @@ class FormatDetector:
             ),
             "raw": content,
         }
+
+        non_empty = sum(
+            1
+            for v in data.values()
+            if (isinstance(v, str) and v not in ("", "Unknown"))
+            or (isinstance(v, list) and len(v) > 0)  # pyright: ignore[reportUnknownArgumentType]
+        )
+        logger.debug(
+            "JD regex results: %d/%d fields populated",
+            non_empty,
+            len(data) - 1,
+        )
 
         if self._is_insufficient_jd(data) and self.client is not None:
             logger.info("Regex parsing sparse, falling back to LLM")
@@ -492,7 +522,9 @@ class FormatDetector:
             ``"markdown"`` if Markdown patterns are found, else ``"plain"``.
         """
         if re.search(r"^##\s+", content, re.MULTILINE):
+            logger.debug("Format detection: markdown (found ## headings)")
             return "markdown"
+        logger.debug("Format detection: plain (no ## headings found)")
         return "plain"
 
     # ------------------------------------------------------------------
@@ -544,6 +576,11 @@ class FormatDetector:
         )
         if self.client is None:
             return None
+        logger.debug(
+            "LLM resume parse: prompt_len=%d, input_len=%d",
+            len(prompt),
+            len(content),
+        )
         try:
             raw = await self.client.chat(
                 purpose="Resume parsing agent",
@@ -562,6 +599,7 @@ class FormatDetector:
                 rules=["Return only valid JSON", "Do not infer missing information"],
                 inputs=[content],
             )
+            logger.debug("LLM resume response: %s", raw[:200] if raw else "<empty>")
             result = self._safe_json(raw)
             if result is not None:
                 result = self._normalize_list_fields(result)
@@ -591,6 +629,11 @@ class FormatDetector:
         )
         if self.client is None:
             return None
+        logger.debug(
+            "LLM JD parse: prompt_len=%d, input_len=%d",
+            len(prompt),
+            len(content),
+        )
         try:
             raw = await self.client.chat(
                 purpose="Job description parsing agent",
@@ -602,6 +645,7 @@ class FormatDetector:
                 ],
                 inputs=[content],
             )
+            logger.debug("LLM JD response: %s", raw[:200] if raw else "<empty>")
             return self._safe_json(raw)
         except (
             NotImplementedError,
@@ -630,7 +674,7 @@ class FormatDetector:
                     flat.append(item)
                 elif isinstance(item, dict):
                     # Join all values into a single descriptive string
-                    flat.append(" - ".join(str(v) for v in item.values() if v))
+                    flat.append(" - ".join(str(v) for v in item.values() if v))  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
             data[key] = flat
         return data
 
@@ -641,6 +685,7 @@ class FormatDetector:
         Handles responses wrapped in markdown fences (```json ... ```).
         """
         text = raw.strip()
+        logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
         fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
         if fence_match:
             text = fence_match.group(1).strip()

@@ -1,10 +1,19 @@
 """Shared fixtures for tests."""
 
+import logging
 from pathlib import Path
 
 import pytest
 
 SAMPLE_DIR = Path(__file__).resolve().parent.parent / "sample"
+
+
+@pytest.fixture(autouse=True)
+def configure_test_logging():
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(name)s %(levelname)s: %(message)s",
+    )
 
 
 @pytest.fixture

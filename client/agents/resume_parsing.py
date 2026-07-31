@@ -68,7 +68,10 @@ class ResumeParsingAgent:
         """
         resume_text = inputs.get("resume", "")
         if not resume_text:
+            logger.debug("Resume parsing: empty input, returning defaults")
             return ResumeParsingOutput()
+
+        logger.debug("Resume parsing: input_len=%d", len(resume_text))
 
         # Attempt LLM extraction (with one retry)
         for attempt in range(2):
@@ -102,6 +105,12 @@ class ResumeParsingAgent:
             ]
         )
 
+        logger.debug(
+            "LLM resume attempt=%s prompt_len=%d",
+            "strict" if strict else "normal",
+            len(prompt),
+        )
+
         try:
             raw = await self.client.chat(
                 purpose=_SYSTEM_PROMPT,
@@ -122,6 +131,7 @@ class ResumeParsingAgent:
             )
             return None
 
+        logger.debug("LLM resume response: %s", raw[:200] if raw else "<empty>")
         data = self._parse_json(raw)
         if data is None:
             return None
@@ -139,6 +149,7 @@ class ResumeParsingAgent:
         Handles responses wrapped in markdown fences.
         """
         text = raw.strip()
+        logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
         fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
         if fence_match:
             text = fence_match.group(1).strip()
@@ -165,6 +176,13 @@ class ResumeParsingAgent:
         fd = FormatDetector()
         parsed = await fd.parse_resume(resume_text)
 
+        logger.debug(
+            "Regex fallback results: skills=%d experience=%d projects=%d",
+            len(parsed.skills),
+            len(parsed.experience),
+            len(parsed.projects),
+        )
+
         experience: list[ExperienceEntry] = []
         for entry in parsed.experience:
             experience.append(_parse_experience_line(entry))
@@ -187,10 +205,16 @@ def _parse_experience_line(line: str) -> ExperienceEntry:
     ``responsibilities`` if parsing fails.
     """
     # Pattern: "Title | Company | Dates" or "Title - Company - Dates"
-    for sep in [" | ", " -- ", " – ", " - ", " at "]:
+    for sep in [" | ", " -- ", " \u2013 ", " - ", " at "]:
         if sep in line:
             parts = [p.strip() for p in line.split(sep)]
             if len(parts) >= 2:
+                logger.debug(
+                    "Experience parse: title=%s company=%s dates=%s",
+                    parts[0],
+                    parts[1] if len(parts) > 1 else "",
+                    parts[2] if len(parts) > 2 else "",
+                )
                 return ExperienceEntry(
                     title=parts[0],
                     company=parts[1] if len(parts) > 1 else "",
@@ -199,4 +223,5 @@ def _parse_experience_line(line: str) -> ExperienceEntry:
                 )
 
     # No delimiter found -- put the whole line as responsibility
+    logger.debug("Experience parse: no delimiter found, full line as responsibility")
     return ExperienceEntry(responsibilities=[line])

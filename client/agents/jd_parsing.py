@@ -67,7 +67,10 @@ class JDParsingAgent:
         """
         jd_text = inputs.get("job_description", "")
         if not jd_text:
+            logger.debug("JD parsing: empty input, returning defaults")
             return JDParsingOutput()
+
+        logger.debug("JD parsing: input_len=%d", len(jd_text))
 
         # Attempt LLM extraction (with one retry)
         for attempt in range(2):
@@ -101,6 +104,12 @@ class JDParsingAgent:
             ]
         )
 
+        logger.debug(
+            "LLM JD attempt=%s prompt_len=%d",
+            "strict" if strict else "normal",
+            len(prompt),
+        )
+
         try:
             raw = await self.client.chat(
                 purpose=_SYSTEM_PROMPT,
@@ -121,6 +130,7 @@ class JDParsingAgent:
             )
             return None
 
+        logger.debug("LLM JD response: %s", raw[:200] if raw else "<empty>")
         data = self._parse_json(raw)
         if data is None:
             return None
@@ -138,6 +148,7 @@ class JDParsingAgent:
         Handles responses wrapped in markdown fences.
         """
         text = raw.strip()
+        logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
         fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
         if fence_match:
             text = fence_match.group(1).strip()
@@ -159,6 +170,15 @@ class JDParsingAgent:
         """
         fd = FormatDetector()
         parsed = await fd.parse_job_description(jd_text)
+
+        logger.debug(
+            "Regex fallback results: title=%s responsibilities=%d"
+            " requirements=%d nice_to_have=%d",
+            parsed.title,
+            len(parsed.responsibilities),
+            len(parsed.requirements),
+            len(parsed.nice_to_have),
+        )
 
         # Map ParsedJobDescription fields to JDParsingOutput fields
         return JDParsingOutput(

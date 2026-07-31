@@ -8,11 +8,15 @@ Concrete ModelClient implementation for the Ollama API.
 """
 
 import asyncio
+import logging
+import time
 
 import ollama
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
 from client.model_client import ModelClient
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaClient(ModelClient):
@@ -67,6 +71,13 @@ class OllamaClient(ModelClient):
         """
         task = self._build_compact_prompt(purpose, prompt, output, rules, inputs)
 
+        logger.debug(
+            "Ollama request: model=%s prompt_len=%d messages=2",
+            self.model,
+            len(task),
+        )
+        start = time.monotonic()
+
         try:
             response = await asyncio.wait_for(
                 self.client.chat(  # pyright: ignore[reportUnknownMemberType]
@@ -80,23 +91,40 @@ class OllamaClient(ModelClient):
                 timeout=self.timeout,
             )
         except ollama.RequestError as e:
+            logger.warning("Ollama connection failed: %s", e, exc_info=True)
             raise LLMConnectionError(
                 f"Cannot connect to Ollama. Is the server running? {e}"
             ) from e
         except ollama.ResponseError as e:
+            logger.warning("Ollama response error: %s", e, exc_info=True)
             raise LLMResponseError(
                 f"Ollama returned an error for model '{self.model}': {e}"
             ) from e
         except TimeoutError as e:
+            logger.warning(
+                "Ollama timeout after %ds for model %s",
+                self.timeout,
+                self.model,
+                exc_info=True,
+            )
             raise LLMTimeoutError(
                 f"Ollama model '{self.model}' did not respond within {self.timeout}s"
             ) from e
 
         content = response.message.content
         if content is None:
+            logger.warning("Ollama returned empty response for model %s", self.model)
             raise LLMResponseError(
                 f"Ollama model '{self.model}' returned an empty response"
             )
+
+        elapsed = time.monotonic() - start
+        logger.debug(
+            "Ollama response: model=%s response_len=%d latency=%.1fs",
+            self.model,
+            len(content),
+            elapsed,
+        )
         return content
 
     def _build_compact_prompt(

@@ -19,10 +19,13 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 from client.model_registry import ModelClientRegistry
+
+logger = logging.getLogger(__name__)
 
 
 def get_agent_config() -> dict[str, Any]:
@@ -46,6 +49,13 @@ def get_agent_config() -> dict[str, Any]:
     provider = os.getenv("MODEL_PROVIDER", "ollama")
     model = os.getenv("MODEL_NAME", "qwen2.5:7b-instruct")
     api_key = os.getenv("OPENAI_API_KEY", "")
+
+    logger.debug(
+        "Agent config: provider=%s model=%s has_api_key=%s",
+        provider,
+        model,
+        bool(api_key),
+    )
 
     # Agent names for environment variable lookup
     agent_names = [
@@ -86,6 +96,12 @@ def get_agent_config() -> dict[str, Any]:
                     else {}
                 ),
             }
+            logger.debug(
+                "Agent override: %s provider=%s model=%s",
+                agent_name,
+                agent_provider or provider,
+                agent_model or model,
+            )
 
     # Build agent assignments
     agents: dict[str, str] = {}
@@ -113,6 +129,11 @@ def build_registry() -> ModelClientRegistry:
     config = get_agent_config()
     registry = ModelClientRegistry()
     registry.from_config(config)
+    logger.info(
+        "Registry built: %d clients, %d agent overrides",
+        len(config["clients"]),
+        len(config["agents"]),
+    )
     return registry
 
 

@@ -31,7 +31,7 @@ Use stdlib `logging.config.dictConfig` via a dedicated `logging_config.py` modul
 
 ### 1. Create logging configuration module
 
-**New file:** `logging_config.py`
+**New file:** `logging_config.py` ✅ DONE
 
 Create a `configure_logging()` function using `logging.config.dictConfig()`:
 
@@ -77,9 +77,11 @@ Key design decisions:
 - LLM client loggers hard-coded to `DEBUG` so API traffic is always visible when root is at `DEBUG`
 - New per-module overrides can be added to the `loggers` dict as needed
 
+Includes third-party suppressions (task 11): `ollama`, `openai`, `httpx`, `httpcore` all set to `WARNING`.
+
 ### 2. Call `configure_logging()` at pipeline entry points
 
-**Files:** `pipeline.py`, `basic.py`
+**Files:** `pipeline.py`, `basic.py` ✅ DONE
 
 Call `configure_logging()` at the top of each entry point, before any agents run:
 - `pipeline.py` ~line 184 (`run_resume_pipeline`): add `configure_logging()` before agent execution
@@ -91,7 +93,7 @@ This ensures all existing `logger.info()` / `logger.warning()` / `logger.error()
 
 ### 3. Add logging to OllamaClient
 
-**File:** `client/ollama_client.py`
+**File:** `client/ollama_client.py` ✅ DONE
 
 Add `logger = logging.getLogger(__name__)` after imports.
 
@@ -106,7 +108,7 @@ Log at these points:
 
 ### 4. Add logging to OpenAIClient
 
-**File:** `client/open_ai_client.py`
+**File:** `client/open_ai_client.py` ✅ DONE
 
 Add `logger = logging.getLogger(__name__)` after imports.
 
@@ -121,7 +123,7 @@ Log at these points:
 
 ### 5. Add debug logging to FormatDetector
 
-**File:** `client/format_detector.py`
+**File:** `client/format_detector.py` ✅ DONE
 
 Existing logger at line 20. Add `debug`-level calls:
 
@@ -136,7 +138,7 @@ Existing logger at line 20. Add `debug`-level calls:
 
 ### 6. Add debug logging to JD Parsing Agent
 
-**File:** `client/agents/jd_parsing.py`
+**File:** `client/agents/jd_parsing.py` ✅ DONE
 
 Existing logger at line 22. Add `debug`-level calls:
 
@@ -149,7 +151,7 @@ Existing logger at line 22. Add `debug`-level calls:
 
 ### 7. Add debug logging to Resume Parsing Agent
 
-**File:** `client/agents/resume_parsing.py`
+**File:** `client/agents/resume_parsing.py` ✅ DONE
 
 Existing logger at line 22. Add `debug`-level calls:
 
@@ -163,7 +165,7 @@ Existing logger at line 22. Add `debug`-level calls:
 
 ### 8. Add logging to config loader
 
-**File:** `config/agents.py`
+**File:** `config/agents.py` ✅ DONE
 
 Add `logger = logging.getLogger(__name__)` after imports.
 
@@ -176,7 +178,7 @@ Add `logger = logging.getLogger(__name__)` after imports.
 
 ### 9. Add logging to ModelClientRegistry
 
-**File:** `client/model_registry.py`
+**File:** `client/model_registry.py` ✅ DONE
 
 Add `logger = logging.getLogger(__name__)` after imports.
 
@@ -188,7 +190,7 @@ Add `logger = logging.getLogger(__name__)` after imports.
 
 ### 10. Add logging to model clients (base class awareness)
 
-**File:** `client/model_client.py`
+**File:** `client/model_client.py` ✅ SKIPPED
 
 This is an ABC — no logging needed here. Skip.
 
@@ -207,21 +209,21 @@ In `logging_config.py`, add suppressions for library loggers that would otherwis
 },
 ```
 
-Without this, `LOG_LEVEL=DEBUG` would dump raw HTTP traffic from the SDK libraries on top of the application-level logs.
+Without this, `LOG_LEVEL=DEBUG` would dump raw HTTP traffic from the SDK libraries on top of the application-level logs. ✅ DONE (implemented in task 1)
 
 ### 12. Enforce lazy formatting in log calls
 
 All log calls must use `%s` formatting, not f-strings:
 
 ```python
-# Correct — string interpolation is deferred until the message is actually emitted
+# Correct -- string interpolation is deferred until the message is actually emitted
 logger.debug("LLM response for %s: %d chars", model_name, len(response))
 
-# Wrong — string is interpolated even when DEBUG is disabled
+# Wrong -- string is interpolated even when DEBUG is disabled
 logger.debug(f"LLM response for {model_name}: {len(response)} chars")
 ```
 
-Apply this rule to every `logger.debug()` / `logger.info()` call added in tasks 3-9.
+Apply this rule to every `logger.debug()` / `logger.info()` call added in tasks 3-9. ✅ DONE (verified: 0 f-strings found across all log calls)
 
 ### 13. Use `exc_info=True` for exception paths
 
@@ -233,13 +235,13 @@ except LLMConnectionError as e:
 ```
 
 This gives full stack traces in the log output without requiring `logger.exception()`. Apply to:
-- `OllamaClient.chat()` exception handlers (task 3)
-- `OpenAIClient.chat()` exception handlers (task 4)
-- `AgentRunner.run_agent()` error path (existing line 167)
+- `OllamaClient.chat()` exception handlers (task 3) ✅
+- `OpenAIClient.chat()` exception handlers (task 4) ✅
+- `AgentRunner.run_agent()` error path (existing line 167) ✅
 
 ### 14. Add test logging configuration
 
-**File:** `tests/conftest.py`
+**File:** `tests/conftest.py` ✅ DONE
 
 Add a pytest fixture that configures logging for the test suite so log output is visible during test runs but doesn't clutter CI:
 
@@ -265,14 +267,14 @@ uv run pytest tests/test_format_detector.py -v --log-cli-level=DEBUG
 
 Do NOT log:
 - API keys or tokens (even partially masked)
-- Full resume or JD text content at INFO level (DEBUG is acceptable since it's opt-in)
+- Full resume or JD text at INFO level (DEBUG is acceptable since it's opt-in)
 - File paths that reveal directory structure on the user's machine
 
-When in doubt, log metadata (lengths, model names, section counts) rather than content.
+When in doubt, log metadata (lengths, model names, section counts) rather than content. ✅ DONE (audited: no API keys, tokens, or file paths in any log calls; resume/JD content only at DEBUG truncated)
 
 ### 16. Log startup environment configuration
 
-**File:** `pipeline.py`
+**File:** `pipeline.py` ✅ DONE
 
 At the start of `run_resume_pipeline()`, after `configure_logging()`, log the resolved configuration so users can verify their setup before agents run:
 
@@ -286,7 +288,7 @@ This answers the common question "which model am I actually using?" without requ
 
 ### 17. Log pipeline completion summary
 
-**File:** `pipeline.py`
+**File:** `pipeline.py` ✅ DONE
 
 At the end of `run_resume_pipeline()`, log a summary of what happened:
 

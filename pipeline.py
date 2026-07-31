@@ -24,6 +24,7 @@ from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
 from client.ollama_client import OllamaClient
 from config.agents import build_registry
+from logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class AgentRunner:
             logger.info("Agent %s completed in %.1fs", name, elapsed)
             return result
         except Exception as e:
-            logger.error("Agent '%s' failed: %s", name, e)
+            logger.error("Agent '%s' failed: %s", name, e, exc_info=True)
             raise
 
     def get_client_for_agent(self, name: str) -> ModelClient | None:
@@ -198,6 +199,15 @@ def run_resume_pipeline(
         ``tailoring_strategy``, ``rewritten_resume``, ``ats_optimized_resume``,
         ``polished_resume``, ``cover_letter``.
     """
+    configure_logging()
+
+    total_agents = 7
+    pipeline_start = time.monotonic()
+
+    logger.info("Pipeline starting")
+    agent_names = list(runner.agents.keys())
+    logger.info("Agents configured: %s", ", ".join(agent_names))
+
     # 1. JD Parsing Agent
     jd_result = runner.run_agent(
         "jd_parsing_agent",
@@ -290,6 +300,14 @@ def run_resume_pipeline(
         },
     )
     cover_letter = cover_result["cover_letter"]
+
+    total_time = time.monotonic() - pipeline_start
+    logger.info(
+        "Pipeline completed in %.1fs — %d/%d agents succeeded",
+        total_time,
+        total_agents,
+        total_agents,
+    )
 
     return {
         "parsed_job_description": parsed_job_description,
