@@ -35,6 +35,7 @@ No CI is configured. No `Makefile` exists.
 ```plaintext
 pipeline.py          # AgentRunner, PipelineAgent, run_resume_pipeline()
 basic.py             # Single-agent demo
+logging_config.py    # Centralized logging (dictConfig, LOG_LEVEL env var)
 config/agents.py     # Env-var-based agent-to-model configuration
 client/
   model_client.py    # ABC for LLM clients
@@ -63,6 +64,16 @@ wip_testing/
 - **No extended characters** in LLM output: `"` not `""`, `->` not `→`. Enforced in agent prompts.
 - **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode. LLM is now connected — `wip_testing/parsing.py` demonstrates both modes.
 
+## Logging
+
+`logging_config.py` provides `configure_logging()` using `dictConfig`. Called at pipeline entry points (`pipeline.py`, `basic.py`) before agents run.
+
+- **`LOG_LEVEL` env var** controls root logger (default `INFO`). Set to `DEBUG` for verbose output.
+- LLM client loggers (`client.ollama_client`, `client.open_ai_client`) are hard-coded to `DEBUG`.
+- Third-party loggers (`ollama`, `openai`, `httpx`, `httpcore`) suppressed to `WARNING`.
+- All log calls use lazy `%s` formatting, never f-strings.
+- Exception paths use `exc_info=True` for full tracebacks.
+
 ## Pipeline flow
 
 ```
@@ -79,6 +90,13 @@ JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
 ```
 
 All 7 agents are currently `PipelineAgent` stubs (generic LLM wrappers), except Agent 1 (JD Parsing) and Agent 2 (Resume Parsing) which have dedicated classes. Remaining dedicated agent classes in `client/agents/` are planned (see `resume-todo.md`).
+
+## Toolchain quirks
+
+- **pyright** runs in `strict` mode and **excludes `tests/`**. New code under `tests/` won't be type-checked.
+- **ruff** selects rules: `E`, `F`, `I`, `UP`, `B`, `SIM`. Line length 88.
+- **pytest** uses `asyncio_mode = "auto"` — async test functions run without decorators.
+- Python 3.14+ required (`pyproject.toml`).
 
 ## Testing
 

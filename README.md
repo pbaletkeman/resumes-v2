@@ -26,6 +26,7 @@ uv run python pipeline.py
 | Test JD Parsing Agent | `uv run python wip_testing/debug_jd.py` |
 | Test Resume Parsing Agent | `uv run python wip_testing/test_resume_parsing.py` |
 | Regex parsing test (no LLM) | `uv run python wip_testing/parsing.py` |
+| Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
 | Lint | `uv run ruff check .` |
 | Lint (auto-fix) | `uv run ruff check --fix .` |
 | Format check | `uv run ruff format --check .` |
@@ -33,20 +34,23 @@ uv run python pipeline.py
 | Typecheck | `uv run pyright .` |
 | Test | `uv run pytest` |
 | Test (verbose) | `uv run pytest -v` |
+| Test (single file) | `uv run pytest tests/test_format_detector.py` |
+
+See `TESTING.md` for detailed testing instructions (individual agents, OpenAI provider, model registry).
 
 ## Pipeline flow
 
-```
-JD -> [1. JD Parsing] -> [2. Resume Parsing] <- Resume
-                            |
+```plaintext
+JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
+                            ↓
                     [3. Gap Analysis]
-                            |
+                            ↓
                     [4. Resume Rewrite]
-                            |
+                            ↓
                     [5. ATS Compliance]
-                            |
-                    [6. Tone Polishing] -> polished_resume
-                    [7. Cover Letter] -> cover_letter
+                            ↓
+                    [6. Tone Polishing] → polished_resume
+                    [7. Cover Letter] → cover_letter
 ```
 
 ## Architecture
@@ -54,6 +58,7 @@ JD -> [1. JD Parsing] -> [2. Resume Parsing] <- Resume
 ```plaintext
 pipeline.py              # AgentRunner, PipelineAgent, run_resume_pipeline()
 basic.py                 # Single-agent demo
+logging_config.py        # Centralized logging (dictConfig, LOG_LEVEL env var)
 config/agents.py         # Env-var-based agent-to-model configuration
 client/
   model_client.py        # ABC for LLM clients
@@ -79,6 +84,7 @@ wip_testing/
 - **Default model:** `qwen2.5:7b-instruct` on Ollama
 - **Per-agent overrides** via env vars: `COVER_LETTER_AGENT_MODEL=gpt-4o`, `COVER_LETTER_AGENT_PROVIDER=openai`
 - **Global override:** `MODEL_PROVIDER` and `MODEL_NAME`
+- **Logging:** `LOG_LEVEL` env var (default `INFO`). Set to `DEBUG` for verbose LLM traffic.
 
 ## Project structure
 
@@ -86,4 +92,5 @@ wip_testing/
 - `sample/resume/` - Sample resume for testing
 - `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter)
 - `client/model.md` - Quick reference for all Pydantic models
+- `docs/logging-info.md` - Logging implementation plan and status
 - `resume-todo.md` - Implementation plan and status tracker
