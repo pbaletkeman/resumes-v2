@@ -314,7 +314,7 @@ class GapAnalysisOutput(BaseModel):
 
 ### 3.2 Create Resume Rewrite Agent (`client/agents/resume_rewrite.py`)
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 **Purpose:** Rewrite the resume using the tailoring strategy.
 
@@ -378,8 +378,12 @@ class RewriteOutput(BaseModel):
 7. Validate all certifications from input resume are present in output
 8. On failure: retry with explicit instruction "Output a JSON object matching this exact schema: ..."
 9. On second failure: return the parsed resume unchanged with a warning logged
+10. Create a standalone test script that can be used to test this functionality
 
-**Files changed:** new file `client/agents/resume_rewrite.py`
+**Files changed:**
+
+- new file `client/agents/resume_rewrite.py`
+- new file `wip_testing/test_resume_rewrite.py`
 
 ---
 
@@ -440,8 +444,12 @@ class ATSComplianceOutput(BaseModel):
 5. Validate all certifications from input resume are present in the final resume
 6. Validate experiences are in chronological order (most recent first)
 7. On failure: retry; on second failure, return a default low-score result with the resume unchanged
+8. Create a standalone test script that can be used to test this functionality
 
-**Files changed:** new file `client/agents/ats_compliance.py`
+**Files changed:**
+
+- new file `client/agents/ats_compliance.py`
+- new file `wip_testing/test_ats_compliance.py`
 
 ---
 
@@ -491,10 +499,14 @@ class TonePolishingOutput(BaseModel):
 3. Call LLM
 4. Parse and validate JSON
 5. On failure: retry; on second failure, return the input unchanged
+6. Create a standalone test script that can be used to test this functionality
 
 **Note:** This agent works on raw text, not structured JSON. The prompt should instruct the LLM to return JSON with a single `polished_resume` field containing the full resume.
 
-**Files changed:** new file `client/agents/tone_polishing.py`
+**Files changed:**
+
+- new file `client/agents/tone_polishing.py`
+- new file `wip_testing/test_tone_polishing.py`
 
 ---
 
@@ -548,8 +560,12 @@ class CoverLetterOutput(BaseModel):
 4. Parse and validate JSON
 5. Validate word count is between 250-350
 6. On failure: retry; on second failure, return a minimal generic cover letter
+7. Create a standalone test script that can be used to test this functionality
 
-**Files changed:** new file `client/agents/cover_letter.py`
+**Files changed:**
+
+- new file `client/agents/cover_letter.py`
+- new file `wip_testing/test_cover_letter.py`
 
 ---
 
@@ -956,11 +972,11 @@ wip_testing/
 | 6 | Phase 6.1: Agent output models | ✅ DONE | None | 1 |
 | 7 | Phase 2.3: JD Parsing Agent | ✅ DONE | Steps 3, 6 | 3 |
 | 8 | Phase 2.4: Resume Parsing Agent | ✅ DONE | Steps 3, 6 | 2 |
-| 9 | Phase 3.1: Gap Analysis Agent | ✅ DONE | Steps 6, 7, 8 | 1 |
-| 10 | Phase 3.2: Resume Rewrite Agent | ❌ TODO | Steps 6, 8, 9 | 1 |
-| 11 | Phase 3.3: ATS Compliance Agent | ❌ TODO | Steps 6, 10 | 1 |
-| 12 | Phase 4.1: Tone Polishing Agent | ❌ TODO | Steps 6, 11 | 1 |
-| 13 | Phase 4.2: Cover Letter Agent | ❌ TODO | Steps 6, 7, 8, 9 | 1 |
+| 9 | Phase 3.1: Gap Analysis Agent | ✅ DONE | Steps 6, 7, 8 | 2 |
+| 10 | Phase 3.2: Resume Rewrite Agent | ✅ DONE | Steps 6, 8, 9 | 2 |
+| 11 | Phase 3.3: ATS Compliance Agent | ❌ TODO | Steps 6, 10 | 2 |
+| 12 | Phase 4.1: Tone Polishing Agent | ❌ TODO | Steps 6, 11 | 2 |
+| 13 | Phase 4.2: Cover Letter Agent | ❌ TODO | Steps 6, 7, 8, 9 | 2 |
 | 14 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 7-13 | 1 |
 | 15 | Phase 6.2: Output formatter | ❌ TODO | Step 6 | 1 |
 | 16 | Phase 6.3: Template renderer | ❌ TODO | Steps 6, 15 | 2 |
