@@ -6,6 +6,9 @@ Provides validated schemas that both regex and LLM parsing produce,
 ensuring downstream agents always receive consistent fields.
 """
 
+from __future__ import annotations
+
+import json
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -171,9 +174,10 @@ class GapAnalysisOutput(BaseModel):
     @classmethod
     def _coerce_tone_guidance(cls, v: Any) -> str:
         if isinstance(v, dict):
-            parts = [
-                f"{k}: {val}" for k, val in v.items() if val  # type: ignore[reportUnknownVariableType, reportUnknownMemberType]
-            ]
+            parts: list[str] = []
+            for k, val in v.items():  # type: ignore[reportUnknownVariableType, reportUnknownMemberType]
+                if val:
+                    parts.append(f"{k}: {val}")
             return ", ".join(parts) if parts else ""
         if isinstance(v, list):
             return ", ".join(str(item) for item in v)  # type: ignore[reportUnknownVariableType]
@@ -206,6 +210,30 @@ class ATSComplianceOutput(BaseModel):
     recommended_fixes: list[str] = Field(default_factory=list)
     auto_fixes_applied: list[str] = Field(default_factory=list)
     final_resume: str = ""
+
+    @field_validator(
+        "missing_keywords",
+        "formatting_issues",
+        "clarity_issues",
+        "recommended_fixes",
+        "auto_fixes_applied",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_str_lists(cls, v: Any) -> list[str]:
+        return _coerce_str_list(v)
+
+    @field_validator("final_resume", mode="before")
+    @classmethod
+    def _coerce_final_resume(cls, v: Any) -> str:
+        if isinstance(v, dict):
+            return json.dumps(v, indent=2, default=str)
+        if isinstance(v, list):
+            result: list[str] = []
+            for item in v:  # type: ignore[reportUnknownVariableType]
+                result.append(str(item))  # type: ignore[reportUnknownArgumentType]
+            return "\n".join(result)
+        return str(v) if v else ""
 
 
 class TonePolishingOutput(BaseModel):

@@ -23,9 +23,12 @@ uv run python pipeline.py
 | Install/sync deps | `uv sync` |
 | Full 7-agent pipeline | `uv run python pipeline.py` |
 | Single-agent demo | `uv run python basic.py` |
-| Test JD Parsing Agent | `uv run python wip_testing/debug_jd.py` |
+| Test JD Parsing Agent | `uv run python wip_testing/test_job_description.py` |
 | Test Resume Parsing Agent | `uv run python wip_testing/test_resume_parsing.py` |
-| Regex parsing test (no LLM) | `uv run python wip_testing/parsing.py` |
+| Test Gap Analysis Agent | `uv run python wip_testing/test_gap_analysis.py` |
+| Test Resume Rewrite Agent | `uv run python wip_testing/test_resume_rewrite.py` |
+| Test ATS Compliance Agent | `uv run python wip_testing/test_ats_compliance.py` |
+| Regex parsing test (no LLM) | `uv run python wip_testing/test_parsing.py` |
 | Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
 | Lint | `uv run ruff check .` |
 | Lint (auto-fix) | `uv run ruff check --fix .` |
@@ -36,7 +39,7 @@ uv run python pipeline.py
 | Test (verbose) | `uv run pytest -v` |
 | Test (single file) | `uv run pytest tests/test_format_detector.py` |
 
-See `TESTING.md` for detailed testing instructions (individual agents, OpenAI provider, model registry).
+See `docs/TESTING.md` for detailed testing instructions (individual agents, OpenAI provider, model registry).
 
 ## Pipeline flow
 
@@ -70,13 +73,18 @@ client/
   agents/
     jd_parsing.py        # JD Parsing Agent (Agent 1) - dedicated class
     resume_parsing.py    # Resume Parsing Agent (Agent 2) - dedicated class
+    gap_analysis.py      # Gap Analysis Agent (Agent 3) - dedicated class
+    resume_rewrite.py    # Resume Rewrite Agent (Agent 4) - dedicated class
+    ats_compliance.py    # ATS Compliance Agent (Agent 5) - dedicated class
   templates/             # Jinja2 resume/cover letter templates
 tests/
   test_format_detector.py # FormatDetector regex parsing tests (46 tests)
 wip_testing/
-  parsing.py             # Manual parsing test script (regex + LLM)
-  debug_jd.py            # JD Parsing Agent test script
-  test_resume_parsing.py # Resume Parsing Agent test script
+  test_job_description.py  # JD Parsing Agent test
+  test_resume_parsing.py   # Resume Parsing Agent test
+  test_gap_analysis.py     # Gap Analysis Agent test
+  test_resume_rewrite.py   # Resume Rewrite Agent test
+  test_ats_compliance.py   # ATS Compliance Agent test
 ```
 
 ## Configuration
@@ -91,6 +99,7 @@ wip_testing/
 - `sample/jobs/` - Sample job descriptions for testing
 - `sample/resume/` - Sample resume for testing
 - `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter)
-- `client/model.md` - Quick reference for all Pydantic models
+- `docs/models.md` - Quick reference for all Pydantic models
+- `docs/TESTING.md` - Detailed testing guide
 - `docs/logging-info.md` - Logging implementation plan and status
 - `resume-todo.md` - Implementation plan and status tracker

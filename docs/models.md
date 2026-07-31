@@ -6,16 +6,23 @@
 | --- | --- |
 | ParsedResume | Regex-parsed resume (flat list fields) |
 | ParsedJobDescription | Regex-parsed job description |
-| JDParsingOutput | Agent 1 output |
 
 ## Agent Output Models
 
-| Model | Purpose |
+| Model | Purpose | Validators |
+| --- | --- | --- |
+| JDParsingOutput | Agent 1 output | `company_signals`: coerces list to numbered dict |
+| ExperienceEntry | Single role in work experience (title, company, dates, responsibilities, achievements, metrics) | |
+| ResumeParsingOutput | Agent 2 output | `skills/projects/certifications/education`: `_coerce_str_list`; `experience`: `_coerce_experience_list` |
+| GapAnalysisOutput | Agent 3 output | All `list[str]` fields: `_coerce_str_list`; `tone_guidance`: dict/list to comma-joined string |
+| RewriteOutput | Agent 4 output | `experience`: `_coerce_experience_list` |
+| ATSComplianceOutput | Agent 5 output | `ats_score`: Field(ge=0, le=100); all `list[str]` fields: `_coerce_str_list`; `final_resume`: dict to JSON string |
+| TonePolishingOutput | Agent 6 output | |
+| CoverLetterOutput | Agent 7 output | |
+
+## Coercion Helpers
+
+| Helper | Purpose |
 | --- | --- |
-| ExperienceEntry | Single role in work experience (title, company, dates, responsibilities, achievements, metrics) |
-| ResumeParsingOutput | Agent 2 output |
-| GapAnalysisOutput | Agent 3 output |
-| RewriteOutput | Agent 4 output |
-| ATSComplianceOutput | Agent 5 output (with Field(ge=0, le=100) on ats_score) |
-| TonePolishingOutput | Agent 6 output |
-| CoverLetterOutput | Agent 7 output |
+| `_coerce_str_list` | Converts dicts, ints, None to `list[str]` — handles LLMs returning non-string items in list fields |
+| `_coerce_experience_list` | Converts `list[str]` or `list[dict]` to `list[ExperienceEntry]` |

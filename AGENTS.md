@@ -17,7 +17,7 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 | Install/sync deps | `uv sync` |
 | Basic agent test | `uv run python basic.py` |
 | Full 7-agent pipeline | `uv run python pipeline.py` |
-| Regex parsing test (no LLM) | See `TESTING.md` section 2 |
+| Regex parsing test (no LLM) | See `docs/TESTING.md` section 2 |
 | Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
 | Lint | `uv run ruff check .` |
 | Lint (auto-fix) | `uv run ruff check --fix .` |
@@ -46,14 +46,19 @@ client/
   models.py          # All Pydantic models (Parsed*, JDParsingOutput, ResumeParsingOutput, etc.)
   templates/         # Jinja2 resume/cover letter templates (no renderer yet)
   agents/
-    jd_parsing.py    # JD Parsing Agent (Agent 1)
-    resume_parsing.py # Resume Parsing Agent (Agent 2)
+    jd_parsing.py    # JD Parsing Agent (Agent 1) - dedicated class, LLM + regex fallback
+    resume_parsing.py # Resume Parsing Agent (Agent 2) - dedicated class, LLM + regex fallback
+    gap_analysis.py  # Gap Analysis Agent (Agent 3) - dedicated class, LLM only
+    resume_rewrite.py # Resume Rewrite Agent (Agent 4) - dedicated class, LLM only
+    ats_compliance.py # ATS Compliance Agent (Agent 5) - dedicated class, LLM only
 tests/
-  test_format_detector.py  # FormatDetector regex parsing tests
+  test_format_detector.py  # FormatDetector regex parsing tests (46 tests)
 wip_testing/
-  parsing.py         # Manual parsing test script (regex + LLM)
-  debug_jd.py        # JD Parsing Agent test script
-  test_resume_parsing.py # Resume Parsing Agent test script
+  test_job_description.py  # JD Parsing Agent test
+  test_resume_parsing.py   # Resume Parsing Agent test
+  test_gap_analysis.py     # Gap Analysis Agent test (chains agents 1-3)
+  test_resume_rewrite.py   # Resume Rewrite Agent test (chains agents 1-4)
+  test_ats_compliance.py   # ATS Compliance Agent test (chains agents 1-5)
 ```
 
 ## Key conventions
@@ -63,6 +68,7 @@ wip_testing/
 - **Default model**: `qwen2.5:7b-instruct` on Ollama. Override globally with `MODEL_PROVIDER` and `MODEL_NAME`.
 - **No extended characters** in LLM output: `"` not `""`, `->` not `→`. Enforced in agent prompts.
 - **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode. LLM is now connected — `wip_testing/parsing.py` demonstrates both modes.
+- **LLM output coercion**: Pydantic validators in `client/models.py` handle LLMs returning dicts where strings/lists are expected (e.g., `tone_guidance` as a dict, `keyword_strategy` as a dict). See `_coerce_str_list`, `_coerce_tone_guidance`, `_coerce_final_resume`.
 
 ## Logging
 
@@ -89,7 +95,7 @@ JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
                     [7. Cover Letter] → cover_letter
 ```
 
-All 7 agents are currently `PipelineAgent` stubs (generic LLM wrappers), except Agent 1 (JD Parsing) and Agent 2 (Resume Parsing) which have dedicated classes. Remaining dedicated agent classes in `client/agents/` are planned (see `resume-todo.md`).
+Agents 1-5 have dedicated classes with LLM + validation + fallback logic. Agents 6-7 (Tone Polishing, Cover Letter) still use generic `PipelineAgent` stubs — see `resume-todo.md` for remaining work.
 
 ## Toolchain quirks
 
@@ -102,6 +108,8 @@ All 7 agents are currently `PipelineAgent` stubs (generic LLM wrappers), except 
 
 pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/`. Currently covers `FormatDetector` regex parsing (46 tests). Sample files in `sample/jobs/` and `sample/resume/`.
 
+Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_compliance.py` runs agents 1-5). Run with `uv run python wip_testing/test_<agent>.py`.
+
 ## Status
 
-Many features in `resume-todo.md` are marked NOT DONE. The pipeline runs end-to-end but most agents use generic prompts. Agent 1 (JD Parsing) has a dedicated class with LLM + regex fallback. Agent 2 (Resume Parsing) has a dedicated class with LLM + regex fallback. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist.
+Agents 1-5 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance) have dedicated classes. Agents 6-7 (Tone Polishing, Cover Letter) use generic `PipelineAgent` stubs. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Pipeline runs end-to-end but Agents 6-7 use generic prompts. See `resume-todo.md` for remaining work.
