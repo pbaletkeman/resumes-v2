@@ -73,6 +73,7 @@ uv run python pipeline.py
 ```
 
 This will:
+
 1. Parse the JD (placeholder text)
 2. Parse the resume (placeholder text)
 3. Run gap analysis, rewrite, ATS check, tone polish, cover letter
