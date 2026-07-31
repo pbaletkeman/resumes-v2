@@ -52,6 +52,7 @@ client/
     resume_rewrite.py # Resume Rewrite Agent (Agent 4) - dedicated class, LLM only
     ats_compliance.py # ATS Compliance Agent (Agent 5) - dedicated class, LLM only
     tone_polishing.py # Tone Polishing Agent (Agent 6) - dedicated class, LLM only
+    cover_letter.py  # Cover Letter Agent (Agent 7) - dedicated class, LLM only
 tests/
   test_format_detector.py  # FormatDetector regex parsing tests (46 tests)
 wip_testing/
@@ -61,6 +62,7 @@ wip_testing/
   test_resume_rewrite.py   # Resume Rewrite Agent test (chains agents 1-4)
   test_ats_compliance.py   # ATS Compliance Agent test (chains agents 1-5)
   test_tone_polishing.py   # Tone Polishing Agent test (chains agents 1-6)
+  test_cover_letter.py     # Cover Letter Agent test (chains agents 1-7)
 ```
 
 ## Key conventions
@@ -97,7 +99,7 @@ JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
                     [7. Cover Letter] → cover_letter
 ```
 
-Agents 1-6 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing) have dedicated classes with LLM + validation + fallback logic. Agent 7 (Cover Letter) still uses a generic `PipelineAgent` stub — see `resume-todo.md` for remaining work.
+Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes with LLM + validation + fallback logic.
 
 ## Toolchain quirks
 
@@ -114,4 +116,4 @@ Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_
 
 ## Status
 
-Agents 1-6 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing) have dedicated classes. Agent 7 (Cover Letter) uses a generic `PipelineAgent` stub. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Pipeline runs end-to-end but Agent 7 uses generic prompts. See `resume-todo.md` for remaining work.
+Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Pipeline runs end-to-end with all dedicated agents. See `resume-todo.md` for remaining work (Phase 5: pipeline wiring, Phase 6: output formatting).

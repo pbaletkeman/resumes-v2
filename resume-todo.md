@@ -512,7 +512,7 @@ class TonePolishingOutput(BaseModel):
 
 ### 4.2 Create Cover Letter Agent (`client/agents/cover_letter.py`)
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 **Purpose:** Generate a tailored cover letter.
 
@@ -566,6 +566,73 @@ class CoverLetterOutput(BaseModel):
 
 - new file `client/agents/cover_letter.py`
 - new file `wip_testing/test_cover_letter.py`
+
+---
+
+### 4.3 Fix LLM Fallback Falsehoods
+
+**Status:** ❌ NOT DONE
+
+**Problem:**
+When the LLM fails or returns invalid output, agents fall back to defaults that may generate falsehoods or lack tailoring:
+
+1. **Resume Rewrite Agent** — Falls back to parsed resume unchanged (safe but unoptimized)
+2. **Cover Letter Agent** — Falls back to generic `_MINIMAL_COVER_LETTER` (not tailored, contains placeholder text)
+
+Additionally, when the LLM *does* return output, it sometimes:
+- Adds skills not present in the original resume
+- Uses terms like "current", "now", "presently" when no dates are provided
+- Fabricates achievements or metrics not in the input
+- Writes generic text not specific to the target company
+
+**Root Cause:**
+- LLM prompts are not explicit enough about constraints
+- No post-validation to catch falsehoods before returning results
+- Fallback templates are too generic
+
+**Proposed Solutions:**
+
+#### A. Improve Post-Validation for Resume Rewrite
+
+Add validation checks in `resume_rewrite.py`:
+1. **Skill check**: Verify all skills in output exist in input resume
+2. **Experience check**: Verify experience entries match input (no new entries)
+3. **Company check**: Verify company names match input
+4. **Date check**: Verify dates match input (no fabricated dates)
+
+#### B. Improve Post-Validation for Cover Letter
+
+Add validation checks in `cover_letter.py`:
+1. **Skill check**: Verify all mentioned skills exist in the resume
+2. **Company check**: Verify company name is mentioned and correct
+3. **Role check**: Verify role title matches the job description
+4. **Date check**: Flag if "current"/"now" used but no dates in resume
+5. **Length check**: Verify word count is within range
+
+#### C. Improve Fallback Templates
+
+1. **Resume Rewrite Fallback**: Return parsed resume with *minimal* tailoring (reorder skills to match JD priority, add ATS keywords) — no LLM needed
+2. **Cover Letter Fallback**: Build a template using actual data from inputs:
+   - Use real company name from JD
+   - Use real role title from JD
+   - Use real skills from resume that match JD required_skills
+   - Use real achievements from resume
+
+#### D. Add Fallback Detection Logging
+
+Add `logger.info()` calls indicating which path was taken:
+- `"LLM success"` vs `"Fallback used: [reason]"`
+- Include word count / skill count metrics
+
+**Files to modify:**
+- `client/agents/resume_rewrite.py` — Add post-validation, improve fallback
+- `client/agents/cover_letter.py` — Add post-validation, improve fallback
+
+**Testing:**
+- Run `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG`
+- Run `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG`
+- Verify no skills appear in output that aren't in input resume
+- Verify no fabricated dates or achievements
 
 ---
 
@@ -909,7 +976,7 @@ client/
     minimal.py                     # EXISTS
     cover_letter.py                # EXISTS
     renderer.py                    # NEW - multi-format resume output
-  agents/                          # EXISTS ✅ (partial — Agents 1-6 done)
+  agents/                          # EXISTS ✅ (all 7 agents done)
     __init__.py                    # EXISTS ✅
     jd_parsing.py                  # EXISTS ✅ - Agent 1
     resume_parsing.py              # EXISTS ✅ - Agent 2
@@ -917,7 +984,7 @@ client/
     resume_rewrite.py              # EXISTS ✅ - Agent 4
     ats_compliance.py              # EXISTS ✅ - Agent 5
     tone_polishing.py              # EXISTS ✅ - Agent 6
-    cover_letter.py                # NEW - Agent 7
+    cover_letter.py                # EXISTS ✅ - Agent 7
   formatter.py                     # NEW - output formatting
 config/
   __init__.py                      # EXISTS (empty)
@@ -976,10 +1043,11 @@ wip_testing/
 | 10 | Phase 3.2: Resume Rewrite Agent | ✅ DONE | Steps 6, 8, 9 | 2 |
 | 11 | Phase 3.3: ATS Compliance Agent | ✅ DONE | Steps 6, 10 | 2 |
 | 12 | Phase 4.1: Tone Polishing Agent | ✅ DONE | Steps 6, 11 | 2 |
-| 13 | Phase 4.2: Cover Letter Agent | ❌ TODO | Steps 6, 7, 8, 9 | 2 |
-| 14 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 7-13 | 1 |
-| 15 | Phase 6.2: Output formatter | ❌ TODO | Step 6 | 1 |
-| 16 | Phase 6.3: Template renderer | ❌ TODO | Steps 6, 15 | 2 |
-| 17 | Phase 7.1: test_real_files.py | ❌ TODO | Steps 14, 16 | 1 |
-| 18 | Phase 7.2: Unit tests (agents, pipeline) | ❌ TODO | Steps 6, 15, 16 | 2 |
-| 19 | Phase 7.3: Documentation | ❌ TODO | All | 4 |
+| 13 | Phase 4.2: Cover Letter Agent | ✅ DONE | Steps 6, 7, 8, 9 | 2 |
+| 14 | Phase 4.3: Fix LLM Fallback Falsehoods | ❌ TODO | Steps 10, 13 | 2 |
+| 15 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 7-14 | 1 |
+| 16 | Phase 6.2: Output formatter | ❌ TODO | Step 6 | 1 |
+| 17 | Phase 6.3: Template renderer | ❌ TODO | Steps 6, 16 | 2 |
+| 18 | Phase 7.1: test_real_files.py | ❌ TODO | Steps 15, 17 | 1 |
+| 19 | Phase 7.2: Unit tests (agents, pipeline) | ❌ TODO | Steps 6, 16, 17 | 2 |
+| 20 | Phase 7.3: Documentation | ❌ TODO | All | 4 |
