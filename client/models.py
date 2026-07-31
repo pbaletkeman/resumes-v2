@@ -154,6 +154,31 @@ class GapAnalysisOutput(BaseModel):
     bullet_point_improvement_plan: list[str] = Field(default_factory=list)
     tone_guidance: str = ""
 
+    @field_validator(
+        "missing_skills",
+        "weak_skills",
+        "strong_matches",
+        "recommended_emphasis",
+        "keyword_strategy",
+        "bullet_point_improvement_plan",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_str_lists(cls, v: Any) -> list[str]:
+        return _coerce_str_list(v)
+
+    @field_validator("tone_guidance", mode="before")
+    @classmethod
+    def _coerce_tone_guidance(cls, v: Any) -> str:
+        if isinstance(v, dict):
+            parts = [
+                f"{k}: {val}" for k, val in v.items() if val  # type: ignore[reportUnknownVariableType, reportUnknownMemberType]
+            ]
+            return ", ".join(parts) if parts else ""
+        if isinstance(v, list):
+            return ", ".join(str(item) for item in v)  # type: ignore[reportUnknownVariableType]
+        return str(v) if v else ""
+
 
 class RewriteOutput(BaseModel):
     """Structured output from the Resume Rewrite Agent."""
