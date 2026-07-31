@@ -457,7 +457,7 @@ class ATSComplianceOutput(BaseModel):
 
 ### 4.1 Create Tone Polishing Agent (`client/agents/tone_polishing.py`)
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 **Purpose:** Improve tone and professionalism without changing facts.
 
@@ -909,14 +909,14 @@ client/
     minimal.py                     # EXISTS
     cover_letter.py                # EXISTS
     renderer.py                    # NEW - multi-format resume output
-  agents/                          # EXISTS ✅ (partial — Agent 1 done)
+  agents/                          # EXISTS ✅ (partial — Agents 1-6 done)
     __init__.py                    # EXISTS ✅
     jd_parsing.py                  # EXISTS ✅ - Agent 1
-    resume_parsing.py              # NEW - Agent 2
-    gap_analysis.py                # NEW - Agent 3
-    resume_rewrite.py              # NEW - Agent 4
-    ats_compliance.py              # NEW - Agent 5
-    tone_polishing.py              # NEW - Agent 6
+    resume_parsing.py              # EXISTS ✅ - Agent 2
+    gap_analysis.py                # EXISTS ✅ - Agent 3
+    resume_rewrite.py              # EXISTS ✅ - Agent 4
+    ats_compliance.py              # EXISTS ✅ - Agent 5
+    tone_polishing.py              # EXISTS ✅ - Agent 6
     cover_letter.py                # NEW - Agent 7
   formatter.py                     # NEW - output formatting
 config/
@@ -975,7 +975,7 @@ wip_testing/
 | 9 | Phase 3.1: Gap Analysis Agent | ✅ DONE | Steps 6, 7, 8 | 2 |
 | 10 | Phase 3.2: Resume Rewrite Agent | ✅ DONE | Steps 6, 8, 9 | 2 |
 | 11 | Phase 3.3: ATS Compliance Agent | ✅ DONE | Steps 6, 10 | 2 |
-| 12 | Phase 4.1: Tone Polishing Agent | ❌ TODO | Steps 6, 11 | 2 |
+| 12 | Phase 4.1: Tone Polishing Agent | ✅ DONE | Steps 6, 11 | 2 |
 | 13 | Phase 4.2: Cover Letter Agent | ❌ TODO | Steps 6, 7, 8, 9 | 2 |
 | 14 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 7-13 | 1 |
 | 15 | Phase 6.2: Output formatter | ❌ TODO | Step 6 | 1 |
