@@ -17,10 +17,11 @@ The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompt
 - `client/open_ai_client.py` — OpenAI client with error handling
 - `client/errors.py` — Custom LLM exceptions
 - `client/format_detector.py` — Regex-based document parser with LLM fallback (connected), plain text support, projects, metrics, keywords extraction
-- `client/models.py` — `ParsedResume` (with projects, keywords), `ParsedJobDescription`, and `JDParsingOutput` Pydantic models
+- `client/models.py` — All Pydantic models: `ParsedResume`, `ParsedJobDescription`, `JDParsingOutput`, `ExperienceEntry`, `ResumeParsingOutput`, `GapAnalysisOutput`, `RewriteOutput`, `ATSComplianceOutput`, `TonePolishingOutput`, `CoverLetterOutput`
 - `client/model_registry.py` — Per-agent model assignment registry
+- `logging_config.py` — Centralized logging (dictConfig, LOG_LEVEL env var)
 - `client/templates/` — Jinja2 resume/cover letter templates (no renderer class)
-- `client/agents/jd_parsing.py` — JD Parsing Agent (Agent 1) with LLM + regex fallback
+- `client/agents/` — All 7 dedicated agent classes (JDParsingAgent, ResumeParsingAgent, GapAnalysisAgent, ResumeRewriteAgent, ATSComplianceAgent, TonePolishingAgent, CoverLetterAgent)
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo
@@ -28,8 +29,10 @@ The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompt
 - `tests/conftest.py` — Shared test fixtures
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
-- `TESTING.md` — Testing guide
+- `docs/TESTING.md` — Testing guide
+- `docs/models.md`, `docs/logging-info.md` — Additional docs
 - `sample/` — Sample JDs and resume for testing
+- `wip_testing/` — Manual agent test scripts (8 files, one per agent chain)
 
 ---
 
@@ -73,7 +76,7 @@ Replaced 128-line pip freeze dump with 3 direct dependencies: `ollama`, `openai`
 
 - `_extract_projects()` — extracts bullet points from `## Projects` section
 - `_extract_metrics()` — regex for percentages, dollar amounts, team sizes, timeframes
-- `_extract_keywords()` — frequency-based keyword extraction with stopword filtering (top 20)
+- `extract_keywords()` — frequency-based keyword extraction with stopword filtering (top 20)
 - `_detect_format()` — returns `"markdown"` or `"plain"` based on `##` heading presence
 - `_section_pattern()` — builds regex matching both Markdown (`## Name`) and plain text (`Name:`) headings
 - `_extract_bullet_points()` — rewritten to handle plain text lines (not just `*`/`-` bullets), with heading-anchored keyword matching
@@ -101,7 +104,7 @@ The original plan called for `client/agents/base.py` with a `BaseAgent` ABC. Ins
 - `ModelClientRegistry` in `client/model_registry.py` — per-agent model assignment
 - `config/agents.py` — environment-based configuration
 
-**No further work needed** for this phase. The 7 agents will be implemented as `PipelineAgent` instances with specific system prompts, rather than individual agent classes.
+**No further work needed** for this phase. Agents 1-7 were implemented as dedicated classes (e.g., `JDParsingAgent`, `ResumeRewriteAgent`) rather than `PipelineAgent` instances, with per-agent LLM + validation + fallback logic.
 
 ---
 
@@ -117,11 +120,11 @@ The original plan called for `client/agents/base.py` with a `BaseAgent` ABC. Ins
 - Retries once with stricter rules on validation failure
 - Falls back to `FormatDetector.parse_job_description()` on second failure
 - `client/models.py` — added `JDParsingOutput` model with `@field_validator` for `company_signals` (accepts list or dict)
-- `pipeline.py` — `sample_run()` uses `JDParsingAgent`; `run_resume_pipeline()` handles both model and dict results
+- `pipeline.py` — `sample_run()` uses `JDParsingAgent`; `run_resume_pipeline()` branches on model vs dict for the JD result only (agents 3-7 assume dict-style access — see §5.2)
 
 **Files changed:** `client/agents/jd_parsing.py` (new), `client/agents/__init__.py` (new), `client/models.py`, `pipeline.py`
 
-**Test:** `uv run python wip_testing/debug_jd.py`
+**Test:** `uv run python wip_testing/test_job_description.py`
 
 **System prompt (from `bots.md`):**
 
@@ -169,7 +172,7 @@ class JDParsingOutput(BaseModel):
 **Implementation:**
 
 1. Build user prompt: `f"Extract structured data from this job description:\n\n{inputs['job_description']}"`
-2. Call `self._chat(prompt, output=["json"], rules=["Output only valid JSON", "Do not add information not present in the JD"], inputs=[inputs["job_description"]])`
+2. Call `self.client.chat(purpose=_SYSTEM_PROMPT, prompt=prompt, output=["json"], rules=rules, inputs=[jd_text])` inside `_try_llm()` (there is no `_chat` method; `rules` defaults to `["Output only valid JSON", "Do not add information not present in the JD"]` and is swapped for `_STRICT_RULES` on the retry)
 3. Parse LLM response as JSON
 4. Validate against `JDParsingOutput` Pydantic model
 5. On validation failure: retry once with a stricter prompt ("You must output valid JSON only. No markdown, no explanation.")
@@ -239,7 +242,7 @@ class ResumeParsingOutput(BaseModel):
 
 **Implementation:**
 
-1. Pre-process with `FormatDetector.parse_resume()` to get a rough structure
+1. Send the full resume text to the LLM first — `FormatDetector.parse_resume()` is NOT a pre-processor; it is used only as the fallback in `_regex_fallback` after both LLM attempts fail
 2. Build user prompt with the full resume text
 3. Call LLM with the system prompt
 4. Parse JSON response
@@ -373,9 +376,9 @@ class RewriteOutput(BaseModel):
 2. Build prompt combining both inputs
 3. Call LLM
 4. Parse and validate JSON
-5. Validate experiences are in chronological order (most recent first)
-6. Validate no new experiences were added (compare with input resume experience count)
-7. Validate all certifications from input resume are present in output
+5. ~~Validate experiences are in chronological order (most recent first)~~ NOT IMPLEMENTED — prompt rule only (resume_rewrite.py:37); no post-validation. See §4.3.A.4
+6. Validate no new experiences were added (compare with input resume experience count) — implemented as `_validate_experience_count` (resume_rewrite.py:204)
+7. Validate all certifications from input resume are present in output — implemented as `_validate_certifications` (resume_rewrite.py:208)
 8. On failure: retry with explicit instruction "Output a JSON object matching this exact schema: ..."
 9. On second failure: return the parsed resume unchanged with a warning logged
 10. Create a standalone test script that can be used to test this functionality
@@ -440,10 +443,10 @@ class ATSComplianceOutput(BaseModel):
 1. Serialize the full rewritten resume (not truncated!) to the prompt
 2. Call LLM
 3. Parse and validate JSON
-4. Validate `ats_score` is between 0 and 100
-5. Validate all certifications from input resume are present in the final resume
-6. Validate experiences are in chronological order (most recent first)
-7. On failure: retry; on second failure, return a default low-score result with the resume unchanged
+4. Validate `ats_score` is between 0 and 100 — implemented as a clamp (ats_compliance.py:186-188), not a reject; the Pydantic model also enforces `ge=0, le=100`
+5. ~~Validate all certifications from input resume are present in the final resume~~ NOT IMPLEMENTED — no cert check in ats_compliance.py
+6. ~~Validate experiences are in chronological order (most recent first)~~ NOT IMPLEMENTED — no order check in ats_compliance.py
+7. On failure: retry; on second failure, return a default low-score result with the resume unchanged (`_default_result`, ats_compliance.py:268-279)
 8. Create a standalone test script that can be used to test this functionality
 
 **Files changed:**
@@ -549,7 +552,7 @@ inputs = {
 
 ```python
 class CoverLetterOutput(BaseModel):
-    cover_letter: str  # 250-350 word cover letter
+    cover_letter: str  # 450-600 word cover letter
 ```
 
 **Implementation:**
@@ -558,7 +561,7 @@ class CoverLetterOutput(BaseModel):
 2. Build prompt combining them
 3. Call LLM
 4. Parse and validate JSON
-5. Validate word count is between 250-350
+5. ~~Validate word count is between 450-600~~ NOT IMPLEMENTED — current code only warns at < 250 / > 700 and always accepts (cover_letter.py:260-269). See §4.3.B.4
 6. On failure: retry; on second failure, return a minimal generic cover letter
 7. Create a standalone test script that can be used to test this functionality
 
@@ -574,65 +577,151 @@ class CoverLetterOutput(BaseModel):
 **Status:** ❌ NOT DONE
 
 **Problem:**
-When the LLM fails or returns invalid output, agents fall back to defaults that may generate falsehoods or lack tailoring:
+Two distinct failure modes produce bad output:
 
-1. **Resume Rewrite Agent** — Falls back to parsed resume unchanged (safe but unoptimized)
-2. **Cover Letter Agent** — Falls back to generic `_MINIMAL_COVER_LETTER` (not tailored, contains placeholder text)
-
-Additionally, when the LLM *does* return output, it sometimes:
-- Adds skills not present in the original resume
-- Uses terms like "current", "now", "presently" when no dates are provided
-- Fabricates achievements or metrics not in the input
-- Writes generic text not specific to the target company
+1. **LLM succeeds but fabricates** — The LLM returns valid JSON, but it adds skills not in the original resume, invents achievements, or writes generic text unrelated to the target company.
+2. **LLM fails, fallback is useless** — Agents fall back to defaults that are either unoptimized (resume rewrite returns unchanged data) or contain placeholder text (cover letter returns `_MINIMAL_COVER_LETTER` with `[Your Name]`).
 
 **Root Cause:**
-- LLM prompts are not explicit enough about constraints
-- No post-validation to catch falsehoods before returning results
-- Fallback templates are too generic
 
-**Proposed Solutions:**
+- No post-validation to catch falsehoods before returning LLM results
+- Fallback templates are too generic and don't use actual input data
+- Existing validation is incomplete
 
-#### A. Improve Post-Validation for Resume Rewrite
+**What already exists:**
 
-Add validation checks in `resume_rewrite.py`:
-1. **Skill check**: Verify all skills in output exist in input resume
-2. **Experience check**: Verify experience entries match input (no new entries)
-3. **Company check**: Verify company names match input
-4. **Date check**: Verify dates match input (no fabricated dates)
+- `resume_rewrite.py:204-210` — validates experience count (`_validate_experience_count`) and certifications (`_validate_certifications`) ✅
+- `cover_letter.py:255-269` — validates word count (warns but accepts) and empty-content fallback ⚠️
 
-#### B. Improve Post-Validation for Cover Letter
+**Key data facts that constrain the design:**
 
-Add validation checks in `cover_letter.py`:
-1. **Skill check**: Verify all mentioned skills exist in the resume
-2. **Company check**: Verify company name is mentioned and correct
-3. **Role check**: Verify role title matches the job description
-4. **Date check**: Flag if "current"/"now" used but no dates in resume
-5. **Length check**: Verify word count is within range
+- `JDParsingOutput` has **no `company_name` field** today — `company_signals` is `{culture, values, mission}` only. A company-name check on the cover letter has no structured source of truth. **This task adds a `company_name` field (see §F)** so the check has a reliable target.
+- `Role title` **is** structured (`JDParsingOutput.role_title`) — a reliable check target for the cover letter.
+- Company names **are** structured in the resume (`ExperienceEntry.company`) — a reliable check target for resume rewrite.
+- The word-count spec is **450-600** (per `bots.md` and `cover_letter.py` prompts). The todo's old "250-350 words" references in §4.2 and §7.1 were **wrong** and have already been corrected.
 
-#### C. Improve Fallback Templates
+**Approach: F first (adds `company_name`, unblocking B.2/C.2), then A + B + C in that priority order. D last.**
 
-1. **Resume Rewrite Fallback**: Return parsed resume with *minimal* tailoring (reorder skills to match JD priority, add ATS keywords) — no LLM needed
-2. **Cover Letter Fallback**: Build a template using actual data from inputs:
-   - Use real company name from JD
-   - Use real role title from JD
-   - Use real skills from resume that match JD required_skills
-   - Use real achievements from resume
+**Scope note:** This section targets `resume_rewrite.py` and `cover_letter.py` — the two agents with template/placeholder fallbacks. Other agents' fallbacks are less harmful but worth flagging:
 
-#### D. Add Fallback Detection Logging
+- **GapAnalysisAgent** returns an empty `GapAnalysisOutput()` on failure (lines 73, 91) — cascades an empty strategy to downstream agents. Acceptable (no safe deterministic alternative), but must be logged so failures are visible.
+- **ATSComplianceAgent** returns `_default_result()` with a hardcoded `ats_score=30` and `"Unable to evaluate -- LLM unavailable"` (lines 268-279). A fixed score is itself a falsehood; consider `ats_score=0` plus an explicit "not evaluated" marker instead.
+- **TonePolishingAgent** passes the input through unchanged — safe by design.
 
-Add `logger.info()` calls indicating which path was taken:
-- `"LLM success"` vs `"Fallback used: [reason]"`
-- Include word count / skill count metrics
+---
+
+#### A. Improve Post-Validation for Resume Rewrite (HIGH priority)
+
+Add checks in `resume_rewrite.py` `_try_llm()`, after the existing checks at lines 204-210.
+
+1. **Skill check — sanitize, don't reject.** Filter output skills to those present in input resume skills (case-insensitive, fuzzy token match to tolerate LLM renaming like "JS" → "JavaScript"). Keep the rest of the LLM's work; log the dropped skills. Rejecting the whole result over 1-2 bad skills throws away good rewriting. If >50% of output skills are dropped, reject instead (fall through to `_parsed_to_rewrite`).
+2. **Company check — reject on fabrication.** Each output `experience.company` must match an input `ExperienceEntry.company` (case-insensitive substring). If an output company matches none, it is a fabricated employer — reject the result. **Caveat:** companies are compared per experience entry by position, not by set membership — the LLM can reorder entries, so match by name, then optionally verify counts match the input.
+3. **Date check — skip.** Prompt already prohibits fabricated dates; regex date matching is fragile and low-value.
+4. **Chronological order check — add.** Verify experience entries are most-recent-first; reject if out of order (prompt rule exists at line 37 but is never validated).
+
+**On rejection:** Return `None` so the caller falls back to `_parsed_to_rewrite()`.
+
+**Data-access gap:** `_parsed_to_rewrite()` (line 241) only receives the resume — the JD is **not** an input to `ResumeRewriteAgent.run()`. Options C.1 (reorder by JD `required_skills`) and C.2 (prepend JD `keywords`) therefore cannot run today without either (a) threading the JD through `run()` inputs, or (b) relying on `tailoring_strategy` fields (`keyword_strategy`, `strong_matches`) that are already available. Recommend (b) to avoid an input-schema change, or add JD to `inputs` if the tailoring strategy proves too sparse.
+
+---
+
+#### B. Improve Post-Validation for Cover Letter (HIGH priority)
+
+Add checks in `cover_letter.py` `_try_llm()`, after the word count check at lines 260-269.
+
+1. **Role check — reject only when role_title is meaningful.** The JD's `role_title` must appear in the cover letter (fuzzy, case-insensitive). `role_title` is structured and reliable — a letter that never names the role is generic. **Caveat:** `JDParsingOutput.role_title` defaults to `""`; skip the check when empty rather than rejecting everything.
+2. **Company check — best-effort warning, never reject.** Derive a company name from `company_signals` values or a proper-noun heuristic on raw JD text; if found and absent from the letter, log a warning but accept. There is no structured company field, so a hard reject would cause false positives.
+3. **Skill check — warn only.** Extract skill nouns from the letter; flag skills not in the resume's skill list. Cover letter prose paraphrases, so this is advisory only. Watch out for skill tokens that are substrings of other words (e.g., "ai" inside "aimed") — use word boundaries.
+4. **Length check — enforce the real spec, but reject→fallback only on extreme outliers.** Target is **450-600** (current code warns at < 250 / > 700 but accepts). Reject (→ `_build_fallback_cover_letter`) only if < 200 or > 800; accept with a warning between 200-450 and 600-800. Truncating or regenerating mid-range lengths is worse than a slightly short letter.
+5. **Date check — skip.** Prompt already prohibits "current"/"now"/"presently"; post-validation on natural language is fragile and low-value.
+
+**Note:** the plain-text fallback in `_parse_json` (lines 296-301) treats any >50-char non-JSON response as the letter. All of the above checks must still run on that path — currently they do (it flows through `_try_llm`), but keep it that way.
+
+---
+
+#### C. Improve Fallback Templates (MEDIUM priority)
+
+**Resume Rewrite fallback** (`_parsed_to_rewrite`): Add lightweight deterministic tailoring without an LLM:
+1. Reorder skills so skills matching JD `required_skills` (or `tailoring_strategy.keyword_strategy` — see the data-access gap in §A) appear first.
+2. Prepend JD `keywords` (or strategy keywords) not already present in the resume skills (up to 5).
+3. Leave experience, projects, certifications, education unchanged.
+
+**Cover Letter fallback** (`_MINIMAL_COVER_LETTER`): Replace the placeholder with a data-driven `_build_fallback_cover_letter(jd, resume, strategy)` helper:
+1. Use the real `role_title` from the JD.
+2. Use the company name if derivable (from `company_signals` / raw JD); otherwise omit rather than use "your company".
+3. Pick 2-3 skills from the resume overlapping JD `required_skills`.
+4. Reference 1 achievement from the most recent experience entry.
+5. Use the candidate's name from the resume's name field (or "Candidate" if missing).
+6. Keep the three-paragraph structure (opening, middle, closing).
+
+**Apply the same fallback at all three call sites:** empty input (`cover_letter.py:121`), double LLM failure (`:147`), and empty content (`:258`).
+
+**Note:** the empty-content call site (line 258) lives inside `_try_llm`, which only has the serialized JSON strings — not the raw `jd`/`resume`/`strategy` objects. To build a data-driven letter there, either pass the structured objects into `_try_llm`, or move the empty-content handling up to `run()` (recommended — keeps `_try_llm` pure).
+
+---
+
+#### D. Add Fallback Detection Logging (LOW priority)
+
+Add `logger.info()` calls in both agents:
+
+- Resume rewrite: `"LLM rewrite succeeded"` vs `"Fallback: parsed resume used (reason: %s)"`
+- Cover letter: `"LLM cover letter succeeded"` vs `"Fallback: template cover letter used (reason: %s)"`
+- Include skill count and word count metrics in the success path.
+
+---
+
+#### E. Strengthen Prompts (root-cause mitigation, pairs with A/B)
+
+Post-validation catches falsehoods after the fact but wastes a retry when the LLM consistently ignores constraints. Tighten the prompts that already exist:
+
+- **Resume rewrite** (`_SYSTEM_PROMPT`, line 34): the rule *"You may add reasonable metrics only if implied (e.g., 'managed a team' → 'managed a team of 5')"* actively invites fabrication. Remove it or replace with *"Never add metrics that are not explicitly in the resume. If a metric is missing, rephrase without inventing a number."* This is the single highest-leverage fix for fabricated metrics.
+- **Resume rewrite** (`_SYSTEM_PROMPT`, line 41): strengthen *"All certifications ... MUST be included"* — already enforced by `_validate_certifications`, so keep both.
+- **Cover letter** (`_SYSTEM_PROMPT`, line 36): the unicode char `吸引` is a stray non-ASCII artifact in an otherwise English prompt — replace with "attracts". It may confuse models and contradicts the "ASCII only" rule on line 56.
+
+---
+
+#### F. Add `company_name` to `JDParsingOutput` and `company_signals` (HIGH priority, prerequisite for B.2/C.2)
+
+`JDParsingOutput` currently has **no `company_name` field** — `company_signals` holds only `{culture, values, mission}`. Without a structured company name, the cover letter company check (B.2) and the data-driven fallback letter (C.2) must rely on fragile heuristics. Add a first-class `company_name` field and surface it through `company_signals`:
+
+1. **Add the field** to `JDParsingOutput` in `client/models.py`:
+   ```python
+   company_name: str = ""  # employer name exactly as written in the JD
+   ```
+2. **Extract it in the JD Parsing Agent** (`client/agents/jd_parsing.py`):
+   - Add `company_name` to the LLM prompt's JSON field list.
+   - Add a rule: *"Extract the company name exactly as it appears in the job description; output empty string if not present."*
+   - Include `company_name` in the `company_signals` dict so the name flows with the signals:
+     ```python
+     company_signals = {"company_name": company_name, "culture": ..., "values": ..., "mission": ...}
+     ```
+3. **Regex fallback** (`_regex_fallback`): best-effort extract the company name from raw JD text (e.g., first proper-noun / header heuristic) and inject it into `company_signals` the same way. Empty string if not derivable.
+4. **Consumers** — once the field exists, use `JDParsingOutput.company_name` as the source of truth in:
+   - Cover letter company check (B.2) — upgrade from "derive via heuristic" to "compare against structured field".
+   - Cover letter fallback template (C.2) — use the real company name instead of omitting it.
+
+**Files changed:** `client/models.py`, `client/agents/jd_parsing.py`, `client/agents/cover_letter.py` (B.2 / C.2 consumers).
+
+---
 
 **Files to modify:**
-- `client/agents/resume_rewrite.py` — Add post-validation, improve fallback
-- `client/agents/cover_letter.py` — Add post-validation, improve fallback
+
+- `client/models.py` — Add `company_name: str = ""` to `JDParsingOutput` (see §F)
+- `client/agents/jd_parsing.py` — Extract `company_name` in the LLM prompt and regex fallback; include it in `company_signals`
+- `client/agents/resume_rewrite.py` — Add skill (sanitize) + company + chronological checks to `_try_llm()`; improve `_parsed_to_rewrite()` with skill reordering (from strategy keywords); tighten the "add reasonable metrics" prompt rule
+- `client/agents/cover_letter.py` — Add role + company (best-effort) + length checks to `_try_llm()`; replace `_MINIMAL_COVER_LETTER` with `_build_fallback_cover_letter()` at all 3 call sites; fix stray non-ASCII char in system prompt
+- `tests/` — Add unit tests for the new pure validation helpers (skill/company/role/chronological checks) — these are deterministic and need no LLM
 
 **Testing:**
+
 - Run `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG`
 - Run `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG`
-- Verify no skills appear in output that aren't in input resume
-- Verify no fabricated dates or achievements
+- Run `uv run python wip_testing/test_job_description.py` with `LOG_LEVEL=DEBUG` — verify `company_name` is populated in both LLM and regex-fallback paths
+- Run `uv run pytest` for the new deterministic validation unit tests
+- Verify no skills appear in output that aren't in input resume (dropped with a warning, not silently kept)
+- Verify cover letter contains the JD role title
+- Verify fallback cover letter uses real JD/resume data, not placeholders
+- Verify rewritten metrics never exceed what the input resume states
 
 ---
 
@@ -656,7 +745,7 @@ The `AgentRunner` class is fully implemented with:
 
 ### 5.2 Wire up the 7-agent pipeline
 
-**Status:** ✅ DONE
+**Status:** ⚠️ PARTIAL
 
 `run_resume_pipeline()` chains all 7 agents sequentially:
 
@@ -668,7 +757,9 @@ The `AgentRunner` class is fully implemented with:
 6. Tone Polishing → `polished_resume`
 7. Cover Letter → `cover_letter`
 
-The pipeline currently uses generic `PipelineAgent` instances. Once individual agent classes are created (Phases 2.3-4.2), they can be swapped in.
+**What works:** The pipeline runs end-to-end. `sample_run()` uses dedicated `JDParsingAgent` and `ResumeParsingAgent` for agents 1-2, and generic `PipelineAgent` wrappers for agents 3-7. `create_runner_from_config()` accepts a dict of dedicated agent classes but requires the caller to pass them.
+
+**What's incomplete:** Agents 3-7 are not wired as dedicated classes in `sample_run()`. The pipeline code at lines like `tailoring_strategy = gap_result["tailoring_strategy"]` assumes dict-style access, which works with `PipelineAgent` (returns raw LLM text) but will break with dedicated agents that return Pydantic model objects. Wiring agents 3-7 requires updating `run_resume_pipeline()` to handle both dict and Pydantic model returns.
 
 **Optional improvement:** Add `candidate_name` and `company_name` parameters to `run_resume_pipeline()` for output file naming (see Phase 6.3).
 
@@ -875,7 +966,7 @@ def format_cover_letter(text: str) -> str:
       }
       ```
 
-5. **Add to `requirements.txt`:**
+5. **Add to `pyproject.toml` dependencies:****
 
    ```plaintext
    python-docx>=1.0.0
@@ -890,7 +981,7 @@ def format_cover_letter(text: str) -> str:
    - After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()`
    - Store output paths in the pipeline result dict
 
-**Files changed:** new file `client/templates/renderer.py`, `requirements.txt`, `pipeline.py`
+**Files changed:** new file `client/templates/renderer.py`, `pyproject.toml`, `pipeline.py`
 
 ---
 
@@ -910,7 +1001,7 @@ Create an integration test that runs the full pipeline against real files:
 6. Assert `tailoring_strategy` has `missing_skills`
 7. Assert `ats_optimized_resume` is not empty
 8. Assert `polished_resume` is not empty
-9. Assert `cover_letter` is 250-350 words
+9. Assert `cover_letter` is 450-600 words
 10. Assert experiences are in chronological order (most recent first)
 11. Assert no new experiences were added (compare with input resume)
 12. Assert all certifications from input resume are present in output
@@ -946,7 +1037,7 @@ Create an integration test that runs the full pipeline against real files:
 
 **Status:** ❌ NOT DONE
 
-`docs/` directory exists but is empty. Create:
+`docs/` directory has 3 existing files: `TESTING.md`, `models.md`, `logging-info.md`. Add:
 
 1. **`docs/architecture.md`:** System overview, data flow diagram, agent chain
 2. **`docs/agents.md`:** Each agent's purpose, prompt, input/output schema
@@ -968,7 +1059,7 @@ client/
   ollama_client.py                 # EXISTS ✅ (configurable timeout, default 300s)
   open_ai_client.py                # EXISTS ✅
   format_detector.py               # EXISTS ✅ (expanded with projects, metrics, keywords)
-  models.py                        # EXISTS ✅ (ParsedResume, ParsedJobDescription, JDParsingOutput)
+  models.py                        # EXISTS ✅ (ParsedResume, ParsedJobDescription, JDParsingOutput, + all agent output models)
   templates/                       # EXISTS ⚠️ needs renderer.py
     __init__.py                    # EXISTS
     modern.py                      # EXISTS
@@ -977,14 +1068,14 @@ client/
     cover_letter.py                # EXISTS
     renderer.py                    # NEW - multi-format resume output
   agents/                          # EXISTS ✅ (all 7 agents done)
-    __init__.py                    # EXISTS ✅
-    jd_parsing.py                  # EXISTS ✅ - Agent 1
-    resume_parsing.py              # EXISTS ✅ - Agent 2
-    gap_analysis.py                # EXISTS ✅ - Agent 3
-    resume_rewrite.py              # EXISTS ✅ - Agent 4
-    ats_compliance.py              # EXISTS ✅ - Agent 5
-    tone_polishing.py              # EXISTS ✅ - Agent 6
-    cover_letter.py                # EXISTS ✅ - Agent 7
+    __init__.py                    # EXISTS (docstring only, no exports)
+    jd_parsing.py                  # EXISTS ✅ - Agent 1 (JDParsingAgent)
+    resume_parsing.py              # EXISTS ✅ - Agent 2 (ResumeParsingAgent)
+    gap_analysis.py                # EXISTS ✅ - Agent 3 (GapAnalysisAgent)
+    resume_rewrite.py              # EXISTS ✅ - Agent 4 (ResumeRewriteAgent)
+    ats_compliance.py              # EXISTS ✅ - Agent 5 (ATSComplianceAgent)
+    tone_polishing.py              # EXISTS ✅ - Agent 6 (TonePolishingAgent)
+    cover_letter.py                # EXISTS ✅ - Agent 7 (CoverLetterAgent)
   formatter.py                     # NEW - output formatting
 config/
   __init__.py                      # EXISTS (empty)
@@ -996,24 +1087,36 @@ tests/
   test_agents.py                   # NEW
   test_pipeline.py                 # NEW
 docs/
+  TESTING.md                       # EXISTS ✅ (moved from root)
+  models.md                        # EXISTS ✅
+  logging-info.md                  # EXISTS ✅
   architecture.md                  # NEW
   agents.md                        # NEW
   usage.md                         # NEW
   api.md                           # NEW
 pipeline.py                        # EXISTS ✅
 basic.py                           # EXISTS ✅
+logging_config.py                  # EXISTS ✅ (centralized logging, LOG_LEVEL env var)
 test_real_files.py                 # NEW
 pyproject.toml                     # EXISTS ✅ (ruff, pyright, pytest config)
 AGENTS.md                          # EXISTS ✅
 resume-todo.md                     # THIS FILE
 bots.md                            # UNCHANGED (reference)
-requirements.txt                   # EXISTS ✅
+README.md                          # EXISTS ✅
+opencode.json                      # EXISTS ✅
+.gitignore                         # EXISTS ✅
 sample/                            # EXISTS ✅
-  jobs/                            # 2 sample JDs
-  resume/                          # 1 sample resume
-TESTING.md                         # EXISTS ✅
+  jobs/                            # 2 sample JDs (3Pillar.txt, Zafin.txt)
+  resume/                          # 1 sample resume (Peter-Letkeman-Resume.txt)
 wip_testing/
-  parsing.py                       # EXISTS ✅ (regex + LLM parsing demo)
+  test_parsing.py                  # EXISTS ✅ (regex + LLM parsing demo)
+  test_job_description.py          # EXISTS ✅ (Agent 1 test)
+  test_resume_parsing.py           # EXISTS ✅ (Agent 2 test)
+  test_gap_analysis.py             # EXISTS ✅ (Agents 1-3 chain test)
+  test_resume_rewrite.py           # EXISTS ✅ (Agents 1-4 chain test)
+  test_ats_compliance.py           # EXISTS ✅ (Agents 1-5 chain test)
+  test_tone_polishing.py           # EXISTS ✅ (Agents 1-6 chain test)
+  test_cover_letter.py             # EXISTS ✅ (Agents 1-7 chain test)
 ```
 
 ---
@@ -1045,7 +1148,7 @@ wip_testing/
 | 12 | Phase 4.1: Tone Polishing Agent | ✅ DONE | Steps 6, 11 | 2 |
 | 13 | Phase 4.2: Cover Letter Agent | ✅ DONE | Steps 6, 7, 8, 9 | 2 |
 | 14 | Phase 4.3: Fix LLM Fallback Falsehoods | ❌ TODO | Steps 10, 13 | 2 |
-| 15 | Phase 5.2: Wire agents into pipeline | ❌ TODO | Steps 7-14 | 1 |
+| 15 | Phase 5.2: Wire agents into pipeline | ⚠️ PARTIAL (runs end-to-end; agents 3-7 still use generic `PipelineAgent` — see §5.2) | Steps 7-14 | 1 |
 | 16 | Phase 6.2: Output formatter | ❌ TODO | Step 6 | 1 |
 | 17 | Phase 6.3: Template renderer | ❌ TODO | Steps 6, 16 | 2 |
 | 18 | Phase 7.1: test_real_files.py | ❌ TODO | Steps 15, 17 | 1 |

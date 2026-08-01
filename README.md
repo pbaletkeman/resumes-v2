@@ -28,6 +28,8 @@ uv run python pipeline.py
 | Test Gap Analysis Agent | `uv run python wip_testing/test_gap_analysis.py` |
 | Test Resume Rewrite Agent | `uv run python wip_testing/test_resume_rewrite.py` |
 | Test ATS Compliance Agent | `uv run python wip_testing/test_ats_compliance.py` |
+| Test Tone Polishing Agent | `uv run python wip_testing/test_tone_polishing.py` |
+| Test Cover Letter Agent | `uv run python wip_testing/test_cover_letter.py` |
 | Regex parsing test (no LLM) | `uv run python wip_testing/test_parsing.py` |
 | Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
 | Lint | `uv run ruff check .` |
@@ -76,7 +78,9 @@ client/
     gap_analysis.py      # Gap Analysis Agent (Agent 3) - dedicated class
     resume_rewrite.py    # Resume Rewrite Agent (Agent 4) - dedicated class
     ats_compliance.py    # ATS Compliance Agent (Agent 5) - dedicated class
-  templates/             # Jinja2 resume/cover letter templates
+    tone_polishing.py    # Tone Polishing Agent (Agent 6) - dedicated class
+    cover_letter.py      # Cover Letter Agent (Agent 7) - dedicated class
+  templates/             # Jinja2 resume/cover letter templates (no renderer yet)
 tests/
   test_format_detector.py # FormatDetector regex parsing tests (46 tests)
 wip_testing/
@@ -85,6 +89,9 @@ wip_testing/
   test_gap_analysis.py     # Gap Analysis Agent test
   test_resume_rewrite.py   # Resume Rewrite Agent test
   test_ats_compliance.py   # ATS Compliance Agent test
+  test_tone_polishing.py   # Tone Polishing Agent test
+  test_cover_letter.py     # Cover Letter Agent test
+  test_parsing.py          # Regex + LLM parsing demo
 ```
 
 ## Configuration

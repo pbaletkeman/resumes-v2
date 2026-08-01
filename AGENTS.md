@@ -38,6 +38,7 @@ basic.py             # Single-agent demo
 logging_config.py    # Centralized logging (dictConfig, LOG_LEVEL env var)
 config/agents.py     # Env-var-based agent-to-model configuration
 client/
+  errors.py           # LLMError hierarchy (LLMConnectionError, LLMResponseError, LLMTimeoutError)
   model_client.py    # ABC for LLM clients
   ollama_client.py   # Ollama implementation (configurable timeout, default 300s)
   open_ai_client.py  # OpenAI implementation
@@ -56,6 +57,7 @@ client/
 tests/
   test_format_detector.py  # FormatDetector regex parsing tests (46 tests)
 wip_testing/
+  test_parsing.py            # Regex + LLM parsing demo (both modes)
   test_job_description.py  # JD Parsing Agent test
   test_resume_parsing.py   # Resume Parsing Agent test
   test_gap_analysis.py     # Gap Analysis Agent test (chains agents 1-3)
@@ -69,9 +71,10 @@ wip_testing/
 
 - **Agent names** are snake_case with `_agent` suffix: `jd_parsing_agent`, `resume_parsing_agent`, etc. These are the keys used everywhere (env vars, registry, pipeline wiring).
 - **Model overrides** via env vars: `COVER_LETTER_AGENT_MODEL=gpt-4o`, `COVER_LETTER_AGENT_PROVIDER=openai`. Prefix is the uppercased agent name.
-- **Default model**: `qwen2.5:7b-instruct` on Ollama. Override globally with `MODEL_PROVIDER` and `MODEL_NAME`.
+- **Default model**: `qwen2.5:7b-instruct` on Ollama. Override globally with `MODEL_PROVIDER` and `MODEL_NAME`. OpenAI provider requires `OPENAI_API_KEY` — read in `config/agents.py`, not in the client.
+- **Agent class pattern**: each dedicated agent follows `run()` → `_try_llm()` → `_parse_json()` → Pydantic validation → deterministic fallback. The LLM call is `self.client.chat(purpose=..., prompt=..., output=["json"], rules=..., inputs=[...])` inside `_try_llm` (there is no `_chat` method). `run()` retries once with `strict=True`; `_try_llm` catches `LLMConnectionError`/`LLMResponseError`/`LLMTimeoutError` from `client/errors.py` and returns `None`.
 - **No extended characters** in LLM output: `"` not `""`, `->` not `→`. Enforced in agent prompts.
-- **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode. LLM is now connected — `wip_testing/parsing.py` demonstrates both modes.
+- **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode. LLM is now connected — `wip_testing/test_parsing.py` demonstrates both modes.
 - **LLM output coercion**: Pydantic validators in `client/models.py` handle LLMs returning dicts where strings/lists are expected (e.g., `tone_guidance` as a dict, `keyword_strategy` as a dict). See `_coerce_str_list`, `_coerce_tone_guidance`, `_coerce_final_resume`.
 
 ## Logging
@@ -116,4 +119,4 @@ Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_
 
 ## Status
 
-Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Pipeline runs end-to-end with all dedicated agents. See `resume-todo.md` for remaining work (Phase 5: pipeline wiring, Phase 6: output formatting).
+Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Pipeline runs end-to-end, but `sample_run()` uses dedicated classes only for agents 1-2; agents 3-7 use generic `PipelineAgent` wrappers. See `resume-todo.md` for remaining work (Phase 5: pipeline wiring for agents 3-7, Phase 6: output formatting).
