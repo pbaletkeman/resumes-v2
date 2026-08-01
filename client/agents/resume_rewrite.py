@@ -209,6 +209,20 @@ class ResumeRewriteAgent:
             logger.warning("Output missing certifications from input -- rejecting")
             return None
 
+        if not _validate_companies(result, resume_json):
+            logger.warning("Output contains a fabricated company -- rejecting")
+            return None
+
+        if not _validate_chronological(result):
+            logger.warning("Output experiences not in chronological order -- rejecting")
+            return None
+
+        sanitized = _sanitize_skills(result, resume_json)
+        if sanitized is None:
+            logger.warning("Output skills are mostly fabricated -- rejecting")
+            return None
+        result = sanitized
+
         return result
 
 
@@ -292,3 +306,155 @@ def _validate_certifications(result: RewriteOutput, resume_json: str) -> bool:
             logger.debug("Missing certification: %s", cert)
             return False
     return True
+
+
+def _validate_companies(result: RewriteOutput, resume_json: str) -> bool:
+    """Return True if every output company matches an input employer.
+
+    Companies are matched case-insensitively by substring against the set
+    of input company names (the LLM may reorder entries, so match by name
+    rather than by position).  Empty output companies are skipped.
+    """
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return True  # can't validate, pass
+    input_companies = _extract_companies(resume_data.get("experience", []))
+    if not input_companies:
+        return True
+    for entry in result.experience:
+        company = entry.company.strip()
+        if not company:
+            continue
+        if not any(_company_matches(company, inp) for inp in input_companies):
+            logger.debug("Fabricated company not in input resume: %s", company)
+            return False
+    return True
+
+
+def _extract_companies(experiences: list[Any]) -> list[str]:
+    """Extract non-empty company names from a list of experience entries."""
+    companies: list[str] = []
+    for exp in experiences:
+        if isinstance(exp, dict):
+            company = exp.get("company", "")  # type: ignore[reportUnknownMemberType]
+        else:
+            company = getattr(exp, "company", "")
+        if isinstance(company, str) and company.strip():
+            companies.append(company.strip())
+    return companies
+
+
+def _company_matches(output: str, input_: str) -> bool:
+    """Case-insensitive substring match between two company names."""
+    out = output.lower()
+    inp = input_.lower()
+    return out in inp or inp in out
+
+
+def _validate_chronological(result: RewriteOutput) -> bool:
+    """Return True if experiences are listed most-recent-first.
+
+    Entries without a parseable start year are skipped.  A result with
+    fewer than two parseable years is accepted (cannot be validated).
+    """
+    years: list[int] = []
+    for entry in result.experience:
+        year = _extract_start_year(entry.dates)
+        if year is not None:
+            years.append(year)
+    if len(years) < 2:
+        return True
+    for current, following in zip(years, years[1:], strict=False):
+        if current < following:
+            logger.debug(
+                "Experience out of chronological order: %d before %d",
+                current,
+                following,
+            )
+            return False
+    return True
+
+
+def _extract_start_year(dates: str) -> int | None:
+    """Return the first 4-digit year in a dates string, or None."""
+    match = re.search(r"(\d{4})", dates)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def _sanitize_skills(result: RewriteOutput, resume_json: str) -> RewriteOutput | None:
+    """Filter output skills to those present in the input resume.
+
+    Returns a copy of ``result`` with fabricated skills removed, or
+    ``None`` when more than half of the output skills are fabricated
+    (the caller should fall back to ``_parsed_to_rewrite``).
+    """
+    input_skills = _load_str_list(resume_json, "skills")
+    if not input_skills or not result.skills:
+        return result
+    input_normalized = [norm for s in input_skills if (norm := _normalize_skill(s))]
+    kept: list[str] = []
+    dropped: list[str] = []
+    for skill in result.skills:
+        if _skill_matches(skill, input_normalized):
+            kept.append(skill)
+        else:
+            dropped.append(skill)
+    if not dropped:
+        return result
+    drop_ratio = len(dropped) / len(result.skills)
+    if drop_ratio > 0.5:
+        logger.warning(
+            "Rejecting rewrite: %d/%d output skills not in input resume",
+            len(dropped),
+            len(result.skills),
+        )
+        return None
+    logger.warning(
+        "Dropped %d skills not present in input resume: %s",
+        len(dropped),
+        ", ".join(dropped),
+    )
+    return result.model_copy(update={"skills": kept})
+
+
+def _skill_matches(skill: str, input_skills: list[str]) -> bool:
+    """Fuzzy-match an output skill against normalized input skills.
+
+    Accepts exact, substring (len >= 3), and shared-token matches to
+    tolerate LLM renaming (e.g., 'SQL' vs 'PostgreSQL').
+    """
+    norm = _normalize_skill(skill)
+    if not norm:
+        return False
+    if norm in input_skills:
+        return True
+    norm_tokens = {t for t in norm.split() if len(t) >= 2}
+    for inp in input_skills:
+        if not inp:
+            continue
+        if len(norm) >= 3 and (norm in inp or inp in norm):
+            return True
+        inp_tokens = {t for t in inp.split() if len(t) >= 2}
+        if norm_tokens & inp_tokens:
+            return True
+    return False
+
+
+def _normalize_skill(skill: str) -> str:
+    """Lowercase a skill and reduce it to whitespace-separated tokens."""
+    return " ".join(re.findall(r"[a-z0-9]+", skill.lower()))
+
+
+def _load_str_list(resume_json: str, field: str) -> list[str]:
+    """Load a list-of-strings field from a serialized resume."""
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return []
+    value = resume_data.get(field, [])
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]

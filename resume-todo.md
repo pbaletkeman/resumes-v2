@@ -574,7 +574,7 @@ class CoverLetterOutput(BaseModel):
 
 ### 4.3 Fix LLM Fallback Falsehoods
 
-**Status:** ⚠️ PARTIAL — §F (company_name field) is DONE; §A–§E remain
+**Status:** ⚠️ PARTIAL — §F (company_name) and §A (resume rewrite validation) are DONE; §B–§E remain
 
 **Problem:**
 Two distinct failure modes produce bad output:
@@ -612,16 +612,18 @@ Two distinct failure modes produce bad output:
 
 #### A. Improve Post-Validation for Resume Rewrite (HIGH priority)
 
-Add checks in `resume_rewrite.py` `_try_llm()`, after the existing checks at lines 204-210.
+**Status:** ✅ DONE
 
-1. **Skill check — sanitize, don't reject.** Filter output skills to those present in input resume skills (case-insensitive, fuzzy token match to tolerate LLM renaming like "JS" → "JavaScript"). Keep the rest of the LLM's work; log the dropped skills. Rejecting the whole result over 1-2 bad skills throws away good rewriting. If >50% of output skills are dropped, reject instead (fall through to `_parsed_to_rewrite`).
-2. **Company check — reject on fabrication.** Each output `experience.company` must match an input `ExperienceEntry.company` (case-insensitive substring). If an output company matches none, it is a fabricated employer — reject the result. **Caveat:** companies are compared per experience entry by position, not by set membership — the LLM can reorder entries, so match by name, then optionally verify counts match the input.
-3. **Date check — skip.** Prompt already prohibits fabricated dates; regex date matching is fragile and low-value.
-4. **Chronological order check — add.** Verify experience entries are most-recent-first; reject if out of order (prompt rule exists at line 37 but is never validated).
+Checks added in `resume_rewrite.py` `_try_llm()`, after the existing experience-count and certification checks (previously at lines 204-210).
 
-**On rejection:** Return `None` so the caller falls back to `_parsed_to_rewrite()`.
+1. **Skill check — sanitize, don't reject** (`_sanitize_skills`). Filters output skills to those present in input resume skills. Matching is case-insensitive with a fuzzy match (`_normalize_skill` + `_skill_matches`: exact, substring ≥3 chars, shared-token) to tolerate LLM renaming (e.g., `SQL` vs `PostgreSQL`). Fabricated skills are dropped with a warning, and the rest of the LLM's work is kept. If **>50%** of output skills are dropped, the result is rejected (returns `None`) and falls through to `_parsed_to_rewrite()`.
+2. **Company check — reject on fabrication** (`_validate_companies`). Each output `experience.company` must match an input `ExperienceEntry.company` (case-insensitive substring, `_company_matches`). The LLM may reorder entries, so output companies are matched **by name against the set of input companies** rather than by position; empty output companies are skipped. An output company matching none is a fabricated employer — the result is rejected. Counts are already covered by the existing `_validate_experience_count`.
+3. **Date check — skipped.** Prompt already prohibits fabricated dates; regex date matching is fragile and low-value.
+4. **Chronological order check — add** (`_validate_chronological`). Verifies experience entries are most-recent-first by comparing start years (`_extract_start_year` — first 4-digit year in each `dates` string). Entries without a parseable year are skipped; results with <2 parseable years pass (cannot be validated). Out-of-order results are rejected.
 
-**Data-access gap:** `_parsed_to_rewrite()` (line 241) only receives the resume — the JD is **not** an input to `ResumeRewriteAgent.run()`. Options C.1 (reorder by JD `required_skills`) and C.2 (prepend JD `keywords`) therefore cannot run today without either (a) threading the JD through `run()` inputs, or (b) relying on `tailoring_strategy` fields (`keyword_strategy`, `strong_matches`) that are already available. Recommend (b) to avoid an input-schema change, or add JD to `inputs` if the tailoring strategy proves too sparse.
+**On rejection:** `_try_llm()` returns `None` so `run()` falls back to `_parsed_to_rewrite()`.
+
+**Data-access gap (still open, relevant to §C.1/C.2):** `_parsed_to_rewrite()` only receives the resume — the JD is **not** an input to `ResumeRewriteAgent.run()`. Options C.1 (reorder by JD `required_skills`) and C.2 (prepend JD `keywords`) therefore cannot run today without either (a) threading the JD through `run()` inputs, or (b) relying on `tailoring_strategy` fields (`keyword_strategy`, `strong_matches`) that are already available. Recommend (b) to avoid an input-schema change, or add JD to `inputs` if the tailoring strategy proves too sparse.
 
 ---
 
@@ -711,17 +713,17 @@ Post-validation catches falsehoods after the fact but wastes a retry when the LL
 
 - `client/models.py` — ✅ Add `company_name: str = ""` to `JDParsingOutput` (see §F)
 - `client/agents/jd_parsing.py` — ✅ Extract `company_name` in the LLM prompt and regex fallback; include it in `company_signals` (see §F)
-- `client/agents/resume_rewrite.py` — Add skill (sanitize) + company + chronological checks to `_try_llm()`; improve `_parsed_to_rewrite()` with skill reordering (from strategy keywords); tighten the "add reasonable metrics" prompt rule
+- `client/agents/resume_rewrite.py` — ✅ skill sanitize + company + chronological checks added to `_try_llm()` (see §A); still open: improve `_parsed_to_rewrite()` with skill reordering (from strategy keywords) and tighten the "add reasonable metrics" prompt rule
 - `client/agents/cover_letter.py` — Add role + company + length checks to `_try_llm()`; replace `_MINIMAL_COVER_LETTER` with `_build_fallback_cover_letter()` at all 3 call sites; fix stray non-ASCII char in system prompt. Company check (B.2) and fallback letter (C.2) should now use `JDParsingOutput.company_name` as the source of truth
-- `tests/` — ✅ `tests/test_jd_parsing.py` covers `_extract_company_name` + `_sync_company_name` (deterministic, no LLM); still needed: skill/company/role/chronological check tests for A/B
+- `tests/` — ✅ `tests/test_jd_parsing.py` covers `_extract_company_name` + `_sync_company_name`; ✅ `tests/test_resume_rewrite_validation.py` covers the A checks (skill/company/chronological — deterministic, no LLM); still needed: role/length check tests for B
 
 **Testing:**
 
 - Run `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG`
 - Run `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG`
 - Run `uv run python wip_testing/test_job_description.py` with `LOG_LEVEL=DEBUG` — verify `company_name` is populated in both LLM and regex-fallback paths ✅ (script now prints `company_name`; regex path verified against `sample/jobs/3Pillar.txt` → `3Pillar`, `Zafin.txt` → `Zafin`)
-- Run `uv run pytest` for the new deterministic validation unit tests ✅ (`tests/test_jd_parsing.py` — 19 tests for `_extract_company_name` / `_sync_company_name`)
-- Verify no skills appear in output that aren't in input resume (dropped with a warning, not silently kept)
+- Run `uv run pytest` for the new deterministic validation unit tests ✅ (`tests/test_jd_parsing.py` — 19 tests; `tests/test_resume_rewrite_validation.py` — 25 tests)
+- Verify no skills appear in output that aren't in input resume (dropped with a warning, not silently kept) ✅ (see §A `_sanitize_skills`)
 - Verify cover letter contains the JD role title
 - Verify fallback cover letter uses real JD/resume data, not placeholders
 - Verify rewritten metrics never exceed what the input resume states
