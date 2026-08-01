@@ -10,7 +10,7 @@ Implement the full 7-agent resume optimization pipeline as described in `bots.md
 
 The pipeline uses `PipelineAgent` (generic LLM wrappers with fixed system prompts) orchestrated by `AgentRunner`. Per-agent model assignment is handled by `ModelClientRegistry` + `config/agents.py`. The 7 agents are wired in `pipeline.py` via `run_resume_pipeline()`.
 
-### What exists now:
+### What exists now
 
 - `client/model_client.py` — Proper ABC for LLM clients
 - `client/ollama_client.py` — Ollama client with error handling
@@ -642,11 +642,13 @@ Add checks in `cover_letter.py` `_try_llm()`, after the word count check at line
 #### C. Improve Fallback Templates (MEDIUM priority)
 
 **Resume Rewrite fallback** (`_parsed_to_rewrite`): Add lightweight deterministic tailoring without an LLM:
+
 1. Reorder skills so skills matching JD `required_skills` (or `tailoring_strategy.keyword_strategy` — see the data-access gap in §A) appear first.
 2. Prepend JD `keywords` (or strategy keywords) not already present in the resume skills (up to 5).
 3. Leave experience, projects, certifications, education unchanged.
 
 **Cover Letter fallback** (`_MINIMAL_COVER_LETTER`): Replace the placeholder with a data-driven `_build_fallback_cover_letter(jd, resume, strategy)` helper:
+
 1. Use the real `role_title` from the JD.
 2. Use the company name if derivable (from `company_signals` / raw JD); otherwise omit rather than use "your company".
 3. Pick 2-3 skills from the resume overlapping JD `required_skills`.
@@ -685,16 +687,20 @@ Post-validation catches falsehoods after the fact but wastes a retry when the LL
 `JDParsingOutput` currently has **no `company_name` field** — `company_signals` holds only `{culture, values, mission}`. Without a structured company name, the cover letter company check (B.2) and the data-driven fallback letter (C.2) must rely on fragile heuristics. Add a first-class `company_name` field and surface it through `company_signals`:
 
 1. **Add the field** to `JDParsingOutput` in `client/models.py`:
+
    ```python
    company_name: str = ""  # employer name exactly as written in the JD
    ```
+
 2. **Extract it in the JD Parsing Agent** (`client/agents/jd_parsing.py`):
    - Add `company_name` to the LLM prompt's JSON field list.
    - Add a rule: *"Extract the company name exactly as it appears in the job description; output empty string if not present."*
    - Include `company_name` in the `company_signals` dict so the name flows with the signals:
+
      ```python
      company_signals = {"company_name": company_name, "culture": ..., "values": ..., "mission": ...}
      ```
+
 3. **Regex fallback** (`_regex_fallback`): best-effort extract the company name from raw JD text (e.g., first proper-noun / header heuristic) and inject it into `company_signals` the same way. Empty string if not derivable.
 4. **Consumers** — once the field exists, use `JDParsingOutput.company_name` as the source of truth in:
    - Cover letter company check (B.2) — upgrade from "derive via heuristic" to "compare against structured field".
@@ -974,7 +980,7 @@ def format_cover_letter(text: str) -> str:
    markdown>=3.5
    ```
 
-7. **Wire into pipeline:**
+6. **Wire into pipeline:**
 
    - `run_resume_pipeline` gains two new parameters: `candidate_name: str` and `company_name: str`
    - These are passed through to `ResumeRenderer.render_all()` for file naming
