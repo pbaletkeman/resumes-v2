@@ -574,7 +574,7 @@ class CoverLetterOutput(BaseModel):
 
 ### 4.3 Fix LLM Fallback Falsehoods
 
-**Status:** ⚠️ PARTIAL — §F (company_name) and §A (resume rewrite validation) are DONE; §B–§E remain
+**Status:** ⚠️ PARTIAL — §F (company_name), §A (resume rewrite validation), and §B (cover letter validation) are DONE; §C–§E remain
 
 **Problem:**
 Two distinct failure modes produce bad output:
@@ -629,15 +629,17 @@ Checks added in `resume_rewrite.py` `_try_llm()`, after the existing experience-
 
 #### B. Improve Post-Validation for Cover Letter (HIGH priority)
 
-Add checks in `cover_letter.py` `_try_llm()`, after the word count check at lines 260-269.
+**Status:** ✅ DONE
 
-1. **Role check — reject only when role_title is meaningful.** The JD's `role_title` must appear in the cover letter (fuzzy, case-insensitive). `role_title` is structured and reliable — a letter that never names the role is generic. **Caveat:** `JDParsingOutput.role_title` defaults to `""`; skip the check when empty rather than rejecting everything.
-2. **Company check — best-effort warning, never reject.** Compare `JDParsingOutput.company_name` (see §F) against the letter; if the name is set and absent from the letter, log a warning but accept. Fall back to `company_signals` values or a proper-noun heuristic on raw JD text when the field is empty. A hard reject would cause false positives, so warn only.
-3. **Skill check — warn only.** Extract skill nouns from the letter; flag skills not in the resume's skill list. Cover letter prose paraphrases, so this is advisory only. Watch out for skill tokens that are substrings of other words (e.g., "ai" inside "aimed") — use word boundaries.
-4. **Length check — enforce the real spec, but reject→fallback only on extreme outliers.** Target is **450-600** (current code warns at < 250 / > 700 but accepts). Reject (→ `_build_fallback_cover_letter`) only if < 200 or > 800; accept with a warning between 200-450 and 600-800. Truncating or regenerating mid-range lengths is worse than a slightly short letter.
-5. **Date check — skip.** Prompt already prohibits "current"/"now"/"presently"; post-validation on natural language is fragile and low-value.
+Checks added in `cover_letter.py` `_try_llm()`, after the empty-content fallback (which now returns early).
 
-**Note:** the plain-text fallback in `_parse_json` (lines 296-301) treats any >50-char non-JSON response as the letter. All of the above checks must still run on that path — currently they do (it flows through `_try_llm`), but keep it that way.
+1. **Role check — reject only when role_title is meaningful** (`_validate_role`). The JD's `role_title` must appear in the cover letter. Matching is case-insensitive: the full title is tried first, then the non-filler tokens (seniority words like "senior"/"junior" and function words are stripped) must each appear as whole words — so "Senior Data Scientist" still passes a letter that only says "Data Scientist". `role_title` defaults to `""`, in which case the check passes. A meaningful title absent from the letter is rejected (returns `None` → fallback).
+2. **Company check — best-effort warning, never reject** (`_check_company`). Compares `JDParsingOutput.company_name` (see §F, source of truth) against the letter, falling back to `company_signals["company_name"]` via `_get_company_name`. A letter that omits the name logs a warning but is accepted. Partial mention passes if **any** significant token appears as a whole word (e.g. "Acme Corporation" vs a letter that only says "Acme"). No proper-noun heuristic on raw JD text — the structured field covers the realistic cases.
+3. **Skill check — warn only** (`_check_skills`). Candidate skill nouns come from the JD's `required_skills`/`preferred_skills` plus the resume's skill list. A skill mentioned in the letter but absent from the resume is flagged with a warning; nothing is rejected. Matching uses whole-word boundaries so short tokens like "ai" do not match inside "aimed", and fuzzy matching (`_skill_in_list`: exact / substring / shared-token) suppresses false warnings for e.g. "SQL" vs resume "PostgreSQL".
+4. **Length check — reject only on extreme outliers** (`_validate_length`). Spec is **450-600**. Rejects (returns `None` → fallback) only if < 200 or > 800; accepts with a warning between 200-450 and 600-800. Replaces the old `<250`/`>700` warn-only check.
+5. **Date check — skipped.** Prompt already prohibits "current"/"now"/"presently"; post-validation on natural language is fragile and low-value.
+
+**Note:** the plain-text fallback in `_parse_json` treats any >50-char non-JSON response as the letter. All of the above checks still run on that path — they flow through `_try_llm` unchanged.
 
 ---
 
@@ -714,17 +716,17 @@ Post-validation catches falsehoods after the fact but wastes a retry when the LL
 - `client/models.py` — ✅ Add `company_name: str = ""` to `JDParsingOutput` (see §F)
 - `client/agents/jd_parsing.py` — ✅ Extract `company_name` in the LLM prompt and regex fallback; include it in `company_signals` (see §F)
 - `client/agents/resume_rewrite.py` — ✅ skill sanitize + company + chronological checks added to `_try_llm()` (see §A); still open: improve `_parsed_to_rewrite()` with skill reordering (from strategy keywords) and tighten the "add reasonable metrics" prompt rule
-- `client/agents/cover_letter.py` — Add role + company + length checks to `_try_llm()`; replace `_MINIMAL_COVER_LETTER` with `_build_fallback_cover_letter()` at all 3 call sites; fix stray non-ASCII char in system prompt. Company check (B.2) and fallback letter (C.2) should now use `JDParsingOutput.company_name` as the source of truth
-- `tests/` — ✅ `tests/test_jd_parsing.py` covers `_extract_company_name` + `_sync_company_name`; ✅ `tests/test_resume_rewrite_validation.py` covers the A checks (skill/company/chronological — deterministic, no LLM); still needed: role/length check tests for B
+- `client/agents/cover_letter.py` — ✅ role + company + length checks added to `_try_llm()` (see §B); still open: replace `_MINIMAL_COVER_LETTER` with `_build_fallback_cover_letter()` at all 3 call sites and fix the stray non-ASCII char in the system prompt (see §C/E)
+- `tests/` — ✅ `tests/test_jd_parsing.py` covers `_extract_company_name` + `_sync_company_name`; ✅ `tests/test_resume_rewrite_validation.py` covers the A checks; ✅ `tests/test_cover_letter_validation.py` covers the B checks (role/company/skill/length — deterministic, no LLM)
 
 **Testing:**
 
 - Run `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG`
 - Run `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG`
 - Run `uv run python wip_testing/test_job_description.py` with `LOG_LEVEL=DEBUG` — verify `company_name` is populated in both LLM and regex-fallback paths ✅ (script now prints `company_name`; regex path verified against `sample/jobs/3Pillar.txt` → `3Pillar`, `Zafin.txt` → `Zafin`)
-- Run `uv run pytest` for the new deterministic validation unit tests ✅ (`tests/test_jd_parsing.py` — 19 tests; `tests/test_resume_rewrite_validation.py` — 25 tests)
+- Run `uv run pytest` for the new deterministic validation unit tests ✅ (`tests/test_jd_parsing.py` — 19 tests; `tests/test_resume_rewrite_validation.py` — 25 tests; `tests/test_cover_letter_validation.py` — 48 tests)
 - Verify no skills appear in output that aren't in input resume (dropped with a warning, not silently kept) ✅ (see §A `_sanitize_skills`)
-- Verify cover letter contains the JD role title
+- Verify cover letter contains the JD role title ✅ (see §B `_validate_role`; rejected when absent and role_title meaningful)
 - Verify fallback cover letter uses real JD/resume data, not placeholders
 - Verify rewritten metrics never exceed what the input resume states
 

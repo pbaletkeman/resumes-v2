@@ -230,9 +230,7 @@ class CoverLetterAgent:
             )
             return None
 
-        logger.debug(
-            "LLM cover letter response: %s", raw[:200] if raw else "<empty>"
-        )
+        logger.debug("LLM cover letter response: %s", raw[:200] if raw else "<empty>")
         data = _parse_json(raw)
         if data is None:
             return None
@@ -258,17 +256,20 @@ class CoverLetterAgent:
         if not result.cover_letter.strip():
             logger.warning("cover_letter is empty, using minimal fallback")
             result.cover_letter = _MINIMAL_COVER_LETTER
+            return result
 
-        # Validate word count (450-600 words)
-        word_count = len(result.cover_letter.split())
-        if word_count < 250:
-            logger.warning(
-                "Cover letter too short (%d words), accepting anyway", word_count
-            )
-        elif word_count > 700:
-            logger.warning(
-                "Cover letter too long (%d words), accepting anyway", word_count
-            )
+        # Post-validation checks
+        if not _validate_role(result, jd_json):
+            logger.warning("Cover letter does not name the JD role title -- rejecting")
+            return None
+
+        _check_company(result, jd_json)
+
+        _check_skills(result, resume_json, jd_json)
+
+        if not _validate_length(result):
+            logger.warning("Cover letter length outside extreme bounds -- rejecting")
+            return None
 
         return result
 
@@ -302,3 +303,194 @@ def _parse_json(raw: str) -> dict[str, Any] | None:
             return {"cover_letter": text}
         logger.warning("Response too short to be a valid cover letter")
         return None
+
+
+_ROLE_FILLER_WORDS = {
+    "senior",
+    "junior",
+    "mid",
+    "lead",
+    "principal",
+    "staff",
+    "entry",
+    "the",
+    "a",
+    "an",
+    "of",
+    "for",
+}
+
+
+def _validate_role(result: CoverLetterOutput, jd_json: str) -> bool:
+    """Return True if the JD role title appears in the cover letter.
+
+    The check is skipped when ``role_title`` is empty (its default).  The
+    full title is matched case-insensitively first; if that fails, the
+    non-filler tokens must each appear as whole words (so "Senior Data
+    Scientist" still passes a letter that only says "Data Scientist").
+    """
+    try:
+        jd_data: dict[str, Any] = json.loads(jd_json)
+    except json.JSONDecodeError, TypeError:
+        return True  # can't validate, pass
+    role_title = jd_data.get("role_title", "")
+    if not isinstance(role_title, str) or not role_title.strip():
+        return True
+    letter_lower = result.cover_letter.lower()
+    title_lower = role_title.strip().lower()
+    if title_lower in letter_lower:
+        return True
+    tokens = [
+        t
+        for t in re.findall(r"[a-z0-9]+", title_lower)
+        if t not in _ROLE_FILLER_WORDS and len(t) >= 3
+    ]
+    if not tokens:
+        return True  # nothing meaningful left to require
+    return all(
+        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
+    )
+
+
+def _check_company(result: CoverLetterOutput, jd_json: str) -> None:
+    """Warn if the cover letter omits the JD company name (never rejects).
+
+    Uses ``JDParsingOutput.company_name``, falling back to
+    ``company_signals["company_name"]`` (see Phase 4.3.F).  A missing name
+    or a letter that omits it only logs a warning -- paraphrased or
+    abbreviated company names make a hard reject a false-positive risk.
+    """
+    company = _get_company_name(jd_json)
+    if not company:
+        logger.debug("Cover letter: no company name to check against")
+        return
+    letter_lower = result.cover_letter.lower()
+    if company.lower() in letter_lower:
+        return
+    # Allow partial mention: at least one significant token of the company
+    # name appears as a whole word (e.g. "Acme Corporation" vs a letter
+    # that only says "Acme").
+    tokens = [t for t in re.findall(r"[a-z0-9]+", company.lower()) if len(t) >= 3]
+    if tokens and any(
+        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
+    ):
+        return
+    logger.warning(
+        "Cover letter does not mention target company %r (accepting anyway)",
+        company,
+    )
+
+
+def _get_company_name(jd_json: str) -> str:
+    """Return the JD company name, or an empty string when unavailable."""
+    try:
+        jd_data: dict[str, Any] = json.loads(jd_json)
+    except json.JSONDecodeError, TypeError:
+        return ""
+    company = jd_data.get("company_name", "")
+    if isinstance(company, str) and company.strip():
+        return company.strip()
+    signals = jd_data.get("company_signals", {})
+    if isinstance(signals, dict):
+        signals_str: dict[str, str] = signals  # type: ignore[reportUnknownVariableType]
+        name = signals_str.get("company_name", "")
+        if name.strip():
+            return name.strip()
+    return ""
+
+
+def _check_skills(result: CoverLetterOutput, resume_json: str, jd_json: str) -> None:
+    """Warn if the letter mentions skills absent from the resume (advisory).
+
+    Candidate skill nouns come from the JD's required/preferred skills and
+    the resume's skill list.  A skill mentioned in the letter but missing
+    from the resume is flagged with a warning; nothing is rejected because
+    cover letter prose paraphrases freely.  Word boundaries keep short
+    tokens like "ai" from matching inside words like "aimed".
+    """
+    resume_skills = _load_str_list(resume_json, "skills")
+    jd_skills = _load_str_list(jd_json, "required_skills") + _load_str_list(
+        jd_json, "preferred_skills"
+    )
+    candidates = list(dict.fromkeys(jd_skills + resume_skills))
+    if not candidates:
+        return
+    letter_lower = result.cover_letter.lower()
+    foreign: list[str] = []
+    for skill in candidates:
+        if not _skill_mentioned(letter_lower, skill):
+            continue
+        if not _skill_in_list(skill, resume_skills):
+            foreign.append(skill)
+    if foreign:
+        logger.warning(
+            "Cover letter mentions skills not in resume: %s",
+            ", ".join(foreign),
+        )
+
+
+def _skill_mentioned(letter_lower: str, skill: str) -> bool:
+    """Return True if ``skill`` appears in the letter as whole words."""
+    tokens = [t for t in re.findall(r"[a-z0-9]+", skill.lower()) if len(t) >= 2]
+    if not tokens:
+        return False
+    return all(
+        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
+    )
+
+
+def _skill_in_list(skill: str, skills: list[str]) -> bool:
+    """Fuzzy-match ``skill`` against a list of skills (case-insensitive)."""
+    norm = _normalize_skill(skill)
+    if not norm:
+        return True
+    for candidate in skills:
+        candidate_norm = _normalize_skill(candidate)
+        if not candidate_norm:
+            continue
+        if norm == candidate_norm:
+            return True
+        if len(norm) >= 3 and (norm in candidate_norm or candidate_norm in norm):
+            return True
+        if set(norm.split()) & set(candidate_norm.split()):
+            return True
+    return False
+
+
+def _normalize_skill(skill: str) -> str:
+    """Lowercase a skill and reduce it to whitespace-separated tokens."""
+    return " ".join(re.findall(r"[a-z0-9]+", skill.lower()))
+
+
+def _load_str_list(json_text: str, field: str) -> list[str]:
+    """Load a list-of-strings field from a serialized object."""
+    try:
+        data: dict[str, Any] = json.loads(json_text)
+    except json.JSONDecodeError, TypeError:
+        return []
+    value = data.get(field, [])
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
+
+
+def _validate_length(result: CoverLetterOutput) -> bool:
+    """Return True unless the letter is an extreme length outlier.
+
+    The spec is 450-600 words.  Mid-range deviations (200-450 and 600-800)
+    are accepted with a warning; only <200 or >800 words trigger rejection
+    so the caller falls back to the template letter.
+    """
+    word_count = len(result.cover_letter.split())
+    if word_count < 200:
+        logger.warning("Cover letter too short (%d words) -- rejecting", word_count)
+        return False
+    if word_count > 800:
+        logger.warning("Cover letter too long (%d words) -- rejecting", word_count)
+        return False
+    if word_count < 450 or word_count > 600:
+        logger.warning(
+            "Cover letter length %d words outside 450-600 spec (accepting)",
+            word_count,
+        )
+    return True
