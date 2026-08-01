@@ -574,7 +574,7 @@ class CoverLetterOutput(BaseModel):
 
 ### 4.3 Fix LLM Fallback Falsehoods
 
-**Status:** ❌ NOT DONE
+**Status:** ⚠️ PARTIAL — §F (company_name field) is DONE; §A–§E remain
 
 **Problem:**
 Two distinct failure modes produce bad output:
@@ -595,7 +595,7 @@ Two distinct failure modes produce bad output:
 
 **Key data facts that constrain the design:**
 
-- `JDParsingOutput` has **no `company_name` field** today — `company_signals` is `{culture, values, mission}` only. A company-name check on the cover letter has no structured source of truth. **This task adds a `company_name` field (see §F)** so the check has a reliable target.
+- `JDParsingOutput` now has a **`company_name` field** (see §F, ✅ DONE) — `company_signals` also carries it under the `"company_name"` key. The cover letter company check (B.2) and fallback letter (C.2) can rely on this structured source of truth.
 - `Role title` **is** structured (`JDParsingOutput.role_title`) — a reliable check target for the cover letter.
 - Company names **are** structured in the resume (`ExperienceEntry.company`) — a reliable check target for resume rewrite.
 - The word-count spec is **450-600** (per `bots.md` and `cover_letter.py` prompts). The todo's old "250-350 words" references in §4.2 and §7.1 were **wrong** and have already been corrected.
@@ -630,7 +630,7 @@ Add checks in `resume_rewrite.py` `_try_llm()`, after the existing checks at lin
 Add checks in `cover_letter.py` `_try_llm()`, after the word count check at lines 260-269.
 
 1. **Role check — reject only when role_title is meaningful.** The JD's `role_title` must appear in the cover letter (fuzzy, case-insensitive). `role_title` is structured and reliable — a letter that never names the role is generic. **Caveat:** `JDParsingOutput.role_title` defaults to `""`; skip the check when empty rather than rejecting everything.
-2. **Company check — best-effort warning, never reject.** Derive a company name from `company_signals` values or a proper-noun heuristic on raw JD text; if found and absent from the letter, log a warning but accept. There is no structured company field, so a hard reject would cause false positives.
+2. **Company check — best-effort warning, never reject.** Compare `JDParsingOutput.company_name` (see §F) against the letter; if the name is set and absent from the letter, log a warning but accept. Fall back to `company_signals` values or a proper-noun heuristic on raw JD text when the field is empty. A hard reject would cause false positives, so warn only.
 3. **Skill check — warn only.** Extract skill nouns from the letter; flag skills not in the resume's skill list. Cover letter prose paraphrases, so this is advisory only. Watch out for skill tokens that are substrings of other words (e.g., "ai" inside "aimed") — use word boundaries.
 4. **Length check — enforce the real spec, but reject→fallback only on extreme outliers.** Target is **450-600** (current code warns at < 250 / > 700 but accepts). Reject (→ `_build_fallback_cover_letter`) only if < 200 or > 800; accept with a warning between 200-450 and 600-800. Truncating or regenerating mid-range lengths is worse than a slightly short letter.
 5. **Date check — skip.** Prompt already prohibits "current"/"now"/"presently"; post-validation on natural language is fragile and low-value.
@@ -650,7 +650,7 @@ Add checks in `cover_letter.py` `_try_llm()`, after the word count check at line
 **Cover Letter fallback** (`_MINIMAL_COVER_LETTER`): Replace the placeholder with a data-driven `_build_fallback_cover_letter(jd, resume, strategy)` helper:
 
 1. Use the real `role_title` from the JD.
-2. Use the company name if derivable (from `company_signals` / raw JD); otherwise omit rather than use "your company".
+2. Use the real company name from `JDParsingOutput.company_name` (see §F); fall back to `company_signals` / raw JD, otherwise omit rather than use "your company".
 3. Pick 2-3 skills from the resume overlapping JD `required_skills`.
 4. Reference 1 achievement from the most recent experience entry.
 5. Use the candidate's name from the resume's name field (or "Candidate" if missing).
@@ -684,46 +684,43 @@ Post-validation catches falsehoods after the fact but wastes a retry when the LL
 
 #### F. Add `company_name` to `JDParsingOutput` and `company_signals` (HIGH priority, prerequisite for B.2/C.2)
 
-`JDParsingOutput` currently has **no `company_name` field** — `company_signals` holds only `{culture, values, mission}`. Without a structured company name, the cover letter company check (B.2) and the data-driven fallback letter (C.2) must rely on fragile heuristics. Add a first-class `company_name` field and surface it through `company_signals`:
+**Status:** ✅ DONE
 
-1. **Add the field** to `JDParsingOutput` in `client/models.py`:
+`JDParsingOutput` previously had **no `company_name` field** — `company_signals` held only `{culture, values, mission}`. Without a structured company name, the cover letter company check (B.2) and the data-driven fallback letter (C.2) must rely on fragile heuristics. A first-class `company_name` field now exists and is surfaced through `company_signals`:
+
+1. **Field added** to `JDParsingOutput` in `client/models.py`:
 
    ```python
    company_name: str = ""  # employer name exactly as written in the JD
    ```
 
-2. **Extract it in the JD Parsing Agent** (`client/agents/jd_parsing.py`):
-   - Add `company_name` to the LLM prompt's JSON field list.
-   - Add a rule: *"Extract the company name exactly as it appears in the job description; output empty string if not present."*
-   - Include `company_name` in the `company_signals` dict so the name flows with the signals:
-
-     ```python
-     company_signals = {"company_name": company_name, "culture": ..., "values": ..., "mission": ...}
-     ```
-
-3. **Regex fallback** (`_regex_fallback`): best-effort extract the company name from raw JD text (e.g., first proper-noun / header heuristic) and inject it into `company_signals` the same way. Empty string if not derivable.
-4. **Consumers** — once the field exists, use `JDParsingOutput.company_name` as the source of truth in:
+2. **Extracted in the JD Parsing Agent** (`client/agents/jd_parsing.py`):
+   - `company_name` added to the LLM prompt's JSON field list (`_SYSTEM_PROMPT`).
+   - Rule added: *"Extract the company name exactly as it appears in the job description; output empty string if not present."*
+   - `_sync_company_name()` keeps the field and `company_signals["company_name"]` in agreement after every successful LLM parse — prefers the top-level field, falls back to the value embedded in `company_signals`, and injects the name under the `"company_name"` key.
+3. **Regex fallback** (`_regex_fallback`): `_extract_company_name()` is a best-effort deterministic extractor — tries explicit labels (`Company:` / `Employer:` / `Organization:` / `Hiring Company:`), then the common JD opening pattern `<Name> is/are ...`, then `at/for/with <Name>` references. Filters out pure-number tokens, pronoun openers (`We`/`Our`/etc.), and returns empty string when nothing confident is derivable. The result populates both `company_name` and `company_signals["company_name"]`.
+4. **Consumers** (still pending — part of B.2 / C.2): once B.2 / C.2 are implemented, use `JDParsingOutput.company_name` as the source of truth in:
    - Cover letter company check (B.2) — upgrade from "derive via heuristic" to "compare against structured field".
    - Cover letter fallback template (C.2) — use the real company name instead of omitting it.
 
-**Files changed:** `client/models.py`, `client/agents/jd_parsing.py`, `client/agents/cover_letter.py` (B.2 / C.2 consumers).
+**Files changed:** `client/models.py`, `client/agents/jd_parsing.py`, `wip_testing/test_job_description.py`, `tests/test_jd_parsing.py`
 
 ---
 
 **Files to modify:**
 
-- `client/models.py` — Add `company_name: str = ""` to `JDParsingOutput` (see §F)
-- `client/agents/jd_parsing.py` — Extract `company_name` in the LLM prompt and regex fallback; include it in `company_signals`
+- `client/models.py` — ✅ Add `company_name: str = ""` to `JDParsingOutput` (see §F)
+- `client/agents/jd_parsing.py` — ✅ Extract `company_name` in the LLM prompt and regex fallback; include it in `company_signals` (see §F)
 - `client/agents/resume_rewrite.py` — Add skill (sanitize) + company + chronological checks to `_try_llm()`; improve `_parsed_to_rewrite()` with skill reordering (from strategy keywords); tighten the "add reasonable metrics" prompt rule
-- `client/agents/cover_letter.py` — Add role + company (best-effort) + length checks to `_try_llm()`; replace `_MINIMAL_COVER_LETTER` with `_build_fallback_cover_letter()` at all 3 call sites; fix stray non-ASCII char in system prompt
-- `tests/` — Add unit tests for the new pure validation helpers (skill/company/role/chronological checks) — these are deterministic and need no LLM
+- `client/agents/cover_letter.py` — Add role + company + length checks to `_try_llm()`; replace `_MINIMAL_COVER_LETTER` with `_build_fallback_cover_letter()` at all 3 call sites; fix stray non-ASCII char in system prompt. Company check (B.2) and fallback letter (C.2) should now use `JDParsingOutput.company_name` as the source of truth
+- `tests/` — ✅ `tests/test_jd_parsing.py` covers `_extract_company_name` + `_sync_company_name` (deterministic, no LLM); still needed: skill/company/role/chronological check tests for A/B
 
 **Testing:**
 
 - Run `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG`
 - Run `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG`
-- Run `uv run python wip_testing/test_job_description.py` with `LOG_LEVEL=DEBUG` — verify `company_name` is populated in both LLM and regex-fallback paths
-- Run `uv run pytest` for the new deterministic validation unit tests
+- Run `uv run python wip_testing/test_job_description.py` with `LOG_LEVEL=DEBUG` — verify `company_name` is populated in both LLM and regex-fallback paths ✅ (script now prints `company_name`; regex path verified against `sample/jobs/3Pillar.txt` → `3Pillar`, `Zafin.txt` → `Zafin`)
+- Run `uv run pytest` for the new deterministic validation unit tests ✅ (`tests/test_jd_parsing.py` — 19 tests for `_extract_company_name` / `_sync_company_name`)
 - Verify no skills appear in output that aren't in input resume (dropped with a warning, not silently kept)
 - Verify cover letter contains the JD role title
 - Verify fallback cover letter uses real JD/resume data, not placeholders

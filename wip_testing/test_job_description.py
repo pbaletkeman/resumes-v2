@@ -25,6 +25,7 @@ result = asyncio.run(agent.run({"job_description": jd}))
 
 print("=== JD Parsing Agent Output ===")
 print(f"role_title:        {result.role_title}")
+print(f"company_name:      {result.company_name}")
 print(f"seniority_level:   {result.seniority_level}")
 print(f"required_skills:   {result.required_skills}")
 print(f"preferred_skills:  {result.preferred_skills}")

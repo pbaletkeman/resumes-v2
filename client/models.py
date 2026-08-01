@@ -43,6 +43,7 @@ class JDParsingOutput(BaseModel):
     """Structured output from the JD Parsing Agent."""
 
     role_title: str = ""
+    company_name: str = ""  # employer name exactly as written in the JD
     seniority_level: str = ""  # "junior", "mid", "senior", "lead", "executive"
     required_skills: list[str] = Field(default_factory=list)
     preferred_skills: list[str] = Field(default_factory=list)

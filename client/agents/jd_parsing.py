@@ -26,10 +26,13 @@ _SYSTEM_PROMPT = (
     "Your task is to extract structured, machine-readable information "
     "from a job description. "
     "Produce a JSON object with the following fields: "
-    "role_title, seniority_level, required_skills, preferred_skills, "
-    "responsibilities, keywords, industry_terms, company_signals. "
+    "role_title, company_name, seniority_level, required_skills, "
+    "preferred_skills, responsibilities, keywords, industry_terms, "
+    "company_signals. "
     "Follow these rules: "
     "Do not add information not present in the job description. "
+    "Extract the company name exactly as it appears in the job "
+    "description; output empty string if not present. "
     "Normalize skills (e.g., 'communication skills' -> 'communication'). "
     "Extract all relevant keywords. "
     "Output only valid JSON."
@@ -40,6 +43,67 @@ _STRICT_RULES = [
     "Do not add information not present in the JD",
     "No markdown, no explanation — just the JSON object",
 ]
+
+_COMPANY_TOKEN = r"[A-Z0-9][A-Za-z0-9&.'-]+"
+_COMPANY_NAME_GROUP = _COMPANY_TOKEN + r"(?:[ \t]+" + _COMPANY_TOKEN + r")"
+_COMPANY_LABEL_RE = re.compile(
+    r"(?:^|\n)[ \t]*(?i:company|employer|organization|hiring\s+company)"
+    r"[ \t]*[:–-][ \t]*(" + _COMPANY_NAME_GROUP + r"{0,2})"
+)
+_COMPANY_FIRST_SENTENCE_RE = re.compile(
+    r"^(" + _COMPANY_NAME_GROUP + r"{0,2})\s+(?:is|are)\b",
+    re.MULTILINE,
+)
+_COMPANY_AT_RE = re.compile(
+    r"\b(?:at|for|with)\s+(" + _COMPANY_NAME_GROUP + r"{0,1})\b"
+)
+
+_NON_COMPANY_NAMES = frozenset(
+    {"we", "you", "they", "our", "this", "there", "it", "that", "your"}
+)
+
+
+def _extract_company_name(jd_text: str) -> str:
+    """Best-effort extraction of the employer name from raw JD text.
+
+    Tries explicit labels (``Company:``) first, then the common JD opening
+    pattern ``<Name> is/are ...``, then ``at/for/with <Name>`` references.
+    Returns an empty string when nothing confident can be derived.
+    """
+    text = jd_text.lstrip("\ufeff \t\r\n")
+    for pattern in (_COMPANY_LABEL_RE, _COMPANY_FIRST_SENTENCE_RE, _COMPANY_AT_RE):
+        match = pattern.search(text)
+        if match:
+            name = _clean_company_name(match.group(1))
+            if (
+                name
+                and any(ch.isalpha() for ch in name)
+                and name.lower() not in _NON_COMPANY_NAMES
+            ):
+                return name
+    return ""
+
+
+def _clean_company_name(name: str) -> str:
+    """Strip trailing punctuation and stray whitespace from a company name."""
+    return name.strip(" \t\r\n,;:!?.").strip()
+
+
+def _sync_company_name(result: JDParsingOutput) -> JDParsingOutput:
+    """Make ``company_name`` and ``company_signals["company_name"]`` agree.
+
+    Prefers the top-level ``company_name`` field, falling back to the
+    value embedded in ``company_signals``.  Injects the name into
+    ``company_signals`` under the ``"company_name"`` key so downstream
+    consumers have a single source of truth.
+    """
+    signals = dict(result.company_signals)
+    name = result.company_name or signals.get("company_name", "")
+    if name:
+        signals["company_name"] = name
+    else:
+        signals.pop("company_name", None)
+    return result.model_copy(update={"company_name": name, "company_signals": signals})
 
 
 class JDParsingAgent:
@@ -136,10 +200,14 @@ class JDParsingAgent:
             return None
 
         try:
-            return JDParsingOutput(**data)
+            result = JDParsingOutput(**data)
         except ValidationError:
             logger.warning("LLM output failed Pydantic validation")
             return None
+
+        # Keep company_name and company_signals in sync so the name
+        # flows with the signals regardless of which the LLM populated.
+        return _sync_company_name(result)
 
     @staticmethod
     def _parse_json(raw: str) -> dict[str, Any] | None:
@@ -180,14 +248,18 @@ class JDParsingAgent:
             len(parsed.nice_to_have),
         )
 
+        company_name = _extract_company_name(jd_text)
+        company_signals = {"company_name": company_name} if company_name else {}
+
         # Map ParsedJobDescription fields to JDParsingOutput fields
         return JDParsingOutput(
             role_title=parsed.title,
+            company_name=company_name,
             seniority_level="",
             required_skills=parsed.requirements,
             preferred_skills=parsed.nice_to_have,
             responsibilities=parsed.responsibilities,
             keywords=FormatDetector.extract_keywords(jd_text),
             industry_terms=[],
-            company_signals={},
+            company_signals=company_signals,
         )
