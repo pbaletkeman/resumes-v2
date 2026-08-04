@@ -62,7 +62,7 @@ Convert a `RewriteOutput` (or `ATSComplianceOutput`'s `final_resume`) to plain-t
 
 #### 6.A.3 Add `format_cover_letter()` to `client/formatter.py`
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Clean up cover letter text: normalize whitespace, fix encoding artifacts, ensure consistent paragraph spacing. Takes a `CoverLetterOutput` or raw string, returns clean string.
 
