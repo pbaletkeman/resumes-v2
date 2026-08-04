@@ -50,7 +50,7 @@ Convert a `RewriteOutput` to clean Markdown. Handles: name/title header, summary
 
 #### 6.A.2 Add `format_resume_plain()` to `client/formatter.py`
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Convert a `RewriteOutput` (or `ATSComplianceOutput`'s `final_resume`) to plain-text ATS-friendly format. No Markdown syntax, no special characters. Suitable for ATS upload and as input to DOCX/PDF rendering.
 
