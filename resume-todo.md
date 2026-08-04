@@ -4,7 +4,7 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), and 227 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), and 227 unit tests. The items below are what remains.
 
 ---
 
@@ -14,7 +14,7 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 
 ### 5.2 Wire up the 7-agent pipeline
 
-**Status:** ⚠️ PARTIAL — runs end-to-end; agents 3-7 still use generic `PipelineAgent` wrappers in `sample_run()`
+**Status:** ✅ COMPLETE — all 7 agents wired as dedicated classes; both dict and Pydantic model returns handled
 
 `run_resume_pipeline()` chains all 7 agents sequentially:
 
@@ -26,11 +26,9 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 6. Tone Polishing → `polished_resume`
 7. Cover Letter → `cover_letter`
 
-**What works:** The pipeline runs end-to-end. `sample_run()` uses dedicated `JDParsingAgent` and `ResumeParsingAgent` for agents 1-2, and generic `PipelineAgent` wrappers for agents 3-7. `create_runner_from_config()` accepts a dict of dedicated agent classes but requires the caller to pass them.
+**What works:** `sample_run()` now wires all 7 dedicated classes via `create_runner_from_config()`, which defaults to `DEFAULT_AGENT_CLASSES` (all 7 dedicated classes) and builds a `ModelClientRegistry` from the environment. The `_extract_field()` helper handles both dict returns (from generic `PipelineAgent`) and Pydantic model returns (from dedicated classes).
 
-**What's incomplete:** Agents 3-7 are not wired as dedicated classes in `sample_run()`. The pipeline code at lines like `tailoring_strategy = gap_result["tailoring_strategy"]` assumes dict-style access, which works with `PipelineAgent` (returns raw LLM text) but will break with dedicated agents that return Pydantic model objects. Wiring agents 3-7 requires updating `run_resume_pipeline()` to handle both dict and Pydantic model returns.
-
-**Optional improvement:** Add `candidate_name` and `company_name` parameters to `run_resume_pipeline()` for output file naming (see Phase 6.3).
+**What changed:** `client/agents/__init__.py` now exports all 7 agent classes. `pipeline.py` imports from the package, defines `DEFAULT_AGENT_CLASSES` constant, and `create_runner_from_config()` defaults to the full set when `agent_classes=None`.
 
 ---
 
@@ -245,9 +243,8 @@ test_real_files.py                # NEW (Phase 7.1)
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | Phase 5.2: Wire agents 3-7 into pipeline as dedicated classes | ⚠️ PARTIAL (runs end-to-end; agents 3-7 still use generic `PipelineAgent` — see §5.2) | Done work | 1 |
-| 2 | Phase 6.2: Output formatter (`client/formatter.py`) | ❌ TODO | None | 1 |
-| 3 | Phase 6.3: Template renderer (`client/templates/renderer.py`) | ❌ TODO | Step 2 | 2 |
-| 4 | Phase 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1, 3 | 1 |
-| 5 | Phase 7.2 (remaining): Unit tests for agents + pipeline | ❌ TODO | Steps 1, 2, 3 | 2 |
-| 6 | Phase 7.3: Documentation (`docs/architecture.md`, `agents.md`, `usage.md`, `api.md`) | ❌ TODO | All | 4 |
+| 1 | Phase 6.2: Output formatter (`client/formatter.py`) | ❌ TODO | None | 1 |
+| 2 | Phase 6.3: Template renderer (`client/templates/renderer.py`) | ❌ TODO | Step 1 | 2 |
+| 3 | Phase 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1, 2 | 1 |
+| 4 | Phase 7.2 (remaining): Unit tests for agents + pipeline | ❌ TODO | Steps 1, 2 | 2 |
+| 5 | Phase 7.3: Documentation (`docs/architecture.md`, `agents.md`, `usage.md`, `api.md`) | ❌ TODO | All | 4 |

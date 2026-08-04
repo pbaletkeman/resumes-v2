@@ -2,12 +2,14 @@
 pipeline.py
 Multi-agent resume optimization pipeline.
 
-Defines ``AgentRunner`` (a placeholder for agent orchestration) and
-``run_resume_pipeline``, which chains 7 specialized agents to transform
-a raw job description and resume into an ATS-optimized resume and
-tailored cover letter.
+Defines ``AgentRunner`` (agent orchestration) and ``run_resume_pipeline``,
+which chains 7 specialized agents to transform a raw job description and
+resume into an ATS-optimized resume and tailored cover letter.
 
-Supports per-agent model assignment via ``ModelClientRegistry``.
+All 7 stages run as dedicated classes (``JDParsingAgent`` through
+``CoverLetterAgent``); generic ``PipelineAgent`` wrappers remain supported
+for compatibility.  Per-agent model assignment is provided via
+``ModelClientRegistry`` and ``create_runner_from_config``.
 """
 
 from __future__ import annotations
@@ -16,17 +18,35 @@ import asyncio
 import logging
 import time
 from collections.abc import Mapping
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
-from client.agents.jd_parsing import JDParsingAgent
-from client.agents.resume_parsing import ResumeParsingAgent
+from client.agents import (
+    ATSComplianceAgent,
+    CoverLetterAgent,
+    GapAnalysisAgent,
+    JDParsingAgent,
+    ResumeParsingAgent,
+    ResumeRewriteAgent,
+    TonePolishingAgent,
+)
 from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
-from client.ollama_client import OllamaClient
 from config.agents import build_registry
 from logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
+
+# All 7 dedicated agent classes, keyed by their pipeline agent name.
+# Used as the default wiring for ``create_runner_from_config``.
+DEFAULT_AGENT_CLASSES: dict[str, Any] = {
+    "jd_parsing_agent": JDParsingAgent,
+    "resume_parsing_agent": ResumeParsingAgent,
+    "gap_analysis_agent": GapAnalysisAgent,
+    "resume_rewrite_agent": ResumeRewriteAgent,
+    "ats_compliance_agent": ATSComplianceAgent,
+    "tone_polishing_agent": TonePolishingAgent,
+    "cover_letter_agent": CoverLetterAgent,
+}
 
 
 class Agent(Protocol):
@@ -184,6 +204,29 @@ class AgentRunner:
         return self.registry.get_client_for_agent(name)
 
 
+def _extract_field(result: Any, *fields: str) -> Any:
+    """Return the first present dict field from ``result``, else ``result``.
+
+    Dedicated agents return validated Pydantic models (e.g.
+    ``GapAnalysisOutput``) that are themselves the stage output, while
+    generic ``PipelineAgent`` wrappers return a raw dict with named result
+    keys.  This helper normalises both shapes so ``run_resume_pipeline``
+    accepts a runner built from either kind of agent.
+
+    Args:
+        result: The agent's return value (dict or model).
+        fields: Candidate field names to look up on a dict result.
+
+    Returns:
+        The first field present in a dict result, otherwise ``result``.
+    """
+    if isinstance(result, dict):
+        for field in fields:
+            if field in result:
+                return cast(Any, result[field])
+    return cast(Any, result)
+
+
 def run_resume_pipeline(
     runner: AgentRunner,
     job_description: str,
@@ -217,12 +260,7 @@ def run_resume_pipeline(
             "job_description": job_description,
         },
     )
-    # Handle both JDParsingOutput model and raw dict
-    parsed_job_description: Any = (  # pyright: ignore[reportUnknownVariableType]
-        jd_result.get("parsed_job_description", jd_result)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-        if isinstance(jd_result, dict)
-        else jd_result
-    )
+    parsed_job_description: Any = _extract_field(jd_result, "parsed_job_description")
 
     # 2. Resume Parsing Agent
     resume_result = runner.run_agent(
@@ -231,7 +269,7 @@ def run_resume_pipeline(
             "resume": resume,
         },
     )
-    parsed_resume = resume_result
+    parsed_resume: Any = resume_result
 
     # 3. Gap Analysis Agent
     gap_result = runner.run_agent(
@@ -246,7 +284,7 @@ def run_resume_pipeline(
             "parsed_resume": parsed_resume,
         },
     )
-    tailoring_strategy = gap_result["tailoring_strategy"]
+    tailoring_strategy: Any = _extract_field(gap_result, "tailoring_strategy")
 
     # 4. Resume Rewrite Agent
     rewrite_result = runner.run_agent(
@@ -261,7 +299,7 @@ def run_resume_pipeline(
             "tailoring_strategy": tailoring_strategy,
         },
     )
-    rewritten_resume = rewrite_result["rewritten_resume"]
+    rewritten_resume: Any = _extract_field(rewrite_result, "rewritten_resume")
 
     # 5. ATS Compliance Agent
     ats_result = runner.run_agent(
@@ -273,8 +311,8 @@ def run_resume_pipeline(
             "rewritten_resume": rewritten_resume,
         },
     )
-    ats_optimized_resume = ats_result.get("ats_optimized_resume") or ats_result.get(
-        "final_resume"
+    ats_optimized_resume: Any = _extract_field(
+        ats_result, "ats_optimized_resume", "final_resume"
     )
 
     # 6. Tone Polishing Agent
@@ -287,7 +325,7 @@ def run_resume_pipeline(
             "ats_optimized_resume": ats_optimized_resume,
         },
     )
-    polished_resume = tone_result["polished_resume"]
+    polished_resume: Any = _extract_field(tone_result, "polished_resume")
 
     # 7. Cover Letter Agent
     cover_result = runner.run_agent(
@@ -301,7 +339,7 @@ def run_resume_pipeline(
             "tailoring_strategy": tailoring_strategy,
         },
     )
-    cover_letter = cover_result["cover_letter"]
+    cover_letter: Any = _extract_field(cover_result, "cover_letter")
 
     total_time = time.monotonic() - pipeline_start
     logger.info(
@@ -332,65 +370,35 @@ def create_runner_from_config(
 
     Args:
         agent_classes: Optional mapping of agent names to agent classes.
-            If ``None``, returns a runner with empty agents (for manual setup).
+            When ``None``, all 7 dedicated pipeline agents are wired up
+            (see :data:`DEFAULT_AGENT_CLASSES`).
 
     Returns:
         A configured ``AgentRunner`` with the registry attached.
 
     Example::
 
-        from config.agents import build_registry
-        from client.agents import (
-            JDParsingAgent, ResumeParsingAgent, GapAnalysisAgent,
-            ResumeRewriteAgent, ATSComplianceAgent, TonePolishingAgent,
-            CoverLetterAgent,
-        )
+        from pipeline import create_runner_from_config, run_resume_pipeline
 
-        registry = build_registry()
-        agents = {
-            "jd_parsing_agent": JDParsingAgent,
-            "resume_parsing_agent": ResumeParsingAgent,
-            "gap_analysis_agent": GapAnalysisAgent,
-            "resume_rewrite_agent": ResumeRewriteAgent,
-            "ats_compliance_agent": ATSComplianceAgent,
-            "tone_polishing_agent": TonePolishingAgent,
-            "cover_letter_agent": CoverLetterAgent,
-        }
-        runner = AgentRunner(agents, registry=registry)
+        runner = create_runner_from_config()
+        results = run_resume_pipeline(runner, jd_text, resume_text)
     """
     registry = build_registry()
-    return AgentRunner(agent_classes or {}, registry=registry)
+    return AgentRunner(agent_classes or DEFAULT_AGENT_CLASSES, registry=registry)
 
 
 def sample_run() -> None:
-    """Demonstrate the full resume optimization pipeline end-to-end.
+    """Demonstrate the full 7-agent pipeline end-to-end.
 
-    Creates a ``PipelineAgent`` for each of the 7 pipeline stages, all backed
-    by a single Ollama ``qwen2.5:7b-instruct`` client.  The agents are wired into an
-    ``AgentRunner`` and executed sequentially via ``run_resume_pipeline``.
+    Builds a ``ModelClientRegistry`` from the environment (see
+    ``config.agents``) and wires all 7 dedicated agent classes into an
+    ``AgentRunner`` via ``create_runner_from_config``.  The agents are
+    executed sequentially via ``run_resume_pipeline``.
 
     Replace the placeholder JD and resume text with real content to see
     meaningful output.
     """
-    client = OllamaClient("qwen2.5:7b-instruct")
-
-    agents_map = {
-        "jd_parsing_agent": JDParsingAgent(client),
-        "resume_parsing_agent": ResumeParsingAgent(client),
-        "gap_analysis_agent": PipelineAgent(
-            client, "Compare JD vs resume, produce a tailoring strategy"
-        ),
-        "resume_rewrite_agent": PipelineAgent(
-            client, "Rewrite resume to match job requirements"
-        ),
-        "ats_compliance_agent": PipelineAgent(
-            client, "Check and optimize resume for ATS systems"
-        ),
-        "tone_polishing_agent": PipelineAgent(client, "Polish resume tone and clarity"),
-        "cover_letter_agent": PipelineAgent(client, "Generate tailored cover letters"),
-    }
-
-    runner_instance = AgentRunner(agents_map)
+    runner_instance = create_runner_from_config()
 
     jd_text = "Paste JD here..."
     resume_text = "Paste resume here..."

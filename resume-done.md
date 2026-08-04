@@ -544,7 +544,7 @@ The `AgentRunner` class is fully implemented with:
 
 **No further work needed.**
 
-> Phase 5.2 (wire the 7-agent pipeline with dedicated classes for agents 3-7) is PARTIAL — see `resume-todo.md`.
+> Phase 5.2 (wire the 7-agent pipeline with dedicated classes for agents 3-7) is **complete** — all 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()`. `client/agents/__init__.py` exports all 7 classes. `run_resume_pipeline()` handles both dict and Pydantic model returns via `_extract_field()`. See `resume-done.md` §5.2.
 
 ---
 
