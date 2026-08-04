@@ -74,9 +74,9 @@ Clean up cover letter text: normalize whitespace, fix encoding artifacts, ensure
 
 #### 6.A.4 Add unit tests for formatting helpers
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
-Test all three functions with sample `RewriteOutput` and `CoverLetterOutput` fixtures. Verify: Markdown output has correct headers/bullets, plain output has no Markdown syntax, cover letter whitespace is normalized.
+41 tests covering `format_resume_markdown()` (empty resume, headers, all sections, ordering, edge cases), `format_resume_plain()` (same coverage), `format_cover_letter()` (model input, raw string, whitespace normalization, encoding artifacts, empty input), and `_fix_encoding()` (all replacements, no-op, empty string).
 
 **Depends on:** 6.A.1–6.A.3
 
@@ -291,10 +291,10 @@ test_real_files.py                # NEW (Phase 7.1)
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | 6.A.1: `format_resume_markdown()` | ❌ TODO | None | 1 |
-| 2 | 6.A.2: `format_resume_plain()` | ❌ TODO | Step 1 | 1 |
-| 3 | 6.A.3: `format_cover_letter()` | ❌ TODO | Step 1 | 1 |
-| 4 | 6.A.4: Formatter unit tests | ❌ TODO | Steps 1–3 | 1 |
+| 1 | 6.A.1: `format_resume_markdown()` | ✅ DONE | None | 1 |
+| 2 | 6.A.2: `format_resume_plain()` | ✅ DONE | Step 1 | 1 |
+| 3 | 6.A.3: `format_cover_letter()` | ✅ DONE | Step 1 | 1 |
+| 4 | 6.A.4: Formatter unit tests | ✅ DONE | Steps 1–3 | 1 |
 | 5 | 6.B.1: `ResumeRenderer` skeleton + `render_plaintext()` | ❌ TODO | None | 1 |
 | 6 | 6.B.2: `render_markdown()` | ❌ TODO | Step 5 | 1 |
 | 7 | 6.B.3: Cover letter rendering | ❌ TODO | Step 5 | 1 |

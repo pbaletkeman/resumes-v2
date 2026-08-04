@@ -120,7 +120,7 @@ Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compli
 
 ## Testing
 
-pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 227 tests across 6 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils). Sample files in `sample/jobs/` and `sample/resume/`.
+pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 268 tests across 7 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter). Sample files in `sample/jobs/` and `sample/resume/`.
 
 Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_compliance.py` runs agents 1-5). Run with `uv run python wip_testing/test_<agent>.py`.
 
