@@ -34,123 +34,169 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 
 ## Phase 6: Output & Validation
 
-### 6.2 Add output formatting utilities (`client/formatter.py`)
+Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is independent; 6.B depends on 6.A for the `RewriteOutput` → text conversion that feeds DOCX/PDF generation.
+
+### 6.A — Output Formatting Helpers
+
+#### 6.A.1 Create `client/formatter.py` with `format_resume_markdown()`
 
 **Status:** ❌ NOT DONE
 
-Create a formatter that converts structured output to clean documents:
-
-```python
-def format_resume_markdown(rewrite: RewriteOutput) -> str:
-    """Convert structured resume to clean Markdown."""
-
-
-def format_resume_plain(ats: ATSComplianceOutput) -> str:
-    """Convert to plain-text ATS-friendly format (no Markdown)."""
-
-
-def format_cover_letter(text: str) -> str:
-    """Clean up cover letter text (normalize whitespace, fix encoding)."""
-```
+Convert a `RewriteOutput` to clean Markdown. Handles: name/title header, summary, skills as bullet list, experience blocks (title, company, dates, responsibilities, achievements, metrics), certifications, projects, education. No external dependencies.
 
 **Files changed:** new file `client/formatter.py`
 
 ---
 
-### 6.3 Add template-based resume output (`client/templates/`)
+#### 6.A.2 Add `format_resume_plain()` to `client/formatter.py`
 
-**Status:** ⚠️ PARTIAL — template files exist, renderer is missing
+**Status:** ❌ NOT DONE
 
-**What exists now:** `client/templates/` has 4 Jinja2 template files:
+Convert a `RewriteOutput` (or `ATSComplianceOutput`'s `final_resume`) to plain-text ATS-friendly format. No Markdown syntax, no special characters. Suitable for ATS upload and as input to DOCX/PDF rendering.
 
-- `modern.py` — clean lines, bold section headers
-- `classic.py` — traditional format with underlined headers
-- `minimal.py` — whitespace-focused, no decorative elements
-- `cover_letter.py` — professional cover letter format
+**Depends on:** 6.A.1 (same file)
 
-**What's missing:** A `ResumeRenderer` class to render templates with data.
+**Files changed:** `client/formatter.py`
 
-**What to do:**
+---
 
-1. Create `client/templates/renderer.py` with:
+#### 6.A.3 Add `format_cover_letter()` to `client/formatter.py`
 
-   ```python
-   from pathlib import Path
-   from client.models import RewriteOutput, CoverLetterOutput
+**Status:** ❌ NOT DONE
 
+Clean up cover letter text: normalize whitespace, fix encoding artifacts, ensure consistent paragraph spacing. Takes a `CoverLetterOutput` or raw string, returns clean string.
 
-   class ResumeRenderer:
-       def __init__(self, template_dir: Path | None = None) -> None: ...
+**Depends on:** 6.A.1 (same file)
 
-       def render_plaintext(
-           self, resume: RewriteOutput, template: str = "modern"
-       ) -> str: ...
-       def render_markdown(
-           self, resume: RewriteOutput, template: str = "modern"
-       ) -> str: ...
-       def render_docx(self, resume: RewriteOutput, output_path: Path) -> Path: ...
-       def render_pdf(self, resume: RewriteOutput, output_path: Path) -> Path: ...
-       def render_cover_letter_plaintext(self, letter: CoverLetterOutput) -> str: ...
-       def render_cover_letter_markdown(self, letter: CoverLetterOutput) -> str: ...
+**Files changed:** `client/formatter.py`
 
-       @staticmethod
-       def build_output_path(
-           output_dir: Path,
-           candidate_name: str,
-           company_name: str,
-           doc_type: str,
-           ext: str,
-       ) -> Path:
-           """Build a file path like: 20260727_1430_JohnSmith_AcmeCorp_Resume.pdf"""
-           ...
+---
 
-       def render_all(
-           self,
-           resume: RewriteOutput,
-           letter: CoverLetterOutput,
-           candidate_name: str,
-           company_name: str,
-           output_dir: Path,
-       ) -> dict[str, Path]: ...
-   ```
+#### 6.A.4 Add unit tests for formatting helpers
 
-2. **DOCX generation:**
-   - Use `python-docx` library
-   - Professional font (Calibri or Arial), 10-11pt body, 14pt name
-   - Section headers in bold, slightly larger
-   - 1-inch margins, single spacing
-   - Save to `.docx` file
+**Status:** ❌ NOT DONE
 
-3. **PDF generation:**
-   - Use `weasyprint` or `pdfkit` (HTML → PDF pipeline)
-   - Render Markdown to HTML first, then convert to PDF
-   - Same professional styling as DOCX
-   - Save to `.pdf` file
+Test all three functions with sample `RewriteOutput` and `CoverLetterOutput` fixtures. Verify: Markdown output has correct headers/bullets, plain output has no Markdown syntax, cover letter whitespace is normalized.
 
-4. **`render_all` convenience method:**
-   - Takes a `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and output directory
-   - Generates all 4 formats for resume + cover letter
-   - File names follow the pattern: `{date}_{candidate_name}_{company_name}_{document_type}.{ext}`
-   - Date format: `YYYYMMDD_HHMM`
-   - Example: `20260727_1430_JohnSmith_AcmeCorp_Resume.pdf`
-   - Returns a dict mapping format name to file path
+**Depends on:** 6.A.1–6.A.3
 
-5. **Add to `pyproject.toml` dependencies:**
+**Files changed:** new file `tests/test_formatter.py`
 
-   ```plaintext
-   python-docx>=1.0.0
-   weasyprint>=60.0
-   markdown>=3.5
-   ```
+---
 
-6. **Wire into pipeline:**
+### 6.B — Template-Based Multi-Format Renderer
 
-   - `run_resume_pipeline` gains two new parameters: `candidate_name: str` and `company_name: str`
-   - These are passed through to `ResumeRenderer.render_all()` for file naming
-   - After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()`
-   - Store output paths in the pipeline result dict
+#### 6.B.1 Create `client/templates/renderer.py` with `ResumeRenderer` class skeleton
 
-**Files changed:** new file `client/templates/renderer.py`, `pyproject.toml`, `pipeline.py`
+**Status:** ❌ NOT DONE
+
+Create the `ResumeRenderer` class with `__init__`, template loading from `client/templates/`, and the `render_plaintext()` method (Jinja2 rendering of `RewriteOutput` against template dict). No DOCX/PDF yet — just Jinja2 text output.
+
+```python
+class ResumeRenderer:
+    def __init__(self, template_dir: Path | None = None) -> None: ...
+    def render_plaintext(self, resume: RewriteOutput, template: str = "modern") -> str: ...
+```
+
+**Depends on:** None (independent of 6.A)
+
+**Files changed:** new file `client/templates/renderer.py`
+
+---
+
+#### 6.B.2 Add `render_markdown()` to `ResumeRenderer`
+
+**Status:** ❌ NOT DONE
+
+Render `RewriteOutput` using the template's `"markdown"` key. Same Jinja2 approach as `render_plaintext()`.
+
+**Depends on:** 6.B.1 (same class)
+
+**Files changed:** `client/templates/renderer.py`
+
+---
+
+#### 6.B.3 Add `render_cover_letter_plaintext()` and `render_cover_letter_markdown()`
+
+**Status:** ❌ NOT DONE
+
+Render `CoverLetterOutput` using `COVER_LETTER` template. Two methods for plaintext and markdown variants.
+
+**Depends on:** 6.B.1 (same class)
+
+**Files changed:** `client/templates/renderer.py`
+
+---
+
+#### 6.B.4 Add `build_output_path()` static method
+
+**Status:** ❌ NOT DONE
+
+Static utility to build timestamped file paths: `{date}_{candidate_name}_{company_name}_{document_type}.{ext}`. Date format `YYYYMMDD_HHMM`. Pure path logic, no I/O.
+
+**Depends on:** 6.B.1 (same class)
+
+**Files changed:** `client/templates/renderer.py`
+
+---
+
+#### 6.B.5 Add DOCX generation (`render_docx()`)
+
+**Status:** ❌ NOT DONE
+
+Use `python-docx` to render `RewriteOutput` as a `.docx` file. Professional font (Calibri/Arial), 10–11pt body, 14pt name, bold section headers, 1-inch margins, single spacing.
+
+**Depends on:** 6.B.1 (same class)
+
+**Files changed:** `client/templates/renderer.py`, `pyproject.toml` (add `python-docx>=1.0.0`)
+
+---
+
+#### 6.B.6 Add PDF generation (`render_pdf()`)
+
+**Status:** ❌ NOT DONE
+
+Use `weasyprint` (or `pdfkit`) to render `RewriteOutput` as a `.pdf` file. Markdown → HTML → PDF pipeline. Same professional styling as DOCX.
+
+**Depends on:** 6.B.1 (same class)
+
+**Files changed:** `client/templates/renderer.py`, `pyproject.toml` (add `weasyprint>=60.0`, `markdown>=3.5`)
+
+---
+
+#### 6.B.7 Add `render_all()` convenience method
+
+**Status:** ❌ NOT DONE
+
+Takes `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and output directory. Generates all 4 resume formats (plaintext, markdown, DOCX, PDF) + 2 cover letter formats (plaintext, markdown). Returns `dict[str, Path]` mapping format name to file path.
+
+**Depends on:** 6.B.2–6.B.6
+
+**Files changed:** `client/templates/renderer.py`
+
+---
+
+#### 6.B.8 Wire renderer into pipeline (`pipeline.py`)
+
+**Status:** ❌ NOT DONE
+
+Add `candidate_name: str` and `company_name: str` parameters to `run_resume_pipeline()`. After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()` and store output paths in the pipeline result dict.
+
+**Depends on:** 6.B.7
+
+**Files changed:** `pipeline.py`
+
+---
+
+#### 6.B.9 Add unit tests for `ResumeRenderer`
+
+**Status:** ❌ NOT DONE
+
+Test template loading, `render_plaintext()`, `render_markdown()`, cover letter rendering, `build_output_path()`, and `render_all()` with mocked file I/O. Verify DOCX/PDF generation produces non-empty files.
+
+**Depends on:** 6.B.1–6.B.7
+
+**Files changed:** new file `tests/test_renderer.py`
 
 ---
 
@@ -223,10 +269,12 @@ Create an integration test that runs the full pipeline against real files:
 
 ```plaintext
 client/
-  formatter.py                    # NEW - output formatting (Phase 6.2)
+  formatter.py                    # NEW - output formatting (Phase 6.A)
   templates/
-    renderer.py                   # NEW - multi-format resume output (Phase 6.3)
+    renderer.py                   # NEW - multi-format resume output (Phase 6.B)
 tests/
+  test_formatter.py               # NEW (Phase 6.A.4)
+  test_renderer.py                # NEW (Phase 6.B.9)
   test_agents.py                  # NEW (Phase 7.2)
   test_pipeline.py                # NEW (Phase 7.2)
 docs/
@@ -243,8 +291,19 @@ test_real_files.py                # NEW (Phase 7.1)
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | Phase 6.2: Output formatter (`client/formatter.py`) | ❌ TODO | None | 1 |
-| 2 | Phase 6.3: Template renderer (`client/templates/renderer.py`) | ❌ TODO | Step 1 | 2 |
-| 3 | Phase 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1, 2 | 1 |
-| 4 | Phase 7.2 (remaining): Unit tests for agents + pipeline | ❌ TODO | Steps 1, 2 | 2 |
-| 5 | Phase 7.3: Documentation (`docs/architecture.md`, `agents.md`, `usage.md`, `api.md`) | ❌ TODO | All | 4 |
+| 1 | 6.A.1: `format_resume_markdown()` | ❌ TODO | None | 1 |
+| 2 | 6.A.2: `format_resume_plain()` | ❌ TODO | Step 1 | 1 |
+| 3 | 6.A.3: `format_cover_letter()` | ❌ TODO | Step 1 | 1 |
+| 4 | 6.A.4: Formatter unit tests | ❌ TODO | Steps 1–3 | 1 |
+| 5 | 6.B.1: `ResumeRenderer` skeleton + `render_plaintext()` | ❌ TODO | None | 1 |
+| 6 | 6.B.2: `render_markdown()` | ❌ TODO | Step 5 | 1 |
+| 7 | 6.B.3: Cover letter rendering | ❌ TODO | Step 5 | 1 |
+| 8 | 6.B.4: `build_output_path()` | ❌ TODO | Step 5 | 1 |
+| 9 | 6.B.5: DOCX generation | ❌ TODO | Step 5 | 2 |
+| 10 | 6.B.6: PDF generation | ❌ TODO | Step 5 | 2 |
+| 11 | 6.B.7: `render_all()` | ❌ TODO | Steps 6–10 | 1 |
+| 12 | 6.B.8: Wire renderer into pipeline | ❌ TODO | Step 11 | 1 |
+| 13 | 6.B.9: Renderer unit tests | ❌ TODO | Steps 5–11 | 1 |
+| 14 | 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 4, 12 | 1 |
+| 15 | 7.2 (remaining): Unit tests for agents + pipeline | ❌ TODO | Steps 4, 12 | 2 |
+| 16 | 7.3: Documentation (`docs/`) | ❌ TODO | All | 4 |
