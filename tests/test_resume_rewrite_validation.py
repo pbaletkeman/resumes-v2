@@ -7,12 +7,20 @@ from client.agents.resume_rewrite import (
     _extract_companies,
     _extract_start_year,
     _normalize_skill,
+    _parsed_to_rewrite,
     _sanitize_skills,
     _skill_matches,
+    _tailor_skills,
     _validate_chronological,
     _validate_companies,
 )
-from client.models import ExperienceEntry, RewriteOutput
+from client.models import (
+    ExperienceEntry,
+    GapAnalysisOutput,
+    JDParsingOutput,
+    ResumeParsingOutput,
+    RewriteOutput,
+)
 
 
 def _resume_json(
@@ -218,3 +226,133 @@ class TestValidateChronological:
             ]
         )
         assert _validate_chronological(result)
+
+
+class TestTailorSkills:
+    def _jd(
+        self,
+        required: list[str] | None = None,
+        keywords: list[str] | None = None,
+    ) -> JDParsingOutput:
+        return JDParsingOutput(
+            required_skills=required or [],
+            keywords=keywords or [],
+        )
+
+    def _strategy(self, keywords: list[str] | None = None) -> GapAnalysisOutput:
+        return GapAnalysisOutput(keyword_strategy=keywords or [])
+
+    def test_no_jd_or_strategy_returns_unchanged(self) -> None:
+        skills = ["Git", "Python", "SQL"]
+        assert _tailor_skills(skills) == skills
+
+    def test_required_skills_move_to_front(self) -> None:
+        result = _tailor_skills(
+            ["Git", "Docker", "Python", "C#"],
+            jd=self._jd(required=["Python", "Git"]),
+        )
+        assert result[:2] == ["Git", "Python"]
+
+    def test_required_matches_preserve_relative_order(self) -> None:
+        result = _tailor_skills(
+            ["Python", "Git", "SQL"],
+            jd=self._jd(required=["SQL", "Git"]),
+        )
+        assert result[:2] == ["Git", "SQL"]
+
+    def test_keywords_prepended_when_absent(self) -> None:
+        result = _tailor_skills(
+            ["Python", "SQL"],
+            jd=self._jd(keywords=["REST API", "Docker"]),
+        )
+        assert result[:2] == ["REST API", "Docker"]
+
+    def test_keyword_already_present_not_duplicated(self) -> None:
+        result = _tailor_skills(
+            ["Python", "SQL"],
+            jd=self._jd(keywords=["Python", "Docker"]),
+        )
+        assert result == ["Docker", "Python", "SQL"]
+
+    def test_additions_capped_at_five(self) -> None:
+        result = _tailor_skills(
+            ["Python"],
+            jd=self._jd(keywords=["A", "B", "C", "D", "E", "F"]),
+        )
+        assert len(result) == 6
+        assert result[:5] == ["A", "B", "C", "D", "E"]
+
+    def test_strategy_keywords_used_when_no_jd_required(self) -> None:
+        result = _tailor_skills(
+            ["Git", "Docker", "Python"],
+            strategy=self._strategy(keywords=["Python"]),
+        )
+        assert result[0] == "Python"
+
+    def test_strategy_keywords_prepended_when_no_jd_keywords(self) -> None:
+        result = _tailor_skills(
+            ["Python", "SQL"],
+            strategy=self._strategy(keywords=["Docker"]),
+        )
+        assert result == ["Docker", "Python", "SQL"]
+
+    def test_accepts_dict_inputs(self) -> None:
+        jd = {"required_skills": ["Python"], "keywords": ["Docker"]}
+        strategy = {"keyword_strategy": ["Python"]}
+        result = _tailor_skills(["SQL", "Python"], jd=jd, strategy=strategy)
+        assert result[:2] == ["Docker", "Python"]
+
+    def test_non_ascii_keyword_filtered(self) -> None:
+        result = _tailor_skills(
+            ["Python"],
+            jd=self._jd(keywords=["AWS Glue", "caf\xe9"]),
+        )
+        assert result == ["AWS Glue", "Python"]
+
+    def test_fuzzy_match_counts_as_present(self) -> None:
+        result = _tailor_skills(
+            ["PostgreSQL"],
+            jd=self._jd(keywords=["SQL"]),
+        )
+        assert result == ["PostgreSQL"]
+
+
+class TestParsedToRewrite:
+    def _resume(self, skills: list[str] | None = None) -> ResumeParsingOutput:
+        return ResumeParsingOutput(
+            summary="A summary",
+            skills=skills or [],
+            experience=[ExperienceEntry(company="Acme", dates="2020 - Present")],
+            projects=["Project One"],
+            certifications=["Cert A"],
+            education=["B.Sc."],
+        )
+
+    def test_converts_model_with_tailored_skills(self) -> None:
+        jd = JDParsingOutput(
+            required_skills=["Python"],
+            keywords=["Docker"],
+        )
+        resume = self._resume(skills=["Git", "Python"])
+        result = _parsed_to_rewrite(resume, jd=jd)
+        assert result.skills == ["Docker", "Python", "Git"]
+
+    def test_other_sections_passed_through_unchanged(self) -> None:
+        resume = self._resume(skills=["Git", "Python"])
+        result = _parsed_to_rewrite(resume)
+        assert result.summary == "A summary"
+        assert result.projects == ["Project One"]
+        assert result.certifications == ["Cert A"]
+        assert result.education == ["B.Sc."]
+        assert result.experience[0].company == "Acme"
+
+    def test_converts_dict(self) -> None:
+        resume = {"skills": ["Python"], "experience": [], "summary": ""}
+        result = _parsed_to_rewrite(resume)
+        assert result.skills == ["Python"]
+        assert result.experience == []
+
+    def test_unknown_type_returns_empty(self) -> None:
+        result = _parsed_to_rewrite("not a resume")
+        assert result.skills == []
+        assert result.summary == ""

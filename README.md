@@ -86,8 +86,8 @@ client/
 tests/
   test_format_detector.py          # FormatDetector regex parsing tests (46 tests)
   test_jd_parsing.py               # JD Parsing company_name extraction/sync tests (19 tests)
-  test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (37 tests)
-  test_cover_letter_validation.py  # Cover Letter post-validation tests (48 tests)
+  test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (52 tests)
+  test_cover_letter_validation.py  # Cover Letter post-validation tests (77 tests)
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + JSON Schema helper tests (15 tests)
 wip_testing/

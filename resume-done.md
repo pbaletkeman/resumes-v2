@@ -27,7 +27,7 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo (JSON mode)
-- `tests/` — 176 tests across 6 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils)
+- `tests/` — 220 tests across 6 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils)
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
 - `docs/TESTING.md` — Testing guide
@@ -434,6 +434,32 @@ Checks added in `cover_letter.py` `_try_llm()`, after the empty-content fallback
 
 **Note:** the plain-text fallback in `_parse_json` treats any >50-char non-JSON response as the letter. All of the above checks still run on that path.
 
+#### C. Improve Fallback Templates (MEDIUM priority) — ✅ DONE
+
+Two data-driven, deterministic fallbacks that replace the previous defaults (an untailored parsed resume and a `[Your Name]` placeholder letter).
+
+**Resume Rewrite fallback** (`client/agents/resume_rewrite.py`):
+
+- `_parsed_to_rewrite(parsed, jd=None, strategy=None)` now calls `_tailor_skills()`, which:
+  1. **Reorders skills** so those matching the JD `required_skills` (or, when the JD is not passed to the agent, the strategy's `keyword_strategy`) appear first, preserving original relative order.
+  2. **Prepends up to 5 JD `keywords`** (or strategy keywords) not already present in the resume skills. Presence is checked with the existing fuzzy `_skill_matches`/`_normalize_skill` logic, so "SQL" vs "PostgreSQL" is handled. Non-ASCII keywords are skipped (project "no extended characters" convention).
+  3. Experience, projects, certifications, and education pass through unchanged.
+- `run()` reads an optional `parsed_job_description` from inputs (in addition to `parsed_resume`/`tailoring_strategy`) so the fallback has the JD when the caller provides it.
+
+**Cover Letter fallback** (`client/agents/cover_letter.py`):
+
+- `_MINIMAL_COVER_LETTER` removed; replaced by `_build_fallback_cover_letter(jd, resume, strategy)` which:
+  1. Uses the real `role_title` from the JD ("the advertised position" when absent).
+  2. Uses the real company name via the shared dict helper `_company_from` (top-level `company_name` first, then `company_signals["company_name"]`); omitted entirely rather than "your company" when unavailable.
+  3. Picks up to 3 resume skills overlapping JD `required_skills` (fuzzy `_skill_in_list`); falls back to `keyword_strategy` when there is no required-skill overlap.
+  4. References one achievement from the most recent experience entry (`_most_recent_achievement`), falling back to a responsibility only when the entry has no achievements.
+  5. Uses the candidate name from the resume's `name` field (or "Candidate" when missing).
+  6. Keeps the three-paragraph structure (opening / middle / closing) plus salutation and `Sincerely,\n<name>` signature, ASCII-only.
+- Applied at **all three call sites**: empty input in `run()`, double LLM failure in `run()`, and empty content in `_try_llm`. The empty-content path now returns `None` (per the todo note) so `run()` falls back — `_try_llm` stays pure (only serialized JSON strings).
+- `_get_company_name` was refactored to delegate to the shared `_company_from` (behavior unchanged; existing tests still pass).
+
+**Files changed:** `client/agents/resume_rewrite.py`, `client/agents/cover_letter.py`, `wip_testing/test_cover_letter.py` (fallback detection no longer checks for `[Your Name]`; uses word count < 300)
+
 #### F. Add `company_name` to `JDParsingOutput` and `company_signals` (HIGH priority, prerequisite for B.2/C.2) — ✅ DONE
 
 1. **Field added** to `JDParsingOutput` in `client/models.py`:
@@ -447,15 +473,15 @@ Checks added in `cover_letter.py` `_try_llm()`, after the empty-content fallback
    - Rule added: *"Extract the company name exactly as it appears in the job description; output empty string if not present."*
    - `_sync_company_name()` keeps the field and `company_signals["company_name"]` in agreement after every successful LLM parse — prefers the top-level field, falls back to the value embedded in `company_signals`, and injects the name under the `"company_name"` key.
 3. **Regex fallback** (`_regex_fallback`): `_extract_company_name()` is a best-effort deterministic extractor — tries explicit labels (`Company:` / `Employer:` / `Organization:` / `Hiring Company:`), then the common JD opening pattern `<Name> is/are ...`, then `at/for/with <Name>` references. Filters out pure-number tokens, pronoun openers (`We`/`Our`/etc.), and returns empty string when nothing confident is derivable. The result populates both `company_name` and `company_signals["company_name"]`.
-4. **Consumers:** the cover letter company check (B.2) uses `JDParsingOutput.company_name` as the source of truth. The cover letter fallback template (C.2) is still pending — see `resume-todo.md` §C.
+4. **Consumers:** the cover letter company check (B.2) and the fallback letter (C.2) both use `JDParsingOutput.company_name` as the source of truth via the shared `_company_from` helper.
 
 **Files changed:** `client/models.py`, `client/agents/jd_parsing.py`, `wip_testing/test_job_description.py`, `tests/test_jd_parsing.py`
 
 **Tests added for the completed §4.3 items:**
 
 - `tests/test_jd_parsing.py` — covers `_extract_company_name` + `_sync_company_name` (19 tests)
-- `tests/test_resume_rewrite_validation.py` — covers the A checks (37 tests)
-- `tests/test_cover_letter_validation.py` — covers the B checks, role/company/skill/length (48 tests)
+- `tests/test_resume_rewrite_validation.py` — covers the A checks + §C `_tailor_skills`/`_parsed_to_rewrite` (52 tests)
+- `tests/test_cover_letter_validation.py` — covers the B checks + §C fallback builder helpers (77 tests)
 
 ---
 
@@ -624,8 +650,8 @@ tests/
   conftest.py                      # EXISTS ✅ (shared fixtures)
   test_format_detector.py          # EXISTS ✅ (46 tests)
   test_jd_parsing.py               # EXISTS ✅ (19 tests)
-  test_resume_rewrite_validation.py # EXISTS ✅ (37 tests)
-  test_cover_letter_validation.py  # EXISTS ✅ (48 tests)
+  test_resume_rewrite_validation.py # EXISTS ✅ (52 tests)
+  test_cover_letter_validation.py  # EXISTS ✅ (77 tests)
   test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
   test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
 docs/

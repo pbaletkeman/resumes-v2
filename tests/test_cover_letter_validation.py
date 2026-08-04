@@ -3,17 +3,28 @@
 import json
 
 from client.agents.cover_letter import (
+    _build_fallback_cover_letter,
     _check_company,
     _check_skills,
+    _company_from,
     _get_company_name,
+    _join_skills,
     _load_str_list,
+    _most_recent_achievement,
     _normalize_skill,
+    _overlapping_skills,
     _skill_in_list,
     _skill_mentioned,
     _validate_length,
     _validate_role,
 )
-from client.models import CoverLetterOutput
+from client.models import (
+    CoverLetterOutput,
+    ExperienceEntry,
+    GapAnalysisOutput,
+    JDParsingOutput,
+    ResumeParsingOutput,
+)
 
 
 def _jd_json(
@@ -250,3 +261,207 @@ class TestValidateLength:
 
     def test_boundary_800_passes(self) -> None:
         assert _validate_length(self._letter_of_words(800))
+
+
+class TestJoinSkills:
+    def test_single(self) -> None:
+        assert _join_skills(["Python"]) == "Python"
+
+    def test_two(self) -> None:
+        assert _join_skills(["Python", "SQL"]) == "Python and SQL"
+
+    def test_three(self) -> None:
+        assert _join_skills(["Python", "SQL", "Git"]) == "Python, SQL, and Git"
+
+    def test_empty(self) -> None:
+        assert _join_skills([]) == ""
+
+
+class TestOverlappingSkills:
+    def test_matching_skills_returned(self) -> None:
+        assert _overlapping_skills(["Python", "SQL", "K8s"], ["Python", "SQL"]) == [
+            "Python",
+            "SQL",
+        ]
+
+    def test_fuzzy_match_counts(self) -> None:
+        assert _overlapping_skills(["SQL"], ["PostgreSQL"]) == ["SQL"]
+
+    def test_no_overlap(self) -> None:
+        assert _overlapping_skills(["Docker"], ["Python"]) == []
+
+    def test_empty(self) -> None:
+        assert _overlapping_skills([], []) == []
+
+
+class TestCompanyFrom:
+    def test_top_level_field_wins(self) -> None:
+        data = {"company_name": "Acme", "company_signals": {"company_name": "Zafin"}}
+        assert _company_from(data) == "Acme"
+
+    def test_signals_fallback(self) -> None:
+        data = {"company_signals": {"company_name": "Zafin"}}
+        assert _company_from(data) == "Zafin"
+
+    def test_empty_when_absent(self) -> None:
+        assert _company_from({}) == ""
+
+    def test_non_string_ignored(self) -> None:
+        assert _company_from({"company_name": 123}) == ""
+
+
+class TestMostRecentAchievement:
+    def _resume(
+        self, experiences: list[dict[str, object]] | None = None
+    ) -> dict[str, object]:
+        return {"experience": experiences or []}
+
+    def test_returns_first_achievement_of_first_entry(self) -> None:
+        data = self._resume(
+            [
+                {"achievements": ["Reduced load 90%", "Built ETL jobs"]},
+                {"achievements": ["Older achievement"]},
+            ]
+        )
+        assert _most_recent_achievement(data) == "Reduced load 90%"
+
+    def test_falls_back_to_responsibility(self) -> None:
+        data = self._resume([{"achievements": [], "responsibilities": ["Built APIs"]}])
+        assert _most_recent_achievement(data) == "Built APIs"
+
+    def test_empty_when_no_experience(self) -> None:
+        assert _most_recent_achievement(self._resume([])) == ""
+
+    def test_empty_when_entry_has_no_text(self) -> None:
+        data = self._resume([{"achievements": [""], "responsibilities": [""]}])
+        assert _most_recent_achievement(data) == ""
+
+    def test_handles_model_entries(self) -> None:
+        data = {
+            "experience": [
+                ExperienceEntry(
+                    achievements=["Reduced load 90%"],
+                    responsibilities=[],
+                )
+            ]
+        }
+        assert _most_recent_achievement(data) == "Reduced load 90%"
+
+
+class TestBuildFallbackCoverLetter:
+    def _jd(
+        self,
+        role_title: str = "",
+        company_name: str = "",
+        required: list[str] | None = None,
+    ) -> JDParsingOutput:
+        return JDParsingOutput(
+            role_title=role_title,
+            company_name=company_name,
+            required_skills=required or [],
+        )
+
+    def _resume(
+        self,
+        skills: list[str] | None = None,
+        name: str | None = None,
+        achievements: list[str] | None = None,
+    ) -> ResumeParsingOutput:
+        return ResumeParsingOutput(
+            skills=skills or [],
+            experience=[
+                ExperienceEntry(
+                    company="Acme",
+                    dates="2024 - Present",
+                    achievements=achievements or ["Reduced complexity by 90%"],
+                    responsibilities=["Built APIs"],
+                )
+            ],
+        )
+
+    def _strategy(self, keywords: list[str] | None = None) -> GapAnalysisOutput:
+        return GapAnalysisOutput(keyword_strategy=keywords or [])
+
+    def test_uses_role_title(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Software Engineer"), self._resume(), self._strategy()
+        )
+        assert "Software Engineer position" in letter
+
+    def test_uses_company_name(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(company_name="3Pillar"), self._resume(), self._strategy()
+        )
+        assert "3Pillar" in letter
+
+    def test_omits_company_when_absent(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(), self._resume(), self._strategy()
+        )
+        assert "your company" not in letter
+
+    def test_uses_candidate_name_when_available(self) -> None:
+        resume = self._resume()
+        resume_dict = resume.model_dump()
+        resume_dict["name"] = "Peter Letkeman"
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Engineer"), resume_dict, self._strategy()
+        )
+        assert "Sincerely,\nPeter Letkeman" in letter
+
+    def test_falls_back_to_candidate_name(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Engineer"), self._resume(), self._strategy()
+        )
+        assert "Sincerely,\nCandidate" in letter
+
+    def test_mentions_overlapping_required_skills(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(required=["Python", "SQL", "Docker"]),
+            self._resume(skills=["Python", "SQL", "Git"]),
+            self._strategy(),
+        )
+        assert "Python and SQL" in letter
+
+    def test_references_most_recent_achievement(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(), self._resume(), self._strategy()
+        )
+        assert "reduced complexity by 90%" in letter
+
+    def test_three_paragraph_structure(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Engineer"), self._resume(), self._strategy()
+        )
+        assert letter.startswith("Dear Hiring Manager,")
+        assert "\n\n" in letter
+        assert letter.count("\n\n") == 4
+
+    def test_no_placeholder_text(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(), self._resume(), self._strategy()
+        )
+        assert "[Your Name]" not in letter
+        assert "[Company]" not in letter
+        assert "[Role]" not in letter
+
+    def test_strategy_keywords_used_when_no_required_overlap(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(required=["Kubernetes", "Docker"]),
+            self._resume(skills=["Python", "SQL"]),
+            self._strategy(keywords=["Python"]),
+        )
+        assert "Python" in letter
+
+    def test_accepts_plain_dicts(self) -> None:
+        jd = {"role_title": "Engineer", "company_name": "Acme"}
+        resume = {"skills": ["Python"], "experience": []}
+        letter = _build_fallback_cover_letter(jd, resume, {})
+        assert "Engineer position" in letter
+        assert "Acme" in letter
+
+    def test_ascii_only_output(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Engineer"), self._resume(), self._strategy()
+        )
+        assert all(ord(char) < 128 for char in letter)

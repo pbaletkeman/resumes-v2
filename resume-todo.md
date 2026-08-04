@@ -4,13 +4,13 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), the Phase 4.3 post-validation work (§A/§B/§F), and 176 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), the Phase 4.3 post-validation work (§A/§B/§C/§F), and 220 unit tests. The items below are what remains.
 
 ---
 
-## Phase 4.3 (remaining): Fix LLM Fallback Falsehoods — §C, §D, §E
+## Phase 4.3 (remaining): Fix LLM Fallback Falsehoods — §D, §E
 
-**Status:** §A (resume rewrite validation), §B (cover letter validation), and §F (`company_name`) are ✅ DONE — see `resume-done.md`. §C–§E remain.
+**Status:** §A (resume rewrite validation), §B (cover letter validation), §C (fallback templates), and §F (`company_name`) are ✅ DONE — see `resume-done.md`. §D–§E remain.
 
 **Problem (context):** Two distinct failure modes produce bad output:
 
@@ -26,26 +26,9 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 
 ---
 
-#### C. Improve Fallback Templates (MEDIUM priority)
+#### C. Improve Fallback Templates (MEDIUM priority) — ✅ DONE
 
-**Resume Rewrite fallback** (`_parsed_to_rewrite`): Add lightweight deterministic tailoring without an LLM:
-
-1. Reorder skills so skills matching JD `required_skills` (or `tailoring_strategy.keyword_strategy`) appear first.
-2. Prepend JD `keywords` (or strategy keywords) not already present in the resume skills (up to 5).
-3. Leave experience, projects, certifications, education unchanged.
-
-**Cover Letter fallback** (`_MINIMAL_COVER_LETTER`): Replace the placeholder with a data-driven `_build_fallback_cover_letter(jd, resume, strategy)` helper:
-
-1. Use the real `role_title` from the JD.
-2. Use the real company name from `JDParsingOutput.company_name` (see §F); fall back to `company_signals` / raw JD, otherwise omit rather than use "your company".
-3. Pick 2-3 skills from the resume overlapping JD `required_skills`.
-4. Reference 1 achievement from the most recent experience entry.
-5. Use the candidate's name from the resume's name field (or "Candidate" if missing).
-6. Keep the three-paragraph structure (opening, middle, closing).
-
-**Apply the same fallback at all three call sites:** empty input (`cover_letter.py:121`), double LLM failure (`:147`), and empty content (`:258`).
-
-**Note:** the empty-content call site (line 258) lives inside `_try_llm`, which only has the serialized JSON strings — not the raw `jd`/`resume`/`strategy` objects. To build a data-driven letter there, either pass the structured objects into `_try_llm`, or move the empty-content handling up to `run()` (recommended — keeps `_try_llm` pure).
+**Done — see `resume-done.md` §4.3.C.** Resume Rewrite now reorders/prepends skills deterministically (`_tailor_skills` in `_parsed_to_rewrite`), and the Cover Letter agent builds a data-driven `_build_fallback_cover_letter(jd, resume, strategy)` at all 3 call sites (empty input, double LLM failure, empty content — the last now rejects in `_try_llm` and falls back through `run()`, keeping `_try_llm` pure).
 
 ---
 
@@ -71,14 +54,13 @@ Post-validation catches falsehoods after the fact but wastes a retry when the LL
 
 **Files to modify (remaining):**
 
-- `client/agents/resume_rewrite.py` — improve `_parsed_to_rewrite()` with skill reordering (from strategy keywords) and tighten the "add reasonable metrics" prompt rule (§C.1/§E)
-- `client/agents/cover_letter.py` — replace `_MINIMAL_COVER_LETTER` with `_build_fallback_cover_letter()` at all 3 call sites and fix the stray non-ASCII char in the system prompt (§C.2/§E)
+- `client/agents/resume_rewrite.py` — tighten the "add reasonable metrics" prompt rule (§E)
+- `client/agents/cover_letter.py` — fix the stray non-ASCII char in the system prompt (§E)
 
 **Testing:**
 
 - Run `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG`
 - Run `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG`
-- Verify fallback cover letter uses real JD/resume data, not placeholders
 - Verify rewritten metrics never exceed what the input resume states
 
 ---
@@ -261,12 +243,12 @@ Create an integration test that runs the full pipeline against real files:
 
 **Status:** ⚠️ PARTIAL — existing deterministic tests are done; agent + pipeline tests remain
 
-**What exists now:** 176 tests across 6 files:
+**What exists now:** 220 tests across 6 files:
 
 - `tests/test_format_detector.py` — 46 tests covering all `FormatDetector` static extraction methods + regex-only parse flows
 - `tests/test_jd_parsing.py` — 19 tests (`_extract_company_name` + `_sync_company_name`)
-- `tests/test_resume_rewrite_validation.py` — 37 tests (§4.3.A checks)
-- `tests/test_cover_letter_validation.py` — 48 tests (§4.3.B checks)
+- `tests/test_resume_rewrite_validation.py` — 52 tests (§4.3.A checks + §C skill tailoring)
+- `tests/test_cover_letter_validation.py` — 77 tests (§4.3.B checks + §C fallback builder)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 15 tests (shared parser + JSON Schema helpers)
 
@@ -318,7 +300,7 @@ test_real_files.py                # NEW (Phase 7.1)
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | Phase 4.3 §C: Improve fallback templates (skill reorder + data-driven cover letter) | ❌ TODO | Done work | 2 |
+| 1 | Phase 4.3 §C: Improve fallback templates (skill reorder + data-driven cover letter) | ✅ DONE | Done work | 2 |
 | 2 | Phase 4.3 §D: Fallback detection logging | ❌ TODO | Step 1 | 2 |
 | 3 | Phase 4.3 §E: Strengthen prompts (remove "reasonable metrics" rule; fix `吸引` → "attracts") | ❌ TODO | None | 2 |
 | 4 | Phase 5.2: Wire agents 3-7 into pipeline as dedicated classes | ⚠️ PARTIAL (runs end-to-end; agents 3-7 still use generic `PipelineAgent` — see §5.2) | Done work | 1 |

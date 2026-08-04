@@ -70,22 +70,6 @@ _SCHEMA_HINT = (
     "cover_letter (string with the full cover letter text, 450-600 words)."
 )
 
-_MINIMAL_COVER_LETTER = (
-    "Dear Hiring Manager,\n\n"
-    "I am writing to express my interest in the advertised position "
-    "at your company. I am excited about the opportunity to contribute "
-    "to your team and believe my background aligns well with your "
-    "needs.\n\n"
-    "With my experience and skills, I have developed strong capabilities "
-    "in my field. I am confident that my qualifications make me a "
-    "suitable candidate for this role and that I can deliver meaningful "
-    "results.\n\n"
-    "Thank you for considering my application. I would welcome the "
-    "opportunity to discuss how my skills and experience align with "
-    "your needs. I look forward to hearing from you.\n\n"
-    "Sincerely,\n[Your Name]"
-)
-
 
 class CoverLetterAgent:
     """Agent that generates a tailored cover letter.
@@ -118,8 +102,10 @@ class CoverLetterAgent:
         strategy = inputs.get("tailoring_strategy", {})
 
         if not jd or not resume:
-            logger.debug("Cover letter: empty input, returning minimal cover letter")
-            return CoverLetterOutput(cover_letter=_MINIMAL_COVER_LETTER)
+            logger.debug("Cover letter: empty input, returning fallback cover letter")
+            return CoverLetterOutput(
+                cover_letter=_build_fallback_cover_letter(jd, resume, strategy)
+            )
 
         jd_json = _serialize(jd)
         resume_json = _serialize(resume)
@@ -140,12 +126,13 @@ class CoverLetterAgent:
             if result is not None:
                 return result
 
-        # Fallback: return minimal generic cover letter
+        # Fallback: return data-driven fallback cover letter
         logger.warning(
-            "LLM cover letter failed on both attempts, "
-            "returning minimal generic cover letter"
+            "LLM cover letter failed on both attempts, returning fallback cover letter"
         )
-        return CoverLetterOutput(cover_letter=_MINIMAL_COVER_LETTER)
+        return CoverLetterOutput(
+            cover_letter=_build_fallback_cover_letter(jd, resume, strategy)
+        )
 
     async def _try_llm(
         self,
@@ -255,11 +242,11 @@ class CoverLetterAgent:
             )
             return None
 
-        # If cover_letter is empty, use minimal fallback
+        # If cover_letter is empty, reject so run() falls back to the
+        # data-driven fallback letter
         if not result.cover_letter.strip():
-            logger.warning("cover_letter is empty, using minimal fallback")
-            result.cover_letter = _MINIMAL_COVER_LETTER
-            return result
+            logger.warning("cover_letter is empty, rejecting so run() falls back")
+            return None
 
         # Post-validation checks
         if not _validate_role(result, jd_json):
@@ -378,6 +365,15 @@ def _get_company_name(jd_json: str) -> str:
         jd_data: dict[str, Any] = json.loads(jd_json)
     except json.JSONDecodeError, TypeError:
         return ""
+    return _company_from(jd_data)
+
+
+def _company_from(jd_data: dict[str, Any]) -> str:
+    """Extract the company name from a JD dict.
+
+    Prefers the top-level ``company_name`` field (Phase 4.3.F source of
+    truth), then ``company_signals["company_name"]``.
+    """
     company = jd_data.get("company_name", "")
     if isinstance(company, str) and company.strip():
         return company.strip()
@@ -388,6 +384,178 @@ def _get_company_name(jd_json: str) -> str:
         if name.strip():
             return name.strip()
     return ""
+
+
+def _build_fallback_cover_letter(jd: Any, resume: Any, strategy: Any) -> str:
+    """Build a data-driven fallback cover letter without an LLM.
+
+    Uses the JD's role title and company name, the candidate's name, 2-3
+    JD required skills the candidate already has, and one achievement from
+    the most recent experience entry.  Missing data is omitted rather than
+    replaced with placeholder text.
+    """
+    jd_data = _as_dict(jd)
+    resume_data = _as_dict(resume)
+    strategy_data = _as_dict(strategy)
+
+    role_title = _read_str(jd_data, "role_title").strip()
+    company = _company_from(jd_data)
+    name = _read_str(resume_data, "name").strip() or "Candidate"
+
+    resume_skills = _read_str_list(resume_data, "skills")
+    required_skills = _read_str_list(jd_data, "required_skills")
+    overlap = _overlapping_skills(required_skills, resume_skills)[:3]
+    if not overlap:
+        strategy_keywords = _read_str_list(strategy_data, "keyword_strategy")
+        overlap = _overlapping_skills(strategy_keywords, resume_skills)[:3]
+
+    achievement = _most_recent_achievement(resume_data)
+
+    return (
+        "Dear Hiring Manager,\n\n"
+        f"{_opening_paragraph(role_title, company)}\n\n"
+        f"{_middle_paragraph(overlap, achievement)}\n\n"
+        f"{_closing_paragraph(company)}\n\n"
+        f"Sincerely,\n{name}"
+    )
+
+
+def _opening_paragraph(role_title: str, company: str) -> str:
+    """Build the opening paragraph naming the role and company."""
+    text = "I am writing to express my strong interest in"
+    if role_title:
+        text += f" the {role_title} position"
+    else:
+        text += " the advertised position"
+    if company:
+        text += f" at {company}"
+    text += "."
+    if company:
+        text += (
+            " I am excited about the opportunity to work at "
+            f"{company} and contribute to its success."
+        )
+    else:
+        text += (
+            " I am excited about the opportunity to contribute to a "
+            "forward-thinking team."
+        )
+    return text
+
+
+def _middle_paragraph(overlap: list[str], achievement: str) -> str:
+    """Build the middle paragraph mapping skills and an achievement."""
+    parts: list[str] = []
+    if overlap:
+        skills_text = _join_skills(overlap)
+        parts.append(
+            "Throughout my career, I have developed strong capabilities in "
+            f"{skills_text}, which map directly to the core requirements of "
+            "this role."
+        )
+    if achievement:
+        achievement_sentence = achievement.strip().rstrip(".") + "."
+        sentence = (
+            "In my most recent role, I "
+            + achievement_sentence[0].lower()
+            + achievement_sentence[1:]
+        )
+        parts.append(sentence)
+    if parts:
+        return " ".join(parts)
+    return (
+        "Throughout my career, I have built a strong track record of "
+        "delivering high-quality work, and I am confident my skills and "
+        "experience would let me contribute meaningfully from day one."
+    )
+
+
+def _closing_paragraph(company: str) -> str:
+    """Build the closing paragraph thanking the reader."""
+    if company:
+        contribution = f"contribute to {company}'s success"
+    else:
+        contribution = "contribute to your organization"
+    return (
+        "Thank you for considering my application. I would welcome the "
+        f"opportunity to discuss how I can {contribution}. I look forward "
+        "to hearing from you."
+    )
+
+
+def _join_skills(skills: list[str]) -> str:
+    """Join 1-3 skills into a natural phrase (e.g. 'a, b, and c')."""
+    if not skills:
+        return ""
+    if len(skills) == 1:
+        return skills[0]
+    if len(skills) == 2:
+        return f"{skills[0]} and {skills[1]}"
+    return ", ".join(skills[:-1]) + ", and " + skills[-1]
+
+
+def _overlapping_skills(candidates: list[str], known: list[str]) -> list[str]:
+    """Return candidates the resume already covers (fuzzy match)."""
+    return [skill for skill in candidates if _skill_in_list(skill, known)]
+
+
+def _most_recent_achievement(resume_data: dict[str, Any]) -> str:
+    """Return one achievement (or responsibility) from the first entry.
+
+    Resume experience is listed most-recent-first, so the first entry is
+    the most recent role.  A responsibility is used only when the entry
+    has no achievements.
+    """
+    experiences: Any = resume_data.get("experience", [])
+    if not isinstance(experiences, list) or not experiences:
+        return ""
+    typed_experiences: list[Any] = experiences  # type: ignore[reportUnknownVariableType]
+    first: Any = typed_experiences[0]
+    achievements: Any = []
+    responsibilities: Any = []
+    if isinstance(first, dict):
+        achievements = first.get("achievements", [])  # type: ignore[reportUnknownMemberType]
+        responsibilities = first.get("responsibilities", [])  # type: ignore[reportUnknownMemberType]
+    else:
+        achievements = getattr(first, "achievements", [])
+        responsibilities = getattr(first, "responsibilities", [])
+    if isinstance(achievements, list):
+        for item in achievements:  # type: ignore[reportUnknownVariableType]
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+    if isinstance(responsibilities, list):
+        for item in responsibilities:  # type: ignore[reportUnknownVariableType]
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+    return ""
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Convert a Pydantic model or dict to a plain dict."""
+    result: dict[str, Any]
+    if hasattr(value, "model_dump"):
+        result = value.model_dump()
+    elif isinstance(value, dict):
+        result = dict(value)  # type: ignore[reportUnknownArgumentType]
+    else:
+        result = {}
+    return result
+
+
+def _read_str(data: dict[str, Any], field: str) -> str:
+    """Read a string field from a dict, returning empty when absent."""
+    value = data.get(field, "")
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def _read_str_list(data: dict[str, Any], field: str) -> list[str]:
+    """Read a list-of-strings field from a dict, ignoring non-strings."""
+    value = data.get(field, [])
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
 
 
 def _check_skills(result: CoverLetterOutput, resume_json: str, jd_json: str) -> None:

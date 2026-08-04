@@ -109,14 +109,14 @@ async def main() -> None:
     )
 
     word_count = len(cover_result.cover_letter.split())
-    is_fallback = "[Your Name]" in cover_result.cover_letter
+    is_fallback = word_count < 300
     print()
     print("=" * 60)
     print("=== Cover Letter Agent Output ===")
     print("=" * 60)
     print()
     if is_fallback:
-        print("*** USING MINIMAL FALLBACK (LLM failed) ***")
+        print("*** USING FALLBACK COVER LETTER (LLM failed) ***")
     else:
         print("*** LLM SUCCESS ***")
     print()

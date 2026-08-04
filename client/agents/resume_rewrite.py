@@ -91,6 +91,7 @@ class ResumeRewriteAgent:
         """
         parsed_resume = inputs.get("parsed_resume", {})
         tailoring = inputs.get("tailoring_strategy", {})
+        jd = inputs.get("parsed_job_description", {})
 
         if not parsed_resume:
             logger.debug("Resume rewrite: empty input, returning defaults")
@@ -113,11 +114,11 @@ class ResumeRewriteAgent:
             if result is not None:
                 return result
 
-        # Fallback: return the parsed resume unchanged
+        # Fallback: return the parsed resume, tailored deterministically
         logger.warning(
-            "LLM rewrite failed on both attempts, returning parsed resume unchanged"
+            "LLM rewrite failed on both attempts, returning tailored parsed resume"
         )
-        return _parsed_to_rewrite(parsed_resume)
+        return _parsed_to_rewrite(parsed_resume, jd=jd, strategy=tailoring)
 
     async def _try_llm(
         self,
@@ -247,8 +248,18 @@ def _parse_json(raw: str) -> dict[str, Any] | None:
     return parse_json_response(raw)
 
 
-def _parsed_to_rewrite(parsed: Any) -> RewriteOutput:
-    """Convert a ``ResumeParsingOutput`` (or dict) to ``RewriteOutput``."""
+def _parsed_to_rewrite(
+    parsed: Any,
+    jd: Any | None = None,
+    strategy: Any | None = None,
+) -> RewriteOutput:
+    """Convert a ``ResumeParsingOutput`` (or dict) to ``RewriteOutput``.
+
+    Skills are tailored deterministically toward the JD ``required_skills``
+    / ``keywords`` (falling back to the strategy's ``keyword_strategy``) so
+    the fallback resume is still ATS-targeted without an LLM.  Experience,
+    projects, certifications, and education are passed through unchanged.
+    """
     if hasattr(parsed, "model_dump"):
         data: dict[str, Any] = parsed.model_dump()
     elif isinstance(parsed, dict):
@@ -257,12 +268,92 @@ def _parsed_to_rewrite(parsed: Any) -> RewriteOutput:
         return RewriteOutput()
     return RewriteOutput(
         summary=str(data.get("summary", "")),
-        skills=list(data.get("skills", [])),
+        skills=_tailor_skills(
+            list(data.get("skills", [])),
+            jd=jd,
+            strategy=strategy,
+        ),
         experience=list(data.get("experience", [])),
         projects=list(data.get("projects", [])),
         certifications=list(data.get("certifications", [])),
         education=list(data.get("education", [])),
     )
+
+
+def _tailor_skills(
+    skills: list[str],
+    jd: Any | None = None,
+    strategy: Any | None = None,
+) -> list[str]:
+    """Reorder and augment skills for ATS targeting without an LLM.
+
+    Two deterministic transformations:
+
+    1. Skills matching the JD ``required_skills`` (or the strategy's
+       ``keyword_strategy``) move to the front, preserving relative order.
+    2. Up to 5 JD ``keywords`` (or strategy keywords) not already present
+       in the resume skills are prepended.
+    """
+    jd_data = _as_dict(jd)
+    strategy_data = _as_dict(strategy)
+
+    priority = _read_str_list(jd_data, "required_skills") or _read_str_list(
+        strategy_data, "keyword_strategy"
+    )
+    additions_source = _read_str_list(jd_data, "keywords") or _read_str_list(
+        strategy_data, "keyword_strategy"
+    )
+
+    priority_norm = [_normalize_skill(s) for s in priority]
+    matched: list[str] = []
+    unmatched: list[str] = []
+    for skill in skills:
+        if _skill_matches(skill, priority_norm):
+            matched.append(skill)
+        else:
+            unmatched.append(skill)
+    reordered = matched + unmatched
+
+    present = [_normalize_skill(s) for s in reordered]
+    additions: list[str] = []
+    additions_norm: list[str] = []
+    for keyword in additions_source:
+        if len(additions) >= 5:
+            break
+        keyword = keyword.strip()
+        if not keyword or not _is_ascii(keyword):
+            continue
+        if _skill_matches(keyword, present) or _skill_matches(keyword, additions_norm):
+            continue
+        additions.append(keyword)
+        additions_norm.append(_normalize_skill(keyword))
+
+    return additions + reordered
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Convert a Pydantic model or dict to a plain dict."""
+    result: dict[str, Any]
+    if hasattr(value, "model_dump"):
+        result = value.model_dump()
+    elif isinstance(value, dict):
+        result = dict(value)  # type: ignore[reportUnknownArgumentType]
+    else:
+        result = {}
+    return result
+
+
+def _read_str_list(data: dict[str, Any], field: str) -> list[str]:
+    """Read a list-of-strings field from a dict, ignoring non-strings."""
+    value = data.get(field, [])
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
+
+
+def _is_ascii(text: str) -> bool:
+    """Return True when every character is in the ASCII range."""
+    return all(ord(char) < 128 for char in text)
 
 
 def _validate_experience_count(result: RewriteOutput, resume_json: str) -> bool:
