@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Multi-agent resume optimization pipeline"
 requires-python = ">=3.14"
 dependencies = [
+    "jinja2>=3.1.0",
     "ollama>=0.4.0",
     "openai>=1.0.0",
     "pydantic>=2.0.0",

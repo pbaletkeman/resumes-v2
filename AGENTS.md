@@ -46,7 +46,7 @@ client/
   json_utils.py      # Shared parse_json_response + model_to_json_schema helpers
   format_detector.py # Regex parser with LLM fallback (connected)
   models.py          # All Pydantic models (Parsed*, JDParsingOutput, ResumeParsingOutput, etc.)
-  templates/         # Jinja2 resume/cover letter templates (no renderer yet)
+  templates/         # Jinja2 resume/cover letter templates + ResumeRenderer class
   agents/
     jd_parsing.py    # JD Parsing Agent (Agent 1) - dedicated class, LLM + regex fallback
     resume_parsing.py # Resume Parsing Agent (Agent 2) - dedicated class, LLM + regex fallback

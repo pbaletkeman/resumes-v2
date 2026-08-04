@@ -88,19 +88,13 @@ Clean up cover letter text: normalize whitespace, fix encoding artifacts, ensure
 
 #### 6.B.1 Create `client/templates/renderer.py` with `ResumeRenderer` class skeleton
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
-Create the `ResumeRenderer` class with `__init__`, template loading from `client/templates/`, and the `render_plaintext()` method (Jinja2 rendering of `RewriteOutput` against template dict). No DOCX/PDF yet — just Jinja2 text output.
-
-```python
-class ResumeRenderer:
-    def __init__(self, template_dir: Path | None = None) -> None: ...
-    def render_plaintext(self, resume: RewriteOutput, template: str = "modern") -> str: ...
-```
+`ResumeRenderer` with `__init__`, template loading from `client.templates.TEMPLATES`, `render_plaintext()`, `render_markdown()` (Jinja2 rendering of `RewriteOutput` against template dicts), `_build_context()` helper to convert Pydantic models to plain dicts, and `_clean_output()` to collapse excess blank lines. No DOCX/PDF yet.
 
 **Depends on:** None (independent of 6.A)
 
-**Files changed:** new file `client/templates/renderer.py`
+**Files changed:** new file `client/templates/renderer.py`, `pyproject.toml` (added `jinja2>=3.1.0`)
 
 ---
 
@@ -295,7 +289,7 @@ test_real_files.py                # NEW (Phase 7.1)
 | 2 | 6.A.2: `format_resume_plain()` | ✅ DONE | Step 1 | 1 |
 | 3 | 6.A.3: `format_cover_letter()` | ✅ DONE | Step 1 | 1 |
 | 4 | 6.A.4: Formatter unit tests | ✅ DONE | Steps 1–3 | 1 |
-| 5 | 6.B.1: `ResumeRenderer` skeleton + `render_plaintext()` | ❌ TODO | None | 1 |
+| 5 | 6.B.1: `ResumeRenderer` skeleton + `render_plaintext()` | ✅ DONE | None | 1 |
 | 6 | 6.B.2: `render_markdown()` | ❌ TODO | Step 5 | 1 |
 | 7 | 6.B.3: Cover letter rendering | ❌ TODO | Step 5 | 1 |
 | 8 | 6.B.4: `build_output_path()` | ❌ TODO | Step 5 | 1 |
