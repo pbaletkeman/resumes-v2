@@ -16,6 +16,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
+from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import CoverLetterOutput
 
@@ -217,6 +218,8 @@ class CoverLetterAgent:
                 output=["json"],
                 rules=rules,
                 inputs=[jd_json, resume_json, strategy_json],
+                response_format="json",
+                json_schema=model_to_json_schema(CoverLetterOutput),
             )
         except (
             NotImplementedError,
@@ -286,23 +289,11 @@ def _serialize(value: Any) -> str:
 def _parse_json(raw: str) -> dict[str, Any] | None:
     """Best-effort JSON extraction from an LLM response.
 
+    Thin wrapper over :func:`client.json_utils.parse_json_response`.
     Handles responses wrapped in markdown fences, and plain text
     responses that are not wrapped in JSON.
     """
-    text = raw.strip()
-    logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
-    fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence_match:
-        text = fence_match.group(1).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        logger.debug("Failed to parse as JSON, treating as plain text cover letter")
-        # If JSON parsing fails, treat the entire response as the cover letter
-        if len(text) > 50:  # Only if we have substantial content
-            return {"cover_letter": text}
-        logger.warning("Response too short to be a valid cover letter")
-        return None
+    return parse_json_response(raw, plain_text_fallback="cover_letter")
 
 
 _ROLE_FILLER_WORDS = {

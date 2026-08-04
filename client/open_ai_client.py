@@ -9,6 +9,7 @@ via the official openai Python SDK.
 import asyncio
 import logging
 import time
+from typing import Any, cast
 
 from openai import (
     APIConnectionError,
@@ -27,6 +28,28 @@ from client.errors import (
 from client.model_client import ModelClient
 
 logger = logging.getLogger(__name__)
+
+# OpenAI Structured Outputs requires a schema name matching ^[a-zA-Z0-9_-]{1,64}$.
+_DEFAULT_SCHEMA_NAME = "output"
+
+
+def _schema_name(json_schema: dict[str, Any]) -> str:
+    """Derive a valid OpenAI schema name from a JSON Schema dict.
+
+    Prefers the ``title`` field (Pydantic model name), falling back to a
+    fixed ``"output"`` when the title is missing or contains characters
+    OpenAI rejects.
+
+    Args:
+        json_schema: A JSON Schema dict (e.g. from ``model_to_json_schema``).
+
+    Returns:
+        A schema name safe for OpenAI Structured Outputs.
+    """
+    title = json_schema.get("title")
+    if isinstance(title, str) and title.replace("_", "a").replace("-", "a").isalnum():
+        return title[:64]
+    return _DEFAULT_SCHEMA_NAME
 
 
 class OpenAIClient(ModelClient):
@@ -57,11 +80,16 @@ class OpenAIClient(ModelClient):
         output: list[str],
         rules: list[str],
         inputs: list[str],
+        response_format: str,
+        json_schema: dict[str, Any] | None = None,
     ) -> str:
         """Send a structured prompt to the OpenAI model and return the response.
 
         Builds a compact prompt from the provided parameters, sends it as
         a system + user message pair, and returns the model's text output.
+        JSON mode is always on via ``response_format={"type": "json_object"}``
+        unless a JSON Schema is provided, in which case OpenAI Structured
+        Outputs are requested via ``response_format={"type": "json_schema"}``.
 
         Args:
             purpose: System-level role or persona for this call.
@@ -69,6 +97,14 @@ class OpenAIClient(ModelClient):
             output: Expected output field names or labels.
             rules: Constraints or guidelines the model must follow.
             inputs: Additional context or raw data to include.
+            response_format: Requested provider-native response mode.
+                ``"json"`` is the only supported value and must be passed to
+                every call; free-text responses are not part of the contract.
+            json_schema: Optional JSON Schema dict (from
+                ``client.json_utils.model_to_json_schema``) for OpenAI
+                Structured Outputs. When provided,
+                ``response_format={"type": "json_schema", ...}`` is used
+                instead of ``json_object``. Defaults to ``None``.
 
         Returns:
             The model's text response.
@@ -92,9 +128,24 @@ class OpenAIClient(ModelClient):
 
         task = "\n".join(parts)
 
+        # response_format="json" is the only supported mode; a JSON Schema
+        # dict opts in to OpenAI Structured Outputs (json_schema mode).
+        if json_schema is not None:
+            response_format_value: dict[str, Any] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": _schema_name(json_schema),
+                    "schema": json_schema,
+                    "strict": True,
+                },
+            }
+        else:
+            response_format_value = {"type": "json_object"}
+
         logger.debug(
-            "OpenAI request: model=%s prompt_len=%d messages=2",
+            "OpenAI request: model=%s format=%s prompt_len=%d messages=2",
             self.model,
+            response_format_value["type"],
             len(task),
         )
         start = time.monotonic()
@@ -107,6 +158,7 @@ class OpenAIClient(ModelClient):
                         {"role": "system", "content": purpose},
                         {"role": "user", "content": task},
                     ],
+                    response_format=cast(Any, response_format_value),
                 ),
                 timeout=90,
             )

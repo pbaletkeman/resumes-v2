@@ -40,6 +40,7 @@ import logging
 import logging.config
 import os
 
+
 def configure_logging() -> None:
     level = os.environ.get("LOG_LEVEL", "INFO").upper()
 
@@ -248,6 +249,7 @@ Add a pytest fixture that configures logging for the test suite so log output is
 ```python
 import logging
 import pytest
+
 
 @pytest.fixture(autouse=True)
 def configure_test_logging():

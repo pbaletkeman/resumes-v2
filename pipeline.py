@@ -95,7 +95,9 @@ class PipelineAgent:
             for k, v in inputs.items()
             if k not in ("prompt", "output", "rules")
         ]
-        return await self.client.chat(self.purpose, prompt, output, rules, context)
+        return await self.client.chat(
+            self.purpose, prompt, output, rules, context, response_format="json"
+        )
 
 
 class AgentRunner:

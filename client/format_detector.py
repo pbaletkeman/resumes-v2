@@ -7,13 +7,13 @@ plain-text or Markdown documents. Uses regex-based detection first; falls
 back to an LLM when regex returns little or no data.
 """
 
-import json
 import logging
 import re
 from collections import Counter
 from typing import Any
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
+from client.json_utils import parse_json_response
 from client.model_client import ModelClient
 from client.models import ParsedJobDescription, ParsedResume
 
@@ -598,6 +598,7 @@ class FormatDetector:
                 ],
                 rules=["Return only valid JSON", "Do not infer missing information"],
                 inputs=[content],
+                response_format="json",
             )
             logger.debug("LLM resume response: %s", raw[:200] if raw else "<empty>")
             result = self._safe_json(raw)
@@ -644,6 +645,7 @@ class FormatDetector:
                     "Do not add information not present in the JD",
                 ],
                 inputs=[content],
+                response_format="json",
             )
             logger.debug("LLM JD response: %s", raw[:200] if raw else "<empty>")
             return self._safe_json(raw)
@@ -682,16 +684,7 @@ class FormatDetector:
     def _safe_json(raw: str) -> dict[str, Any] | None:
         """Best-effort JSON extraction from an LLM response.
 
+        Thin wrapper over :func:`client.json_utils.parse_json_response`.
         Handles responses wrapped in markdown fences (```json ... ```).
         """
-        text = raw.strip()
-        logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
-        fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-        if fence_match:
-            text = fence_match.group(1).strip()
-        try:
-            parsed: dict[str, Any] = json.loads(text)
-            return parsed
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse LLM response as JSON")
-            return None
+        return parse_json_response(raw)

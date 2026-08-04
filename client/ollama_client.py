@@ -10,6 +10,7 @@ Concrete ModelClient implementation for the Ollama API.
 import asyncio
 import logging
 import time
+from typing import Any
 
 import ollama
 
@@ -48,11 +49,16 @@ class OllamaClient(ModelClient):
         output: list[str],
         rules: list[str],
         inputs: list[str],
+        response_format: str,
+        json_schema: dict[str, Any] | None = None,
     ) -> str:
         """Send a structured prompt to the Ollama model and return the response.
 
         Builds a compact prompt from the provided parameters, sends it as
         a system + user message pair, and returns the model's text output.
+        JSON mode is always on via ``format="json"`` unless a JSON Schema
+        is provided, in which case ``format`` carries the schema dict for
+        provider Structured Outputs.
 
         Args:
             purpose: System-level role or persona for this call.
@@ -60,6 +66,13 @@ class OllamaClient(ModelClient):
             output: Expected output field names or labels.
             rules: Constraints or guidelines the model must follow.
             inputs: Additional context or raw data to include.
+            response_format: Requested provider-native response mode.
+                ``"json"`` is the only supported value and must be passed to
+                every call; free-text responses are not part of the contract.
+            json_schema: Optional JSON Schema dict (from
+                ``client.json_utils.model_to_json_schema``) for Ollama
+                Structured Outputs. When provided, ``format`` carries the
+                schema dict instead of ``"json"``. Defaults to ``None``.
 
         Returns:
             The model's text response.
@@ -70,10 +83,12 @@ class OllamaClient(ModelClient):
             LLMTimeoutError: If the model does not respond within 90 seconds.
         """
         task = self._build_compact_prompt(purpose, prompt, output, rules, inputs)
+        actual_format: Any = json_schema if json_schema is not None else "json"
 
         logger.debug(
-            "Ollama request: model=%s prompt_len=%d messages=2",
+            "Ollama request: model=%s format=%s prompt_len=%d messages=2",
             self.model,
+            actual_format,
             len(task),
         )
         start = time.monotonic()
@@ -87,6 +102,9 @@ class OllamaClient(ModelClient):
                         {"role": "user", "content": task},
                     ],
                     stream=False,
+                    # response_format="json" is the only supported mode; a
+                    # JSON Schema dict opts in to provider Structured Outputs
+                    format=actual_format,
                 ),
                 timeout=self.timeout,
             )

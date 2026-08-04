@@ -9,12 +9,12 @@ Falls back to returning the input unchanged on LLM failure.
 
 import json
 import logging
-import re
 from typing import Any
 
 from pydantic import ValidationError
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
+from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import TonePolishingOutput
 
@@ -135,6 +135,8 @@ class TonePolishingAgent:
                 output=["json"],
                 rules=rules,
                 inputs=[resume_text],
+                response_format="json",
+                json_schema=model_to_json_schema(TonePolishingOutput),
             )
         except (
             NotImplementedError,
@@ -148,9 +150,7 @@ class TonePolishingAgent:
             )
             return None
 
-        logger.debug(
-            "LLM tone response: %s", raw[:200] if raw else "<empty>"
-        )
+        logger.debug("LLM tone response: %s", raw[:200] if raw else "<empty>")
         data = _parse_json(raw)
         if data is None:
             return None
@@ -183,15 +183,7 @@ class TonePolishingAgent:
 def _parse_json(raw: str) -> dict[str, Any] | None:
     """Best-effort JSON extraction from an LLM response.
 
+    Thin wrapper over :func:`client.json_utils.parse_json_response`.
     Handles responses wrapped in markdown fences.
     """
-    text = raw.strip()
-    logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
-    fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence_match:
-        text = fence_match.group(1).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        logger.warning("Failed to parse LLM response as JSON")
-        return None
+    return parse_json_response(raw)

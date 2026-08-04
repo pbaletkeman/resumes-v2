@@ -38,6 +38,7 @@ class SimpleAgent:
         output: list[str],
         rules: list[str],
         inputs: list[str],
+        response_format: str = "json",
     ) -> str:
         """Run the agent with the given prompt and return the response.
 
@@ -47,11 +48,15 @@ class SimpleAgent:
             output: Expected output field names.
             rules: Constraints or guidelines.
             inputs: Additional context data.
+            response_format: Requested provider-native response mode.
+                ``"json"`` is the only supported value.
 
         Returns:
             The model's text response.
         """
-        return await self.client.chat(purpose, prompt, output, rules, inputs)
+        return await self.client.chat(
+            purpose, prompt, output, rules, inputs, response_format
+        )
 
 
 async def main() -> None:
@@ -76,6 +81,24 @@ async def main() -> None:
 
     result = await agent.run(purpose, prompt, output, rules, inputs)
     print("Agent:", result)
+    await _parse_json_result(result)
+
+
+async def _parse_json_result(raw: str) -> None:
+    """Parse and pretty-print a JSON object response.
+
+    Args:
+        raw: The raw LLM response (JSON mode guarantees valid JSON).
+    """
+    import json
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print("WARNING: response was not valid JSON:", e)
+        print("Raw:", raw)
+        return
+    print("Parsed:", json.dumps(parsed, indent=2))
 
 
 async def per_agent_model_example() -> None:
@@ -114,9 +137,11 @@ async def per_agent_model_example() -> None:
 
     result1 = await agent1.run(purpose, prompt, output, rules, inputs)
     print("Agent 1 (fast):", result1)
+    await _parse_json_result(result1)
 
     result2 = await agent2.run(purpose, prompt, output, rules, inputs)
     print("Agent 2 (fast):", result2)
+    await _parse_json_result(result2)
 
 
 if __name__ == "__main__":

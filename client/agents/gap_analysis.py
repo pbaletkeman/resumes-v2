@@ -10,12 +10,12 @@ LLM reasoning.
 
 import json
 import logging
-import re
 from typing import Any
 
 from pydantic import ValidationError
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
+from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import GapAnalysisOutput
 
@@ -135,6 +135,8 @@ class GapAnalysisAgent:
                 output=["json"],
                 rules=rules,
                 inputs=[jd_json, resume_json],
+                response_format="json",
+                json_schema=model_to_json_schema(GapAnalysisOutput),
             )
         except (
             NotImplementedError,
@@ -183,15 +185,7 @@ def _serialize(value: Any) -> str:
 def _parse_json(raw: str) -> dict[str, Any] | None:
     """Best-effort JSON extraction from an LLM response.
 
+    Thin wrapper over :func:`client.json_utils.parse_json_response`.
     Handles responses wrapped in markdown fences.
     """
-    text = raw.strip()
-    logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
-    fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence_match:
-        text = fence_match.group(1).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        logger.warning("Failed to parse LLM response as JSON")
-        return None
+    return parse_json_response(raw)

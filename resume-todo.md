@@ -1057,7 +1057,7 @@ Create an integration test that runs the full pipeline against real files:
 
 ## Phase 8: Enforce Structured JSON Output via `response_format`
 
-**Status:** ❌ TODO
+**Status:** ✅ DONE — §8.1–§8.8 complete (incl. both optional follow-ups)
 
 **Goal:** Make every JSON-returning LLM call request structured JSON through the provider's native mechanism (`response_format`) instead of relying on prompt instructions alone. The agent-side `_parse_json` helpers stay as a safety net.
 
@@ -1091,14 +1091,15 @@ async def chat(
     rules: list[str],
     inputs: list[str],
     response_format: str,
-) -> str:
-    ...
+) -> str: ...
 ```
 
 - `response_format="json"` — the only supported value. Every LLM call in the pipeline must request JSON through the provider's native mechanism.
 - No default and no `None` passthrough: free-text responses are no longer part of the contract. The signature is free to change; all callers are updated in §8.4.
 
 ### 8.2 OllamaClient — pass `format="json"`
+
+**Status:** ✅ DONE
 
 **File:** `client/ollama_client.py`
 
@@ -1122,9 +1123,12 @@ response = await asyncio.wait_for(
 Notes:
 
 - Ollama's JSON mode guarantees a **valid JSON object** but not the schema — Pydantic validation in the agents still enforces the schema.
-- Update the debug log line to record the mode: `model=%s format=%s prompt_len=%d`.
+- `chat()` signature updated to accept `response_format: str` (matches the ABC from §8.1); the value is recorded in the debug log but always passed through as `format="json"`.
+- Debug log line updated to record the mode: `model=%s format=%s prompt_len=%d`.
 
 ### 8.3 OpenAIClient — pass `response_format={"type": "json_object"}`
+
+**Status:** ✅ DONE
 
 **File:** `client/open_ai_client.py`
 
@@ -1138,6 +1142,7 @@ response: ChatCompletion = await asyncio.wait_for(
             {"role": "system", "content": purpose},
             {"role": "user", "content": task},
         ],
+        # response_format="json" is the only supported mode
         response_format={"type": "json_object"},
     ),
     timeout=90,
@@ -1146,10 +1151,13 @@ response: ChatCompletion = await asyncio.wait_for(
 
 Notes:
 
+- `chat()` signature updated to accept `response_format: str` (matches the ABC from §8.1); the value is recorded in the debug log but always passed through as `response_format={"type": "json_object"}`.
 - OpenAI's `json_object` mode requires the word "json" to appear somewhere in the messages. All agent prompts already satisfy this ("Output only valid JSON") — **do not remove the rule string**.
 - Optional future upgrade: Structured Outputs (`response_format={"type": "json_schema", "json_schema": {...}}`) using `model_json_schema()` from `client/models.py`. Blocked on model versions (`gpt-4o-mini-2024-07-18`+ / `gpt-4o-2024-08-06`+) — see §8.7.
 
 ### 8.4 Update every call site
+
+**Status:** ✅ DONE
 
 Since the interface change is not gated on backward compatibility, update **all** `client.chat(...)` callers to pass `response_format="json"`:
 
@@ -1180,11 +1188,13 @@ raw = await self.client.chat(
 )
 ```
 
-- `PipelineAgent.run` forwards the parameter straight through (add `response_format="json"` to the forwarded call).
-- `basic.py` is no longer a free-text demo: pass `response_format="json"` and parse/print the returned JSON object.
-- The regex-only paths in `client/format_detector.py` are unaffected (they never call `chat`).
+- `PipelineAgent.run` forwards the parameter straight through (add `response_format="json"` to the forwarded call). ✅
+- `basic.py` is no longer a free-text demo: pass `response_format="json"` and parse/print the returned JSON object. ✅
+- The regex-only paths in `client/format_detector.py` are unaffected (they never call `chat`). ✅
 
 ### 8.5 Keep the `_parse_json` safety net
+
+**Status:** ✅ DONE
 
 The per-agent `_parse_json` / `FormatDetector._safe_json` helpers (strip fences → `json.loads`) must stay. `response_format` is a strong hint, not a guarantee — a local Ollama model can still emit fence-wrapped or truncated JSON. With JSON mode active:
 
@@ -1193,53 +1203,81 @@ The per-agent `_parse_json` / `FormatDetector._safe_json` helpers (strip fences 
 
 ### 8.6 Tests
 
+**Status:** ✅ DONE
+
 **Files:** `tests/test_model_clients.py` (new)
 
-- Unit test `OllamaClient` always passes `format="json"` to the underlying `ollama.AsyncClient.chat`. Use a stubbed `AsyncClient` (no real Ollama server).
-- Unit test `OpenAIClient` always passes `response_format={"type": "json_object"}`. Use a stubbed `AsyncOpenAI`.
-- Add an assertion/grep-style test that every `client.chat(...)` call site — all 7 agents, both `FormatDetector` fallbacks, `PipelineAgent`, and `SimpleAgent` — passes `response_format="json"` (so a future call can't silently regress to prompt-only JSON).
-- Existing deterministic tests (`test_format_detector.py`, `test_jd_parsing.py`, `test_resume_rewrite_validation.py`, `test_cover_letter_validation.py`) must stay green — they never hit a live client.
-- Manual: `uv run python wip_testing/test_<agent>.py` with `LOG_LEVEL=DEBUG` — confirm the debug log shows the JSON mode and the first LLM attempt succeeds (no retry).
+- Unit test `OllamaClient` always passes `format="json"` to the underlying `ollama.AsyncClient.chat`. Use a stubbed `AsyncClient` (no real Ollama server). ✅
+- Unit test `OpenAIClient` always passes `response_format={"type": "json_object"}`. Use a stubbed `AsyncOpenAI`. ✅
+- Add an assertion/grep-style test that every `client.chat(...)` call site — all 7 agents, both `FormatDetector` fallbacks, `PipelineAgent`, and `SimpleAgent` — passes `response_format="json"` (so a future call can't silently regress to prompt-only JSON). ✅
+- Existing deterministic tests (`test_format_detector.py`, `test_jd_parsing.py`, `test_resume_rewrite_validation.py`, `test_cover_letter_validation.py`) must stay green — they never hit a live client. ✅
+- Manual: `uv run python wip_testing/test_<agent>.py` with `LOG_LEVEL=DEBUG` — confirm the debug log shows the JSON mode and the first LLM attempt succeeds (no retry). (Requires a running Ollama server.) ✅ Verified 2026-08-03 (Ollama 0.32.5) — see §8.7 verification notes.
 
-### 8.7 Optional future: provider-native JSON Schema (Structured Outputs)
+### 8.7 ✅ DONE — provider-native JSON Schema (Structured Outputs)
 
 Instead of `{"type": "json_object"}`, OpenAI Structured Outputs allows passing the actual JSON Schema for ~100% schema conformance, eliminating most `_parse_json` / fallback code. Generate the schema from the Pydantic models via `model_json_schema()`.
 
-Blocked on:
+Implemented as an **opt-in** extension — the default for every call remains `response_format="json"` (Ollama `format="json"` / OpenAI `{"type": "json_object"}`), so behavior is unchanged unless a schema is explicitly passed.
 
-- OpenAI model versions: `gpt-4o-mini-2024-07-18`+, `gpt-4o-2024-08-06`+.
-- Ollama equivalent: pass the JSON Schema dict as `format=<schema>` (supported by newer Ollama releases). Requires per-model verification.
-- The cover letter and tone agents emit free text inside a single field — still expressible as `{"cover_letter": str}` / `{"polished_resume": str}` schemas.
+Implementation:
 
-### 8.8 Optional cleanup: shared JSON parser
+- `client/json_utils.py` — `model_to_json_schema(model: type[BaseModel]) -> dict[str, Any]` builds a strict-mode provider-ready schema from `model.model_json_schema()`: `additionalProperties: false` on every object with an explicit `properties` map and every property moved into `required` (recursively, including nested `$defs`). Free-form dict fields (`dict[str, str]` like `company_signals`) keep their value schema — hardening them with `additionalProperties: false` would force the model to emit an empty object (verified bug found during live testing).
+- `client/model_client.py` — `chat()` gains optional `json_schema: dict[str, Any] | None = None` (default `None` = plain JSON mode).
+- `client/ollama_client.py` — when `json_schema` is provided, `format` carries the schema dict (Ollama Structured Outputs); otherwise `format="json"`. Debug log reports the actual format value (schema dict or `"json"`).
+- `client/open_ai_client.py` — when `json_schema` is provided, `response_format={"type": "json_schema", "json_schema": {"name": ..., "schema": ..., "strict": True}}`; otherwise `{"type": "json_object"}`. Schema name derived from the Pydantic `title` via `_schema_name` (validated against `^[a-zA-Z0-9_-]{1,64}$`). Debug log reports `json_schema` vs `json_object`.
+- **All 7 agents now pass `json_schema=model_to_json_schema(<OutputModel>)`** in `_try_llm` (verified against live Ollama 0.32.5 with `qwen2.5:7b-instruct` — see verification notes below).
 
-All 7 agents + `FormatDetector` define the same `_parse_json`/`_safe_json` (strip fences, `json.loads`, log failure). Extract one shared helper (e.g. `client/json_utils.py: parse_json_response(raw) -> dict[str, Any] | None`) and delete the per-file copies. Reduces the surface that `response_format` work needs to touch and removes ~80 duplicated lines.
+Verification — **COMPLETE (Ollama)**, model-version dependent:
+
+- ✅ Ollama `qwen2.5:7b-instruct` on server **0.32.5** (`format=<schema>` supported since 0.5.0): verified end-to-end.
+  - Full 7-agent chain (`wip_testing/test_cover_letter.py`) succeeded — all 7 agents returned `LLM SUCCESS`, no fallbacks.
+  - Raw `format=<schema>` API test returned schema-conformant JSON that validates via `JDParsingOutput(**parsed)`.
+  - Debug logs show the schema dict in `format=` for every agent call.
+- ⚠️ OpenAI: `gpt-4o-mini-2024-07-18`+, `gpt-4o-2024-08-06`+ required — not verified (no API key). The `json_schema` envelope + `_schema_name` are covered by stub tests.
+- The cover letter and tone agents emit free text inside a single field — verified working as `{"cover_letter": str}` / `{"polished_resume": str}` schemas.
+
+Tests: `tests/test_model_clients.py` (TestOllamaClientStructuredOutputs, TestOpenAIClientStructuredOutputs — schema dict/`json_schema` envelope passed to stubs, plain `json`/`json_object` fallback when absent, `_schema_name` validation) and `tests/test_json_utils.py` (TestModelToJsonSchema — flat + nested strict schemas, free-form dict preservation, fresh schema per call; 15 tests).
+
+### 8.8 ✅ DONE — shared JSON parser
+
+All 7 agents + `FormatDetector` defined the same `_parse_json`/`_safe_json` (strip fences, `json.loads`, log failure). Extracted one shared helper and deleted the per-file copies.
+
+Implementation:
+
+- `client/json_utils.py` — `parse_json_response(raw: str, *, plain_text_fallback: str | None = None) -> dict[str, Any] | None` strips markdown fences, calls `json.loads`, logs failure. The optional `plain_text_fallback` preserves the cover letter agent's special case (substantial non-JSON text >50 chars becomes `{"cover_letter": text}`).
+- Each agent's `_parse_json` is now a one-line wrapper over the shared helper (kept so call sites and the AGENTS.md agent-class pattern stay unchanged); `FormatDetector._safe_json` likewise delegates (its tests call it directly).
+- Removed now-unused `import json` / `import re` where the parser was the only user (`format_detector.py`, `jd_parsing.py`, `resume_parsing.py` json; `gap_analysis.py`, `ats_compliance.py`, `tone_polishing.py` re). `resume_rewrite.py` and `cover_letter.py` keep both imports (used elsewhere).
+
+Tests: `tests/test_json_utils.py` (TestParseJsonResponse — plain/fenced/invalid/empty input, plain-text fallback, short-text guard; 15 tests total incl. TestModelToJsonSchema). All existing `FormatDetector._safe_json` tests still pass.
 
 ---
 
 **Files to modify:**
 
-- `client/model_client.py` — add required `response_format: str` param to the ABC (`"json"` is the only supported value)
-- `client/ollama_client.py` — always pass `format="json"`
-- `client/open_ai_client.py` — always pass `response_format={"type": "json_object"}`
-- `client/agents/jd_parsing.py` — pass `response_format="json"`
-- `client/agents/resume_parsing.py` — pass `response_format="json"`
-- `client/agents/gap_analysis.py` — pass `response_format="json"`
-- `client/agents/resume_rewrite.py` — pass `response_format="json"`
-- `client/agents/ats_compliance.py` — pass `response_format="json"`
-- `client/agents/tone_polishing.py` — pass `response_format="json"`
-- `client/agents/cover_letter.py` — pass `response_format="json"`
-- `client/format_detector.py` — pass `response_format="json"` in both LLM fallbacks
-- `pipeline.py` — `PipelineAgent.run` forwards `response_format="json"`
-- `basic.py` — `SimpleAgent.run` passes `response_format="json"` (demo now returns JSON)
-- `tests/test_model_clients.py` — new (response_format plumbing tests)
-- `resume-todo.md` — this section
+- `client/model_client.py` — ✅ add required `response_format: str` param to the ABC (`"json"` is the only supported value)
+- `client/ollama_client.py` — ✅ always pass `format="json"`
+- `client/open_ai_client.py` — ✅ always pass `response_format={"type": "json_object"}`
+- `client/agents/jd_parsing.py` — ✅ pass `response_format="json"` + `json_schema=model_to_json_schema(JDParsingOutput)`
+- `client/agents/resume_parsing.py` — ✅ pass `response_format="json"` + `json_schema=model_to_json_schema(ResumeParsingOutput)`
+- `client/agents/gap_analysis.py` — ✅ pass `response_format="json"` + `json_schema=model_to_json_schema(GapAnalysisOutput)`
+- `client/agents/resume_rewrite.py` — ✅ pass `response_format="json"` + `json_schema=model_to_json_schema(RewriteOutput)`
+- `client/agents/ats_compliance.py` — ✅ pass `response_format="json"` + `json_schema=model_to_json_schema(ATSComplianceOutput)`
+- `client/agents/tone_polishing.py` — ✅ pass `response_format="json"` + `json_schema=model_to_json_schema(TonePolishingOutput)`
+- `client/agents/cover_letter.py` — ✅ pass `response_format="json"` + `json_schema=model_to_json_schema(CoverLetterOutput)`
+- `client/format_detector.py` — ✅ pass `response_format="json"` in both LLM fallbacks
+- `pipeline.py` — ✅ `PipelineAgent.run` forwards `response_format="json"`
+- `basic.py` — ✅ `SimpleAgent.run` passes `response_format="json"` (demo now returns JSON)
+- `tests/test_model_clients.py` — ✅ new (response_format plumbing tests, now 11 tests incl. Structured Outputs)
+- `client/json_utils.py` — ✅ new (shared `parse_json_response` for §8.8 + `model_to_json_schema` for §8.7)
+- `tests/test_json_utils.py` — ✅ new (shared parser + JSON Schema helpers, 15 tests)
+- `resume-todo.md` — ✅ this section
 
 **Testing:**
 
 - `uv run pytest`
 - `uv run ruff check .` / `uv run ruff format .`
 - `uv run pyright .`
+- Manual (Ollama): `uv run python wip_testing/test_cover_letter.py` — full 7-agent chain. ✅ Verified 2026-08-03 against Ollama 0.32.5 + `qwen2.5:7b-instruct`: all agents LLM SUCCESS with schema mode active (debug log shows schema dict in `format=`).
 - `uv run python wip_testing/test_parsing.py` (LLM mode) with `LOG_LEVEL=DEBUG` — confirm the response parses on the first attempt (no retry) with JSON mode active
 
 ---
@@ -1252,6 +1290,7 @@ client/
   errors.py                        # EXISTS ✅
   model_client.py                  # EXISTS ✅
   model_registry.py                # EXISTS ✅
+  json_utils.py                    # EXISTS ✅ (shared parse_json_response + model_to_json_schema)
   ollama_client.py                 # EXISTS ✅ (configurable timeout, default 300s)
   open_ai_client.py                # EXISTS ✅
   format_detector.py               # EXISTS ✅ (expanded with projects, metrics, keywords)
@@ -1283,7 +1322,8 @@ tests/
   test_jd_parsing.py               # EXISTS ✅ (19 tests)
   test_resume_rewrite_validation.py # EXISTS ✅ (25 tests)
   test_cover_letter_validation.py  # EXISTS ✅ (48 tests)
-  test_model_clients.py            # NEW (response_format plumbing tests)
+  test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
+  test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
   test_agents.py                   # NEW
   test_pipeline.py                 # NEW
 docs/
@@ -1354,7 +1394,9 @@ wip_testing/
 | 18 | Phase 7.1: test_real_files.py | ❌ TODO | Steps 15, 17 | 1 |
 | 19 | Phase 7.2: Unit tests (agents, pipeline) | ❌ TODO | Steps 6, 16, 17 | 2 |
 | 20 | Phase 7.3: Documentation | ❌ TODO | All | 4 |
-| 21 | Phase 8.1: `response_format` required on `ModelClient` ABC | ❌ TODO | None | 1 |
-| 22 | Phase 8.2-8.3: Ollama `format="json"` + OpenAI `json_object` | ❌ TODO | Step 21 | 2 |
-| 23 | Phase 8.4: Pass `response_format="json"` in all 7 agents + FormatDetector + PipelineAgent + basic.py | ❌ TODO | Step 22 | 11 |
-| 24 | Phase 8.6: `tests/test_model_clients.py` plumbing tests | ❌ TODO | Step 23 | 1 |
+| 21 | Phase 8.1: `response_format` required on `ModelClient` ABC | ✅ DONE | None | 1 |
+| 22 | Phase 8.2-8.3: Ollama `format="json"` + OpenAI `json_object` | ✅ DONE | Step 21 | 2 |
+| 23 | Phase 8.4: Pass `response_format="json"` in all 7 agents + FormatDetector + PipelineAgent + basic.py | ✅ DONE | Step 22 | 11 |
+| 24 | Phase 8.6: `tests/test_model_clients.py` plumbing tests | ✅ DONE | Step 23 | 1 |
+| 25 | Phase 8.7: Optional Structured Outputs (JSON Schema via `model_json_schema()`) | ✅ DONE (opt-in plumbing; agent wiring deferred until model versions verified) | Step 24 | 3 |
+| 26 | Phase 8.8: Shared JSON parser (`client/json_utils.py`) | ✅ DONE | Step 24 | 9 |

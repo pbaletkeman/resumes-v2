@@ -39,10 +39,11 @@ logging_config.py    # Centralized logging (dictConfig, LOG_LEVEL env var)
 config/agents.py     # Env-var-based agent-to-model configuration
 client/
   errors.py           # LLMError hierarchy (LLMConnectionError, LLMResponseError, LLMTimeoutError)
-  model_client.py    # ABC for LLM clients
-  ollama_client.py   # Ollama implementation (configurable timeout, default 300s)
-  open_ai_client.py  # OpenAI implementation
+  model_client.py    # ABC for LLM clients (chat() requires response_format; optional json_schema)
+  ollama_client.py   # Ollama implementation (configurable timeout, default 300s; format="json" always)
+  open_ai_client.py  # OpenAI implementation (response_format json_object / json_schema envelope)
   model_registry.py  # Per-agent model assignment (ModelClientRegistry)
+  json_utils.py      # Shared parse_json_response + model_to_json_schema helpers
   format_detector.py # Regex parser with LLM fallback (connected)
   models.py          # All Pydantic models (Parsed*, JDParsingOutput, ResumeParsingOutput, etc.)
   templates/         # Jinja2 resume/cover letter templates (no renderer yet)
@@ -56,6 +57,8 @@ client/
     cover_letter.py  # Cover Letter Agent (Agent 7) - dedicated class, LLM only
 tests/
   test_format_detector.py  # FormatDetector regex parsing tests (46 tests)
+  test_model_clients.py    # response_format + Structured Outputs plumbing tests (11 tests)
+  test_json_utils.py       # shared parser + JSON Schema helper tests (15 tests)
 wip_testing/
   test_parsing.py            # Regex + LLM parsing demo (both modes)
   test_job_description.py  # JD Parsing Agent test
@@ -72,7 +75,8 @@ wip_testing/
 - **Agent names** are snake_case with `_agent` suffix: `jd_parsing_agent`, `resume_parsing_agent`, etc. These are the keys used everywhere (env vars, registry, pipeline wiring).
 - **Model overrides** via env vars: `COVER_LETTER_AGENT_MODEL=gpt-4o`, `COVER_LETTER_AGENT_PROVIDER=openai`. Prefix is the uppercased agent name.
 - **Default model**: `qwen2.5:7b-instruct` on Ollama. Override globally with `MODEL_PROVIDER` and `MODEL_NAME`. OpenAI provider requires `OPENAI_API_KEY` — read in `config/agents.py`, not in the client.
-- **Agent class pattern**: each dedicated agent follows `run()` → `_try_llm()` → `_parse_json()` → Pydantic validation → deterministic fallback. The LLM call is `self.client.chat(purpose=..., prompt=..., output=["json"], rules=..., inputs=[...])` inside `_try_llm` (there is no `_chat` method). `run()` retries once with `strict=True`; `_try_llm` catches `LLMConnectionError`/`LLMResponseError`/`LLMTimeoutError` from `client/errors.py` and returns `None`.
+- **Agent class pattern**: each dedicated agent follows `run()` → `_try_llm()` → `_parse_json()` → Pydantic validation → deterministic fallback. The LLM call is `self.client.chat(purpose=..., prompt=..., output=["json"], rules=..., inputs=[...], response_format="json", json_schema=model_to_json_schema(<OutputModel>))` inside `_try_llm` (there is no `_chat` method). `run()` retries once with `strict=True`; `_try_llm` catches `LLMConnectionError`/`LLMResponseError`/`LLMTimeoutError` from `client/errors.py` and returns `None`.
+- **Shared JSON parsing**: all `_parse_json`/`_safe_json` helpers are one-line wrappers over `client/json_utils.py: parse_json_response()` (strip fences, `json.loads`, log failure). `client/json_utils.py: model_to_json_schema()` builds strict-mode provider JSON Schemas from Pydantic models for Structured Outputs (every agent passes its output model's schema to `chat()`; fallback to plain JSON mode stays available by omitting `json_schema=`).
 - **No extended characters** in LLM output: `"` not `""`, `->` not `→`. Enforced in agent prompts.
 - **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode. LLM is now connected — `wip_testing/test_parsing.py` demonstrates both modes.
 - **LLM output coercion**: Pydantic validators in `client/models.py` handle LLMs returning dicts where strings/lists are expected (e.g., `tone_guidance` as a dict, `keyword_strategy` as a dict). See `_coerce_str_list`, `_coerce_tone_guidance`, `_coerce_final_resume`.
