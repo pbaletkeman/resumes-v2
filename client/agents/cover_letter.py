@@ -34,7 +34,7 @@ _SYSTEM_PROMPT = (
     "Structure the cover letter in three parts:\n\n"
     "First paragraph: State the exact position title you are applying for. "
     "Mention the company name by name. Reference something specific about "
-    "the company (its mission, values, or what吸引 you to them).\n\n"
+    "the company (its mission, values, or what attracts you to them).\n\n"
     "Middle paragraphs (1-2): Map your top skills DIRECTLY to the required "
     "skills listed in the job description. Pick 2-3 required skills and "
     "explain how your experience demonstrates them. Include a specific "

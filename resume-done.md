@@ -330,7 +330,7 @@ class ATSComplianceOutput(BaseModel):
 
 ## Phase 4: Polish & Cover Letter (Agents 6-7)
 
-> Note: §4.1 and §4.2 (the two agents) are complete. §4.3 is complete for items §A, §B, §C, §D, §F; §E remains — see `resume-todo.md`.
+> Note: §4.1 and §4.2 (the two agents) are complete. §4.3 is complete for all items §A-§F.
 
 ### 4.1 Create Tone Polishing Agent (`client/agents/tone_polishing.py`)
 
@@ -409,7 +409,7 @@ class CoverLetterOutput(BaseModel):
 
 ### 4.3 Fix LLM Fallback Falsehoods — completed items
 
-**Status:** ⚠️ PARTIAL — §A, §B, §C, §D, §F are DONE; §E remains (see `resume-todo.md`)
+**Status:** ✅ COMPLETE — §A-§F are all DONE
 
 #### A. Improve Post-Validation for Resume Rewrite (HIGH priority) — ✅ DONE
 
@@ -479,6 +479,29 @@ Both agents log the outcome at `INFO` so an LLM success vs a deterministic fallb
 **Tests added:** `TestCountWords` (2) + `TestFallbackLogging` (2) in `tests/test_resume_rewrite_validation.py`; `TestFallbackLogging` (3) in `tests/test_cover_letter_validation.py` — each drives `run()` through a stub `ModelClient` (`_MockClient`) with `caplog.set_level(logging.INFO)` to assert the exact success/fallback messages. 227 tests total.
 
 **Files changed:** `client/agents/resume_rewrite.py`, `client/agents/cover_letter.py`, `wip_testing/test_resume_rewrite.py`, `wip_testing/test_cover_letter.py`
+
+#### E. Strengthen Prompts (root-cause mitigation, pairs with A/B) — ✅ DONE
+
+Root-cause mitigation so the LLM is less likely to fabricate in the first place (post-validation in §A/§B stays as the safety net).
+
+**Resume Rewrite** (`client/agents/resume_rewrite.py`, `_SYSTEM_PROMPT`):
+
+- Removed the fabrication-inviting rule *"You may add reasonable metrics only if implied (e.g., 'managed a team' → 'managed a team of 5')"*.
+- Replaced it with *"Never add metrics that are not explicitly in the resume. If a metric is missing, rephrase without inventing a number."* — the single highest-leverage fix for fabricated metrics.
+- The certifications rule ("All certifications ... MUST be included") is unchanged — already enforced by `_validate_certifications`.
+
+**Cover Letter** (`client/agents/cover_letter.py`, `_SYSTEM_PROMPT`):
+
+- Replaced the stray non-ASCII `吸引` with "attracts" ("...or what attracts you to them"). It was an artifact in an otherwise English prompt and contradicted the prompt's own ASCII-only rule. Both prompt files are now ASCII-only (verified programmatically).
+
+**Verification:**
+
+- `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG` → `LLM rewrite succeeded (skills=25, words=438)`.
+- `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG` → `LLM cover letter succeeded (words=280)`.
+- Groundedness cross-check: extracted every number from the input resume text and every number from the rewritten metrics/achievements — **0 ungrounded numbers** (verified on both the LLM-success and deterministic-fallback paths).
+- `uv run pytest` → 227 passed; ruff check/format + scoped pyright all clean.
+
+**Files changed:** `client/agents/resume_rewrite.py`, `client/agents/cover_letter.py`
 
 #### F. Add `company_name` to `JDParsingOutput` and `company_signals` (HIGH priority, prerequisite for B.2/C.2) — ✅ DONE
 
