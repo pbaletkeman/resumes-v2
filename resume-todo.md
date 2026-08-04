@@ -40,7 +40,7 @@ Phase 6 produces clean, formatted output from the pipeline. It breaks into two w
 
 #### 6.A.1 Create `client/formatter.py` with `format_resume_markdown()`
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Convert a `RewriteOutput` to clean Markdown. Handles: name/title header, summary, skills as bullet list, experience blocks (title, company, dates, responsibilities, achievements, metrics), certifications, projects, education. No external dependencies.
 
