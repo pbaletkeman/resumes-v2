@@ -27,7 +27,7 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo (JSON mode)
-- `tests/` — 220 tests across 6 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils)
+- `tests/` — 227 tests across 6 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils)
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
 - `docs/TESTING.md` — Testing guide
@@ -330,7 +330,7 @@ class ATSComplianceOutput(BaseModel):
 
 ## Phase 4: Polish & Cover Letter (Agents 6-7)
 
-> Note: §4.1 and §4.2 (the two agents) are complete. §4.3 is complete for items §A, §B, §F; §C–§E remain — see `resume-todo.md`.
+> Note: §4.1 and §4.2 (the two agents) are complete. §4.3 is complete for items §A, §B, §C, §D, §F; §E remains — see `resume-todo.md`.
 
 ### 4.1 Create Tone Polishing Agent (`client/agents/tone_polishing.py`)
 
@@ -409,7 +409,7 @@ class CoverLetterOutput(BaseModel):
 
 ### 4.3 Fix LLM Fallback Falsehoods — completed items
 
-**Status:** ⚠️ PARTIAL — §A, §B, §F are DONE; §C–§E remain (see `resume-todo.md`)
+**Status:** ⚠️ PARTIAL — §A, §B, §C, §D, §F are DONE; §E remains (see `resume-todo.md`)
 
 #### A. Improve Post-Validation for Resume Rewrite (HIGH priority) — ✅ DONE
 
@@ -460,6 +460,26 @@ Two data-driven, deterministic fallbacks that replace the previous defaults (an 
 
 **Files changed:** `client/agents/resume_rewrite.py`, `client/agents/cover_letter.py`, `wip_testing/test_cover_letter.py` (fallback detection no longer checks for `[Your Name]`; uses word count < 300)
 
+#### D. Add Fallback Detection Logging (LOW priority) — ✅ DONE
+
+Both agents log the outcome at `INFO` so an LLM success vs a deterministic fallback is visible at a glance (`LOG_LEVEL=INFO` or `DEBUG`).
+
+**Resume Rewrite** (`client/agents/resume_rewrite.py`):
+
+- Success: `"LLM rewrite succeeded (skills=%d, words=%d)"` — metrics via the new `_count_words(result)` helper (sums words across summary, skills, experience title/company/dates/responsibilities/achievements/metrics, projects, certifications, education).
+- Fallback: `"Fallback: parsed resume used (reason: %s)"` with reason `"LLM failed on both attempts"` (kept alongside the existing `logger.warning`).
+
+**Cover Letter** (`client/agents/cover_letter.py`):
+
+- Success: `"LLM cover letter succeeded (words=%d)"` (the 450-600 word-count spec makes this the natural metric).
+- Fallback: `"Fallback: template cover letter used (reason: %s)"` — reason is `"empty input"` at the empty-input call site and `"LLM failed on both attempts"` at the double-failure site.
+
+`wip_testing/test_resume_rewrite.py` and `wip_testing/test_cover_letter.py` now call `configure_logging()` (they previously relied on Python's default WARNING-only config, which silently dropped INFO messages even with `LOG_LEVEL=DEBUG` set).
+
+**Tests added:** `TestCountWords` (2) + `TestFallbackLogging` (2) in `tests/test_resume_rewrite_validation.py`; `TestFallbackLogging` (3) in `tests/test_cover_letter_validation.py` — each drives `run()` through a stub `ModelClient` (`_MockClient`) with `caplog.set_level(logging.INFO)` to assert the exact success/fallback messages. 227 tests total.
+
+**Files changed:** `client/agents/resume_rewrite.py`, `client/agents/cover_letter.py`, `wip_testing/test_resume_rewrite.py`, `wip_testing/test_cover_letter.py`
+
 #### F. Add `company_name` to `JDParsingOutput` and `company_signals` (HIGH priority, prerequisite for B.2/C.2) — ✅ DONE
 
 1. **Field added** to `JDParsingOutput` in `client/models.py`:
@@ -480,8 +500,8 @@ Two data-driven, deterministic fallbacks that replace the previous defaults (an 
 **Tests added for the completed §4.3 items:**
 
 - `tests/test_jd_parsing.py` — covers `_extract_company_name` + `_sync_company_name` (19 tests)
-- `tests/test_resume_rewrite_validation.py` — covers the A checks + §C `_tailor_skills`/`_parsed_to_rewrite` (52 tests)
-- `tests/test_cover_letter_validation.py` — covers the B checks + §C fallback builder helpers (77 tests)
+- `tests/test_resume_rewrite_validation.py` — covers the A checks + §C `_tailor_skills`/`_parsed_to_rewrite` + §D fallback logging (56 tests)
+- `tests/test_cover_letter_validation.py` — covers the B checks + §C fallback builder helpers + §D fallback logging (80 tests)
 
 ---
 
@@ -650,8 +670,8 @@ tests/
   conftest.py                      # EXISTS ✅ (shared fixtures)
   test_format_detector.py          # EXISTS ✅ (46 tests)
   test_jd_parsing.py               # EXISTS ✅ (19 tests)
-  test_resume_rewrite_validation.py # EXISTS ✅ (52 tests)
-  test_cover_letter_validation.py  # EXISTS ✅ (77 tests)
+  test_resume_rewrite_validation.py # EXISTS ✅ (56 tests)
+  test_cover_letter_validation.py  # EXISTS ✅ (80 tests)
   test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
   test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
 docs/

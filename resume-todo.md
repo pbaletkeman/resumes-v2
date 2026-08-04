@@ -4,13 +4,13 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), the Phase 4.3 post-validation work (§A/§B/§C/§F), and 220 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), the Phase 4.3 post-validation work (§A/§B/§C/§D/§F), and 227 unit tests. The items below are what remains.
 
 ---
 
-## Phase 4.3 (remaining): Fix LLM Fallback Falsehoods — §D, §E
+## Phase 4.3 (remaining): Fix LLM Fallback Falsehoods — §E
 
-**Status:** §A (resume rewrite validation), §B (cover letter validation), §C (fallback templates), and §F (`company_name`) are ✅ DONE — see `resume-done.md`. §D–§E remain.
+**Status:** §A (resume rewrite validation), §B (cover letter validation), §C (fallback templates), §D (fallback detection logging), and §F (`company_name`) are ✅ DONE — see `resume-done.md`. §E remains.
 
 **Problem (context):** Two distinct failure modes produce bad output:
 
@@ -32,13 +32,14 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 
 ---
 
-#### D. Add Fallback Detection Logging (LOW priority)
+#### D. Add Fallback Detection Logging (LOW priority) — ✅ DONE
 
-Add `logger.info()` calls in both agents:
+**Done.** Both agents now `logger.info()` the outcome so LLM success vs deterministic fallback is visible at a glance:
 
-- Resume rewrite: `"LLM rewrite succeeded"` vs `"Fallback: parsed resume used (reason: %s)"`
-- Cover letter: `"LLM cover letter succeeded"` vs `"Fallback: template cover letter used (reason: %s)"`
-- Include skill count and word count metrics in the success path.
+- Resume rewrite: `"LLM rewrite succeeded (skills=%d, words=%d)"` vs `"Fallback: parsed resume used (reason: %s)"` — skill count and word count via `_count_words`.
+- Cover letter: `"LLM cover letter succeeded (words=%d)"` vs `"Fallback: template cover letter used (reason: %s)"` — reason covers `"empty input"` and `"LLM failed on both attempts"`.
+- `wip_testing/test_resume_rewrite.py` and `test_cover_letter.py` now call `configure_logging()` so `LOG_LEVEL=DEBUG` surfaces the INFO lines.
+- Tests: `TestCountWords` + `TestFallbackLogging` in both validation test files (227 total). See `resume-done.md` §4.3.D.
 
 ---
 
@@ -243,12 +244,12 @@ Create an integration test that runs the full pipeline against real files:
 
 **Status:** ⚠️ PARTIAL — existing deterministic tests are done; agent + pipeline tests remain
 
-**What exists now:** 220 tests across 6 files:
+**What exists now:** 227 tests across 6 files:
 
 - `tests/test_format_detector.py` — 46 tests covering all `FormatDetector` static extraction methods + regex-only parse flows
 - `tests/test_jd_parsing.py` — 19 tests (`_extract_company_name` + `_sync_company_name`)
-- `tests/test_resume_rewrite_validation.py` — 52 tests (§4.3.A checks + §C skill tailoring)
-- `tests/test_cover_letter_validation.py` — 77 tests (§4.3.B checks + §C fallback builder)
+- `tests/test_resume_rewrite_validation.py` — 56 tests (§4.3.A checks + §C skill tailoring + §D fallback logging)
+- `tests/test_cover_letter_validation.py` — 80 tests (§4.3.B checks + §C fallback builder + §D fallback logging)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 15 tests (shared parser + JSON Schema helpers)
 
@@ -301,7 +302,7 @@ test_real_files.py                # NEW (Phase 7.1)
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
 | 1 | Phase 4.3 §C: Improve fallback templates (skill reorder + data-driven cover letter) | ✅ DONE | Done work | 2 |
-| 2 | Phase 4.3 §D: Fallback detection logging | ❌ TODO | Step 1 | 2 |
+| 2 | Phase 4.3 §D: Fallback detection logging | ✅ DONE | Step 1 | 2 |
 | 3 | Phase 4.3 §E: Strengthen prompts (remove "reasonable metrics" rule; fix `吸引` → "attracts") | ❌ TODO | None | 2 |
 | 4 | Phase 5.2: Wire agents 3-7 into pipeline as dedicated classes | ⚠️ PARTIAL (runs end-to-end; agents 3-7 still use generic `PipelineAgent` — see §5.2) | Done work | 1 |
 | 5 | Phase 6.2: Output formatter (`client/formatter.py`) | ❌ TODO | None | 1 |

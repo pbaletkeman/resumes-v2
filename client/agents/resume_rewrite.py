@@ -112,11 +112,19 @@ class ResumeRewriteAgent:
                 resume_json, strategy_json, strict=(attempt == 1)
             )
             if result is not None:
+                logger.info(
+                    "LLM rewrite succeeded (skills=%d, words=%d)",
+                    len(result.skills),
+                    _count_words(result),
+                )
                 return result
 
         # Fallback: return the parsed resume, tailored deterministically
         logger.warning(
             "LLM rewrite failed on both attempts, returning tailored parsed resume"
+        )
+        logger.info(
+            "Fallback: parsed resume used (reason: %s)", "LLM failed on both attempts"
         )
         return _parsed_to_rewrite(parsed_resume, jd=jd, strategy=tailoring)
 
@@ -237,6 +245,21 @@ def _serialize(value: Any) -> str:
     if isinstance(value, dict):
         return json.dumps(value, indent=2, default=str)
     return str(value)
+
+
+def _count_words(result: RewriteOutput) -> int:
+    """Count words across all text fields of a rewritten resume."""
+    fields: list[str] = [result.summary]
+    fields.extend(result.skills)
+    fields.extend(result.projects)
+    fields.extend(result.certifications)
+    fields.extend(result.education)
+    for entry in result.experience:
+        fields.extend([entry.title, entry.company, entry.dates])
+        fields.extend(entry.responsibilities)
+        fields.extend(entry.achievements)
+        fields.extend(entry.metrics)
+    return sum(len(text.split()) for text in fields)
 
 
 def _parse_json(raw: str) -> dict[str, Any] | None:

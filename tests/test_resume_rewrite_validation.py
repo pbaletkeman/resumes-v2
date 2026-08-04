@@ -1,9 +1,13 @@
 """Tests for ResumeRewriteAgent post-validation helpers (no LLM)."""
 
 import json
+import logging
+from typing import Any
 
 from client.agents.resume_rewrite import (
+    ResumeRewriteAgent,
     _company_matches,
+    _count_words,
     _extract_companies,
     _extract_start_year,
     _normalize_skill,
@@ -14,6 +18,7 @@ from client.agents.resume_rewrite import (
     _validate_chronological,
     _validate_companies,
 )
+from client.errors import LLMConnectionError
 from client.models import (
     ExperienceEntry,
     GapAnalysisOutput,
@@ -356,3 +361,90 @@ class TestParsedToRewrite:
         result = _parsed_to_rewrite("not a resume")
         assert result.skills == []
         assert result.summary == ""
+
+
+class _MockClient:
+    """Stub ``ModelClient`` returning a canned response or raising an error."""
+
+    def __init__(
+        self, response: str | None = None, error: Exception | None = None
+    ) -> None:
+        self.response = response
+        self.error = error
+
+    async def chat(self, **kwargs: Any) -> str:
+        if self.error is not None:
+            raise self.error
+        if self.response is None:
+            raise AssertionError("no response configured")
+        return self.response
+
+
+class TestCountWords:
+    def test_empty_output_is_zero(self) -> None:
+        assert _count_words(RewriteOutput()) == 0
+
+    def test_counts_all_text_fields(self) -> None:
+        result = RewriteOutput(
+            summary="two words",
+            skills=["one", "two words"],
+            experience=[
+                ExperienceEntry(
+                    title="Engineer",
+                    company="Acme",
+                    dates="2020 - 2024",
+                    responsibilities=["Built things"],
+                    achievements=["Shipped it"],
+                    metrics=["Cut cost"],
+                )
+            ],
+            projects=["Project Alpha"],
+            certifications=["Cert X"],
+            education=["B.Sc."],
+        )
+        assert _count_words(result) == 21
+
+
+class TestFallbackLogging:
+    def _inputs(self, resume: dict[str, Any] | None = None) -> dict[str, Any]:
+        return {
+            "parsed_resume": resume
+            or {
+                "summary": "Old summary",
+                "skills": ["Python"],
+                "experience": [],
+                "projects": [],
+                "certifications": [],
+                "education": [],
+            },
+            "tailoring_strategy": {},
+        }
+
+    async def test_llm_success_logs_metrics(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        client = _MockClient(
+            response=json.dumps(
+                {
+                    "summary": "Improved summary",
+                    "skills": ["Python"],
+                    "experience": [],
+                    "projects": ["Built a project"],
+                    "certifications": [],
+                    "education": [],
+                }
+            )
+        )
+        agent = ResumeRewriteAgent(client)
+        result = await agent.run(self._inputs())
+        assert result.skills == ["Python"]
+        assert "LLM rewrite succeeded" in caplog.text
+        assert "skills=1" in caplog.text
+        assert "words=6" in caplog.text
+
+    async def test_llm_failure_logs_fallback_reason(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        agent = ResumeRewriteAgent(_MockClient(error=LLMConnectionError("boom")))
+        result = await agent.run(self._inputs())
+        assert result.skills == ["Python"]
+        assert "Fallback: parsed resume used" in caplog.text
+        assert "LLM failed on both attempts" in caplog.text

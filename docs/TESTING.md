@@ -199,12 +199,12 @@ Single file:
 uv run pytest tests/test_format_detector.py
 ```
 
-Currently 220 tests across 6 files:
+Currently 227 tests across 6 files:
 
 - `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
 - `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
-- `tests/test_resume_rewrite_validation.py` — 52 tests (rewrite post-validation + §C skill tailoring)
-- `tests/test_cover_letter_validation.py` — 77 tests (cover letter post-validation + §C fallback builder)
+- `tests/test_resume_rewrite_validation.py` — 56 tests (rewrite post-validation + §C skill tailoring + §D fallback logging)
+- `tests/test_cover_letter_validation.py` — 80 tests (cover letter post-validation + §C fallback builder + §D fallback logging)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 15 tests (shared parser + JSON Schema helpers)
 

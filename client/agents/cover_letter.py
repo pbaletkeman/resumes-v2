@@ -103,6 +103,9 @@ class CoverLetterAgent:
 
         if not jd or not resume:
             logger.debug("Cover letter: empty input, returning fallback cover letter")
+            logger.info(
+                "Fallback: template cover letter used (reason: %s)", "empty input"
+            )
             return CoverLetterOutput(
                 cover_letter=_build_fallback_cover_letter(jd, resume, strategy)
             )
@@ -124,11 +127,19 @@ class CoverLetterAgent:
                 jd_json, resume_json, strategy_json, strict=(attempt == 1)
             )
             if result is not None:
+                logger.info(
+                    "LLM cover letter succeeded (words=%d)",
+                    len(result.cover_letter.split()),
+                )
                 return result
 
         # Fallback: return data-driven fallback cover letter
         logger.warning(
             "LLM cover letter failed on both attempts, returning fallback cover letter"
+        )
+        logger.info(
+            "Fallback: template cover letter used (reason: %s)",
+            "LLM failed on both attempts",
         )
         return CoverLetterOutput(
             cover_letter=_build_fallback_cover_letter(jd, resume, strategy)

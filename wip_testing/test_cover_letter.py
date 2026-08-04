@@ -28,6 +28,9 @@ from client.agents.resume_parsing import ResumeParsingAgent
 from client.agents.resume_rewrite import ResumeRewriteAgent
 from client.agents.tone_polishing import TonePolishingAgent
 from client.ollama_client import OllamaClient
+from logging_config import configure_logging
+
+configure_logging()
 
 client = OllamaClient("qwen2.5:7b-instruct")
 

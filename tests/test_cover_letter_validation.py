@@ -1,8 +1,11 @@
 """Tests for CoverLetterAgent post-validation helpers (no LLM)."""
 
 import json
+import logging
+from typing import Any
 
 from client.agents.cover_letter import (
+    CoverLetterAgent,
     _build_fallback_cover_letter,
     _check_company,
     _check_skills,
@@ -18,6 +21,7 @@ from client.agents.cover_letter import (
     _validate_length,
     _validate_role,
 )
+from client.errors import LLMConnectionError
 from client.models import (
     CoverLetterOutput,
     ExperienceEntry,
@@ -465,3 +469,54 @@ class TestBuildFallbackCoverLetter:
             self._jd(role_title="Engineer"), self._resume(), self._strategy()
         )
         assert all(ord(char) < 128 for char in letter)
+
+
+class _MockClient:
+    """Stub ``ModelClient`` returning a canned response or raising an error."""
+
+    def __init__(
+        self, response: str | None = None, error: Exception | None = None
+    ) -> None:
+        self.response = response
+        self.error = error
+
+    async def chat(self, **kwargs: Any) -> str:
+        if self.error is not None:
+            raise self.error
+        if self.response is None:
+            raise AssertionError("no response configured")
+        return self.response
+
+
+class TestFallbackLogging:
+    def _inputs(self, resume: dict[str, Any] | None = None) -> dict[str, Any]:
+        return {
+            "parsed_job_description": {"role_title": "", "company_name": ""},
+            "parsed_resume": resume or {"skills": []},
+            "tailoring_strategy": {},
+        }
+
+    async def test_llm_success_logs_word_count(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        letter = " ".join(["word"] * 210)
+        client = _MockClient(response=json.dumps({"cover_letter": letter}))
+        agent = CoverLetterAgent(client)
+        result = await agent.run(self._inputs())
+        assert len(result.cover_letter.split()) == 210
+        assert "LLM cover letter succeeded" in caplog.text
+        assert "words=210" in caplog.text
+
+    async def test_llm_failure_logs_fallback_reason(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        agent = CoverLetterAgent(_MockClient(error=LLMConnectionError("boom")))
+        result = await agent.run(self._inputs())
+        assert "Sincerely," in result.cover_letter
+        assert "Fallback: template cover letter used" in caplog.text
+        assert "LLM failed on both attempts" in caplog.text
+
+    async def test_empty_input_logs_fallback_reason(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        agent = CoverLetterAgent(_MockClient())
+        await agent.run({})
+        assert "Fallback: template cover letter used" in caplog.text
+        assert "empty input" in caplog.text
