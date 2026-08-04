@@ -11,7 +11,7 @@
 
 | Model | Purpose | Validators |
 | --- | --- | --- |
-| JDParsingOutput | Agent 1 output | `company_signals`: coerces list to numbered dict |
+| JDParsingOutput | Agent 1 output | `company_name`: default `""`; `company_signals`: coerces list to numbered dict |
 | ExperienceEntry | Single role in work experience (title, company, dates, responsibilities, achievements, metrics) | |
 | ResumeParsingOutput | Agent 2 output | `skills/projects/certifications/education`: `_coerce_str_list`; `experience`: `_coerce_experience_list` |
 | GapAnalysisOutput | Agent 3 output | All `list[str]` fields: `_coerce_str_list`; `tone_guidance`: dict/list to comma-joined string |

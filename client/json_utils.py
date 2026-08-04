@@ -4,7 +4,7 @@ Shared JSON helpers for LLM responses and provider JSON schemas.
 
 Consolidates the per-agent ``_parse_json`` / ``_safe_json`` helpers into a
 single ``parse_json_response`` and provides ``model_to_json_schema`` for
-provider-native Structured Outputs (see resume-todo.md §8.7 / §8.8).
+provider-native Structured Outputs (see resume-done.md §8.7 / §8.8).
 """
 
 import json

@@ -19,7 +19,7 @@ Test the single-agent LLM call:
 uv run python basic.py
 ```
 
-Expected: prints "Agent: Paris" (or similar geography answer).
+Expected: prints "Agent: <json>" followed by a parsed JSON object. Since Phase 8, `basic.py` runs in JSON mode (`response_format="json"`) — it prints the raw JSON response and a pretty-printed parsed version.
 
 ---
 
@@ -66,7 +66,7 @@ print('Requirements:', result.requirements)
 
 ## 3. Full Pipeline (7 Agents)
 
-Uses `PipelineAgent` wrappers around Ollama — runs all 7 agents sequentially:
+Runs all 7 agents sequentially. `pipeline.py` exercises the pipeline end-to-end via `sample_run()`:
 
 ```bash
 uv run python pipeline.py
@@ -74,31 +74,42 @@ uv run python pipeline.py
 
 This will:
 
-1. Parse the JD (placeholder text)
+1. Parse the JD (placeholder text — see below)
 2. Parse the resume (placeholder text)
 3. Run gap analysis, rewrite, ATS check, tone polish, cover letter
 
-**To use real files**, edit `pipeline.py` line 361-362 and paste your JD/resume text, or run this instead:
+**To use real files**, edit the JD/resume placeholder text in `sample_run()` (pipeline.py `sample_run`, near the bottom), or use the chain test scripts in `wip_testing/` — e.g. `wip_testing/test_cover_letter.py` runs the full 1-7 agent chain against real files:
 
 ```python
 # save as test_pipeline.py
 import asyncio
-from pipeline import AgentRunner, run_resume_pipeline
+from client.agents import (
+    JDParsingAgent,
+    ResumeParsingAgent,
+    GapAnalysisAgent,
+    ResumeRewriteAgent,
+    ATSComplianceAgent,
+    TonePolishingAgent,
+    CoverLetterAgent,
+)
 from client.ollama_client import OllamaClient
+from pipeline import AgentRunner, run_resume_pipeline
+from config.agents import build_registry
 
 client = OllamaClient("qwen2.5:7b-instruct")
 
 agents = {
-    "jd_parsing_agent": None,  # stub — will raise NotImplementedError
-    "resume_parsing_agent": None,
-    "gap_analysis_agent": None,
-    "resume_rewrite_agent": None,
-    "ats_compliance_agent": None,
-    "tone_polishing_agent": None,
-    "cover_letter_agent": None,
+    "jd_parsing_agent": JDParsingAgent(client),
+    "resume_parsing_agent": ResumeParsingAgent(client),
+    "gap_analysis_agent": GapAnalysisAgent(client),
+    "resume_rewrite_agent": ResumeRewriteAgent(client),
+    "ats_compliance_agent": ATSComplianceAgent(client),
+    "tone_polishing_agent": TonePolishingAgent(client),
+    "cover_letter_agent": CoverLetterAgent(client),
 }
 
-runner = AgentRunner(agents)
+registry = build_registry()
+runner = AgentRunner(agents, registry=registry)
 
 with open("sample/jobs/3Pillar.txt") as f:
     jd = f.read()
@@ -109,7 +120,7 @@ results = run_resume_pipeline(runner, jd, resume)
 print(results["polished_resume"])
 ```
 
-> **Note:** The pipeline agents are stubs. Each `run_agent()` call raises `NotImplementedError` until the agent is implemented. You'll see this error per agent as you build them.
+> **Note:** All 7 agents are implemented as dedicated classes (see `client/agents/`). The `wip_testing/` scripts chain them with real files; run with `uv run python wip_testing/test_<agent>.py`.
 
 ---
 
@@ -118,7 +129,7 @@ print(results["polished_resume"])
 As each agent is created in `client/agents/`, test it in isolation:
 
 ```python
-# Example: test JD Parsing Agent once implemented
+# Example: test JD Parsing Agent
 import asyncio
 from client.ollama_client import OllamaClient
 from client.agents.jd_parsing import JDParsingAgent
@@ -133,7 +144,7 @@ result = asyncio.run(agent.run({"job_description": jd}))
 print(result)
 ```
 
-Replace `jd_parsing` / `JDParsingAgent` with whichever agent you're testing.
+Replace `jd_parsing` / `JDParsingAgent` with whichever agent you're testing. Each agent has a ready-made chain script in `wip_testing/` (e.g., `test_resume_rewrite.py` runs agents 1-4).
 
 ---
 
@@ -188,7 +199,14 @@ Single file:
 uv run pytest tests/test_format_detector.py
 ```
 
-Currently 46 tests covering `FormatDetector` regex parsing.
+Currently 176 tests across 6 files:
+
+- `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
+- `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
+- `tests/test_resume_rewrite_validation.py` — 37 tests (rewrite post-validation)
+- `tests/test_cover_letter_validation.py` — 48 tests (cover letter post-validation)
+- `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
+- `tests/test_json_utils.py` — 15 tests (shared parser + JSON Schema helpers)
 
 ---
 

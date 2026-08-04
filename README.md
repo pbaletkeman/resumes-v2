@@ -66,12 +66,14 @@ basic.py                 # Single-agent demo
 logging_config.py        # Centralized logging (dictConfig, LOG_LEVEL env var)
 config/agents.py         # Env-var-based agent-to-model configuration
 client/
-  model_client.py        # ABC for LLM clients
-  ollama_client.py       # Ollama implementation (configurable timeout, default 300s)
-  open_ai_client.py      # OpenAI implementation
-  model_registry.py      # Per-agent model assignment (ModelClientRegistry)
-  format_detector.py     # Regex parser with LLM fallback (connected)
-  models.py              # All Pydantic models
+  errors.py            # LLMError hierarchy (LLMConnectionError, LLMResponseError, LLMTimeoutError)
+  model_client.py      # ABC for LLM clients (chat() requires response_format; optional json_schema)
+  ollama_client.py     # Ollama implementation (configurable timeout, default 300s; format="json" always)
+  open_ai_client.py    # OpenAI implementation (response_format json_object / json_schema envelope)
+  model_registry.py    # Per-agent model assignment (ModelClientRegistry)
+  json_utils.py        # Shared parse_json_response + model_to_json_schema helpers
+  format_detector.py   # Regex parser with LLM fallback (connected)
+  models.py            # All Pydantic models
   agents/
     jd_parsing.py        # JD Parsing Agent (Agent 1) - dedicated class
     resume_parsing.py    # Resume Parsing Agent (Agent 2) - dedicated class
@@ -82,7 +84,12 @@ client/
     cover_letter.py      # Cover Letter Agent (Agent 7) - dedicated class
   templates/             # Jinja2 resume/cover letter templates (no renderer yet)
 tests/
-  test_format_detector.py # FormatDetector regex parsing tests (46 tests)
+  test_format_detector.py          # FormatDetector regex parsing tests (46 tests)
+  test_jd_parsing.py               # JD Parsing company_name extraction/sync tests (19 tests)
+  test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (37 tests)
+  test_cover_letter_validation.py  # Cover Letter post-validation tests (48 tests)
+  test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
+  test_json_utils.py               # shared parser + JSON Schema helper tests (15 tests)
 wip_testing/
   test_job_description.py  # JD Parsing Agent test
   test_resume_parsing.py   # Resume Parsing Agent test
@@ -109,4 +116,5 @@ wip_testing/
 - `docs/models.md` - Quick reference for all Pydantic models
 - `docs/TESTING.md` - Detailed testing guide
 - `docs/logging-info.md` - Logging implementation plan and status
-- `resume-todo.md` - Implementation plan and status tracker
+- `resume-done.md` - Completed work archive
+- `resume-todo.md` - Remaining implementation work
