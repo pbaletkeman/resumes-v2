@@ -100,9 +100,9 @@ Clean up cover letter text: normalize whitespace, fix encoding artifacts, ensure
 
 #### 6.B.2 Add `render_markdown()` to `ResumeRenderer`
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
-Render `RewriteOutput` using the template's `"markdown"` key. Same Jinja2 approach as `render_plaintext()`.
+Render `RewriteOutput` using the template's `"markdown"` key. Same Jinja2 approach as `render_plaintext()`. Delivered as part of 6.B.1 — method already present in `renderer.py`.
 
 **Depends on:** 6.B.1 (same class)
 
@@ -290,7 +290,7 @@ test_real_files.py                # NEW (Phase 7.1)
 | 3 | 6.A.3: `format_cover_letter()` | ✅ DONE | Step 1 | 1 |
 | 4 | 6.A.4: Formatter unit tests | ✅ DONE | Steps 1–3 | 1 |
 | 5 | 6.B.1: `ResumeRenderer` skeleton + `render_plaintext()` | ✅ DONE | None | 1 |
-| 6 | 6.B.2: `render_markdown()` | ❌ TODO | Step 5 | 1 |
+| 6 | 6.B.2: `render_markdown()` | ✅ DONE | Step 5 | 1 |
 | 7 | 6.B.3: Cover letter rendering | ❌ TODO | Step 5 | 1 |
 | 8 | 6.B.4: `build_output_path()` | ❌ TODO | Step 5 | 1 |
 | 9 | 6.B.5: DOCX generation | ❌ TODO | Step 5 | 2 |
