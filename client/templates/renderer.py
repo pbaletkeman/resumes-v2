@@ -7,10 +7,17 @@ Jinja2 templates to produce plaintext and Markdown output.  DOCX/PDF
 support will be added in subsequent phases.
 """
 
+import os
 import re
+import tempfile
 from datetime import date, datetime
 from pathlib import Path
+from typing import cast
 
+from docx import Document as create_document
+from docx.document import Document as DocumentType
+from docx.shared import Inches, Pt
+from docx.styles.style import ParagraphStyle
 from jinja2 import BaseLoader, Environment, StrictUndefined
 
 from client.models import CoverLetterOutput, RewriteOutput
@@ -162,6 +169,53 @@ class ResumeRenderer:
         rendered = self._env.from_string(tpl_source).render(**context)
         return self._clean_output(rendered)
 
+    def render_docx(
+        self,
+        resume: RewriteOutput,
+        *,
+        name: str = "",
+        title: str = "",
+        template: str = "modern",
+        output_path: str | Path | None = None,
+    ) -> Path:
+        """Render *resume* as a professionally styled ``.docx`` document.
+
+        The document uses letter-size pages with 1-inch margins, Calibri
+        11pt body text, and the name rendered large and bold.  When
+        *output_path* is ``None`` a temporary path is used.
+
+        Args:
+            resume: Structured resume data from the Resume Rewrite Agent.
+            name: Candidate name for the header.
+            title: Candidate title for the header.
+            template: Accepted for API consistency (styling is fixed).
+            output_path: Destination file. Defaults to a temp file.
+
+        Returns:
+            The ``Path`` the document was written to.
+        """
+        doc: DocumentType = create_document()
+
+        for section in doc.sections:
+            section.page_width = Inches(8.5)
+            section.page_height = Inches(11)
+            section.top_margin = Inches(1)
+            section.bottom_margin = Inches(1)
+            section.left_margin = Inches(1)
+            section.right_margin = Inches(1)
+
+        normal = cast(ParagraphStyle, doc.styles["Normal"])
+        normal.font.name = "Calibri"
+        normal.font.size = Pt(11)
+
+        context = self._build_context(resume, name=name, title=title)
+        self._populate_docx_paragraphs(doc, context)
+
+        path = Path(output_path) if output_path is not None else _temp_docx_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        doc.save(str(path))
+        return path
+
     @staticmethod
     def build_output_path(
         document_type: str,
@@ -293,6 +347,101 @@ class ResumeRenderer:
             prev_blank = is_blank
         return "\n".join(cleaned).strip()
 
+    @staticmethod
+    def _docx_heading(doc: DocumentType, text: str) -> None:
+        """Add a bold section heading paragraph to *doc*.
+
+        Encapsulates the heading run styling so every section header
+        shares the same font size and weight.
+        """
+        para = doc.add_paragraph()
+        run = para.add_run(text)
+        run.bold = True
+        run.font.size = Pt(12)
+
+    @staticmethod
+    def _docx_bullet(doc: DocumentType, text: str) -> None:
+        """Add a bulleted paragraph to *doc* using the ``List Bullet`` style.
+
+        Encapsulates the bullet list styling so all list content shares
+        the same paragraph style.
+        """
+        para = doc.add_paragraph(style="List Bullet")
+        para.add_run(text)
+
+    @staticmethod
+    def _populate_docx_paragraphs(
+        doc: DocumentType, context: dict[str, object]
+    ) -> None:
+        """Populate *doc* with the resume content in *context*.
+
+        *context* is the dict produced by :meth:`_build_context`.  The
+        candidate name is rendered at 14pt bold; section headings are bold;
+        experience is rendered as blocks of a bold title plus company/dates
+        and bulleted responsibilities, achievements, and metrics.
+        """
+        name = str(context.get("name", ""))
+        title = str(context.get("title", ""))
+
+        if name:
+            name_para = doc.add_paragraph()
+            name_run = name_para.add_run(name)
+            name_run.bold = True
+            name_run.font.size = Pt(14)
+        if title:
+            title_para = doc.add_paragraph()
+            title_para.add_run(title)
+
+        summary = str(context.get("summary", "")).strip()
+        if summary:
+            ResumeRenderer._docx_heading(doc, "Summary")
+            doc.add_paragraph(summary)
+
+        skills = cast(list[str], context.get("skills", []))
+        if skills:
+            ResumeRenderer._docx_heading(doc, "Skills")
+            doc.add_paragraph(", ".join(skills))
+
+        experience = cast(list[dict[str, object]], context.get("experience", []))
+        if experience:
+            ResumeRenderer._docx_heading(doc, "Experience")
+            for job in experience:
+                job_title = str(job.get("title", ""))
+                company = str(job.get("company", ""))
+                dates = str(job.get("dates", ""))
+
+                header_parts = [part for part in (job_title, company, dates) if part]
+                if header_parts:
+                    header = doc.add_paragraph()
+                    if job_title:
+                        title_run = header.add_run(job_title)
+                        title_run.bold = True
+                    meta = " - ".join(part for part in (company, dates) if part)
+                    if meta:
+                        header.add_run(f" - {meta}")
+
+                for key in ("responsibilities", "achievements", "metrics"):
+                    for item in cast(list[str], job.get(key, [])):
+                        ResumeRenderer._docx_bullet(doc, item)
+
+        projects = cast(list[str], context.get("projects", []))
+        if projects:
+            ResumeRenderer._docx_heading(doc, "Projects")
+            for item in projects:
+                ResumeRenderer._docx_bullet(doc, item)
+
+        certifications = cast(list[str], context.get("certifications", []))
+        if certifications:
+            ResumeRenderer._docx_heading(doc, "Certifications")
+            for item in certifications:
+                ResumeRenderer._docx_bullet(doc, item)
+
+        education = cast(list[str], context.get("education", []))
+        if education:
+            ResumeRenderer._docx_heading(doc, "Education")
+            for item in education:
+                ResumeRenderer._docx_bullet(doc, item)
+
 
 _SALUTATION_PREFIXES = ("dear", "to whom it may concern", "hello", "hi")
 _SIGNATURE_PREFIXES = (
@@ -323,6 +472,13 @@ _DEFAULT_EXTENSIONS: dict[str, str] = {
 def _default_extension(document_type: str) -> str:
     """Return the default file extension for *document_type*."""
     return _DEFAULT_EXTENSIONS.get(document_type, ".txt")
+
+
+def _temp_docx_path() -> Path:
+    """Return a fresh temporary ``.docx`` path not tied to the workspace."""
+    fd, name = tempfile.mkstemp(suffix=".docx")
+    os.close(fd)
+    return Path(name)
 
 
 def _split_paragraphs(text: str) -> list[str]:

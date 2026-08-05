@@ -4,7 +4,7 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.4 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()`), and 268 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.5 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX generation), and 268 unit tests. The items below are what remains.
 
 ---
 
@@ -16,7 +16,7 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 >
 > Phase 6.B.1 (renderer skeleton + `render_plaintext()`) and 6.B.2 (`render_markdown()`) are **complete** — archived in `resume-done.md` §6.3.
 >
-> Phase 6.B.3 (cover letter rendering) and 6.B.4 (`build_output_path()`) are **complete**.
+> Phase 6.B.3 (cover letter rendering), 6.B.4 (`build_output_path()`), and 6.B.5 (DOCX generation via `render_docx()`) are **complete**.
 
 ---
 
@@ -92,11 +92,11 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 ## Phase 6: Output & Validation
 
-Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering) and 6.B.4 (`build_output_path()`) are complete; the remaining work is 6.B.5–6.B.9 below. 6.B.4–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
+Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering), 6.B.4 (`build_output_path()`), and 6.B.5 (DOCX generation) are complete; the remaining work is 6.B.6–6.B.9 below. 6.B.4–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
 
 ### 6.B — Template-Based Multi-Format Renderer (remaining work)
 
-Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, template loading from `client.templates.TEMPLATES`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()` (with `_build_cover_letter_context()`), and the static `build_output_path()`/`_slugify()` helpers. DOCX/PDF and `render_all()` remain.
+Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()`, the static `build_output_path()`/`_slugify()` helpers, and `render_docx()` (page setup, Calibri 11pt, `_populate_docx_paragraphs()`, `_docx_heading()`/`_docx_bullet()`). The `python-docx` dependency is installed. PDF and `render_all()` remain.
 
 ---
 
@@ -139,7 +139,7 @@ Static utility to build timestamped file paths: `{date}_{candidate_name}_{compan
 
 #### 6.B.5 Add DOCX generation (`render_docx()`)
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Use `python-docx` to render `RewriteOutput` as a `.docx` file. Professional font (Calibri/Arial), 10–11pt body, 14pt name, bold section headers, 1-inch margins, single spacing.
 
@@ -147,10 +147,10 @@ Use `python-docx` to render `RewriteOutput` as a `.docx` file. Professional font
 
 **Sub-tasks:**
 
-- **6.B.5.1** Add `python-docx>=1.0.0` to `pyproject.toml` (under the existing dependencies) and run `uv sync`.
-- **6.B.5.2** Add `render_docx(resume, *, name="", title="", template="modern", output_path=None) -> Path` — create the `Document`, apply page setup (1-inch margins, letter size), set default font (Calibri 11pt), and write to `output_path` (or a temp path when `None`). Return the written `Path`.
-- **6.B.5.3** Add `_populate_docx_paragraphs(doc, context)` helper — walk the `_build_context()` dict and add body content: summary paragraph, skills line/bullets, per-experience blocks (title bold, company + dates, responsibilities/achievements/metrics bullets), projects, certifications, education. Name rendered at 14pt bold.
-- **6.B.5.4** Add `_docx_heading(doc, text)` + `_docx_bullet(doc, text)` helpers — encapsulate the run-level font/bold/spacing styling so the styling rules live in one place.
+- **6.B.5.1** ✅ Add `python-docx>=1.0.0` to `pyproject.toml` (under the existing dependencies) and run `uv sync`.
+- **6.B.5.2** ✅ Add `render_docx(resume, *, name="", title="", template="modern", output_path=None) -> Path` — create the `Document`, apply page setup (1-inch margins, letter size), set default font (Calibri 11pt), and write to `output_path` (or a temp path when `None`). Return the written `Path`.
+- **6.B.5.3** ✅ Add `_populate_docx_paragraphs(doc, context)` helper — walk the `_build_context()` dict and add body content: summary paragraph, skills line/bullets, per-experience blocks (title bold, company + dates, responsibilities/achievements/metrics bullets), projects, certifications, education. Name rendered at 14pt bold.
+- **6.B.5.4** ✅ Add `_docx_heading(doc, text)` + `_docx_bullet(doc, text)` helpers — encapsulate the run-level font/bold/spacing styling so the styling rules live in one place.
 
 **Files changed:** `client/templates/renderer.py`, `pyproject.toml` (add `python-docx>=1.0.0`)
 
@@ -397,10 +397,10 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 3 | 6.B.3.3: `render_cover_letter_markdown()` | ✅ DONE | Step 2 | 1 |
 | 4 | 6.B.4.1: `_slugify()` helper | ✅ DONE | 6.B.1 | 1 |
 | 5 | 6.B.4.2: `build_output_path()` | ✅ DONE | Step 4 | 1 |
-| 6 | 6.B.5.1: add `python-docx` dep | ❌ TODO | 6.B.1 | 1 |
-| 7 | 6.B.5.2: `render_docx()` + page setup | ❌ TODO | Step 6 | 1 |
-| 8 | 6.B.5.3: `_populate_docx_paragraphs()` | ❌ TODO | Step 7 | 1 |
-| 9 | 6.B.5.4: `_docx_heading()`/`_docx_bullet()` | ❌ TODO | Step 7 | 1 |
+| 6 | 6.B.5.1: add `python-docx` dep | ✅ DONE | 6.B.1 | 1 |
+| 7 | 6.B.5.2: `render_docx()` + page setup | ✅ DONE | Step 6 | 1 |
+| 8 | 6.B.5.3: `_populate_docx_paragraphs()` | ✅ DONE | Step 7 | 1 |
+| 9 | 6.B.5.4: `_docx_heading()`/`_docx_bullet()` | ✅ DONE | Step 7 | 1 |
 | 10 | 6.B.6.1: add `reportlab` dep (+`pillow` if graphics) | ❌ TODO | 6.B.1 | 1 |
 | 11 | 6.B.6.2: `_pdf_styles()` | ❌ TODO | 6.B.2 | 1 |
 | 12 | 6.B.6.3: `render_pdf()` | ❌ TODO | Steps 10-11 | 1 |
