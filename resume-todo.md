@@ -174,25 +174,30 @@ Caveats worth keeping in mind when adding the 6.B dependencies:
 
 ### 7.1 Create `test_real_files.py`
 
-**Status:** ❌ NOT DONE
+**Status:** ❌ NOT done
 
-Create an integration test that runs the full pipeline against real files:
+A single end-to-end integration test that runs the full 7-agent pipeline against the real sample files. It is deliberately **not** in `tests/` (which runs under pyright's excluded directory and the deterministic suite) — it depends on a live Ollama, so it is run manually via `uv run python test_real_files.py` (or `uv run pytest test_real_files.py`) and exercises the true agent chain rather than mocks. If Ollama is down, the test should raise a clear `LLMConnectionError`-driven skip/failure message rather than silently pass.
 
-1. Read `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt`
-2. Run `run_resume_pipeline()` with both files
-3. Assert all 7 output keys are present
-4. Assert `parsed_job_description` has `role_title` and `required_skills`
-5. Assert `parsed_resume` has `experience` as a list
-6. Assert `tailoring_strategy` has `missing_skills`
-7. Assert `ats_optimized_resume` is not empty
-8. Assert `polished_resume` is not empty
-9. Assert `cover_letter` is 450-600 words
-10. Assert experiences are in chronological order (most recent first)
-11. Assert no new experiences were added (compare with input resume)
-12. Assert all certifications from input resume are present in output
-13. Call pipeline with candidate name and company name
-14. Assert output files are created with correct naming pattern
-15. Print summary of results
+**Depends on:** 6.B.8 (`pipeline.py` wired with `candidate_name`/`company_name` + `render_all()`), 7.2 `test_pipeline.py` for the mocked-agent coverage already in place.
+
+**Sub-tasks:**
+
+- **7.1.1** Create `test_real_files.py` at repo root with a `main()`-style entry (`if __name__ == "__main__":`) so it doubles as a runnable script and a pytest module. Include `configure_logging()` at import/module scope.
+- **7.1.2** Add a **file-loading helper** (`_load_job()`/`_load_resume()`, or inline `Path(...).read_text(...)`) that reads `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt`, asserting both files exist first with a clear `FileNotFoundError` message.
+- **7.1.3** Call `run_resume_pipeline(job_description, resume_text)` with both texts. Capture the returned result dict.
+- **7.1.4** **Structure-existence assertions** — assert all 7 agent output keys are present in the result dict: `parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_compliance`, `polished_resume`, `cover_letter`.
+- **7.1.5** **JD parsing assertions** — assert `result["parsed_job_description"]["role_title"]` is non-empty and `result["parsed_job_description"]["required_skills"]` is a non-empty list.
+- **7.1.6** **Resume parsing assertions** — assert `result["parsed_resume"]["experience"]` is a list (and non-empty), and that the parsed name matches/corresponds to the input file.
+- **7.1.7** **Gap analysis assertions** — assert `result["tailoring_strategy"]["missing_skills"]` exists (list, at least one entry on a normal 3Pillar run).
+- **7.1.8** **Rewrite/ATS/polish assertions** — assert `ats_optimized_resume` and `polished_resume` are truthy non-empty (accept a dict, NOT a string), per the final output models.
+- **7.1.9** **Cover letter word-count assertion** — assert the `cover_letter` output is 450–600 words. Compute word count on the text content (strip Markdown) and log the computed count.
+- **7.1.10** **Chronological ordering assertion** — assert `parsed_resume.experience` is ordered most-recent-first by comparing parsed date ranges; log the ordering it found.
+- **7.1.11** **No-added-experience assertion** — compare the set of company/role titles in the input resume vs. the rewritten/polished output; assert nothing new was introduced (no fabricated experience).
+- **7.1.12** **Certification-preservation assertion** — assert every certification present in the input resume text still appears in the output (compare normalized lowercase names).
+- **7.1.13** **Output-file assertions** — a second call (or reuse) with `candidate_name="..."` and `company_name="..."` so `render_all()` writes files; assert the returned `output_files` dict has the 6 expected keys and that each written `Path` exists and is non-empty.
+- **7.1.14** **Naming-pattern assertion** — assert each output filename matches `{YYYYMMDD_HHMM}_{slug(candidate)}_{slug(company)}_{doc_type}.{ext}` (e.g. regex `^\d{8}_\d{4}_.+$`), i.e. exercises the `build_output_path()` format for real files.
+- **7.1.15** **Summary print** — at the end, `print()` a compact summary table (per-agent non-empty ✓/✗, cover letter word count, output file list, total elapsed time) so a human can eyeball it at a glance.
+- **7.1.16** **Deterministic guard** — add an env-var/module flag (e.g. `RUN_LIVE_PIPELINE`) so the test is skipped (not failed) under the deterministic `pytest` run when live Ollama is unavailable, guarding against the suite being broken on stripped/offline machines.
 
 **Files changed:** new file `test_real_files.py`
 
@@ -218,20 +223,71 @@ Create an integration test that runs the full pipeline against real files:
 - `tests/test_agents.py` — mock `ModelClient`, verify prompts and JSON validation
 - `tests/test_pipeline.py` — end-to-end with mocked agents
 
-**Files changed:** new files `tests/test_agents.py`, `tests/test_pipeline.py` (plus `tests/test_renderer.py` from 6.B.9)
+#### 7.2.1 Agent unit tests — per-agent behaviour with a mocked `ModelClient`
+
+**Status:** ❌ NOT done
+
+Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()` → validation → fallback contract against a fake client that injects canned responses, with **no real LLM**. Because the built-in structured outputs enforce provider JSON, some of these are the only place the parse/validation layer is exercised off-network.
+
+**Pre-requisites.** Define a `FakeClient` (or reuse a `StubModel` from `tests/conftest.py`) whose `chat()` returns a fixed payload from a fixture map keyed by `purpose`, and record the call args so each test can assert the `json_schema`/`response_format`/`purpose`/`output` was passed as specified in AGENTS.md.
+
+- **7.2.1.1** Create `tests/test_agent_jd_parsing.py` — JD Parsing: valid JSON → `JDParsingOutput`; malformed JSON → fallback; `LLMConnectionError` → fallback; `strict=True` retry round on second exception.
+- **7.2.1.2** Create `tests/test_agent_resume_parsing.py` — Resume Parsing: valid parse, malformed JSON fallback, missing `experience` key fallback, dict-where-list coercion via `_coerce_str_list`.
+- **7.2.1.3** Create `tests/test_agent_gap_analysis.py` — Gap Analysis: LLM happy path, LLM returning `None` → deterministic missing-skills fallback, prompt receives `missing_skills`.
+- **7.2.1.4** Create `tests/test_agent_resume_rewrite.py` — Resume Rewrite: post-validation path (§4.3.A) applies, strict-mode retry toggles, invalid-date/empty-tone coercion.
+- **7.2.1.5** Create `tests/test_agent_ats_compliance.py` — ATS: compliance checks run on a non-compliant payload and return fix suggestions; fallback when the frame is absent.
+- **7.2.1.6** Create `tests/test_agent_tone_polishing.py` — Tone: `tone_guidance` dict→string coercion (`_coerce_tone_guidance`), fallback when LLM fails.
+- **7.2.1.7** Create `tests/test_agent_cover_letter.py` — Cover Letter: uses `_sync_company_name`-style verification, word-count/fallback-builder, `CoverLetterOutput` fill.
+
+**(Alternate, factored layout)** — If preferred, one slim `tests/test_agents.py` module with parametrized fixtures that cover items 7.2.1.1–7.2.1.7 above, rather than 7 separate files; the AGENTS.md convention favors function-specific modules, so pick the one that matches `tests/test_jd_parsing.py`/`tests/test_formatter.py` style.
+
+#### 7.2.2 `tests/test_pipeline.py` — pipeline wiring with mocked agents
+
+**Status:** ⚠️ NOT done
+
+**What it covers:** `AgentRunner` and `run_resume_pipeline()` orchestration (not the real LLM). Because the real agents are instantiated by the runner via `DEFAULT_AGENT_CLASSES`, the cleanest seam is to either (a) patch/`@mock.patch` the agent classes in the module, or (b) swap `DEFAULT_AGENT_CLASSES` with a list of minimal fakes. This validates ordering, input/output threading, and the `output_files` dict without touching Ollama.
+
+- **7.2.2.1 — async end-to-end** — `async` test that runs `run_resume_pipeline(jd, resume, candidate_name=..., company_name=...)` with stub agents that return fixed `ParsedJDOutput`/`ParsedResumeOutput`/etc.; assert the 7 keys + `output_files` (6 keys) are present.
+- **7.2.2.2 — dependency threading** — test that each agent in the chain receives the preceding agent's output (assert via stub `run()` that records its `inputs` argument).
+- **7.2.2.3 — error propagation** — stub an agent that raises `LLMConnectionError`; assert `run_resume_pipeline()` surfaces/logs the failure and does not hallucinate a missing output key.
+- **7.2.2.4 — `company`/`candidate` passthrough** — verify the `name`/`company` args reach the renderer call and `render_all()` and that an empty `candidate_name` skips rendering (no `output_files`).
+- **7.2.2.5 — `AgentRunner` unit** — `AgentRunner.run(..)` calls the right agent, carries `purpose`/`inputs`/`output`/`response_format`/`json_schema`, and maps LLM failures to the documented error-type handling.
+
+**Files changed:** new files `tests/test_agents.py` (+7 split files per layout), `tests/test_pipeline.py` (or the 7.1 `test_pipeline.py` reused), plus `tests/conftest.py` if no `FakeClient` fixture exists yet.
 
 ---
 
 ### 7.3 Populate `docs/`
 
-**Status:** ❌ NOT DONE
+**Status:** ❌ NOT done
 
-`docs/` directory has 3 existing files: `TESTING.md`, `models.md`, `logging-info.md`. Add:
+`docs/` directory has 3 existing files: `TESTING.md`, `models.md`, `logging-info.md`. Add four new guides. Each docs file should end with a `## References` section pointing at the relevant `client/*.py` and `resume-*.md` files it documents.
 
-1. **`docs/architecture.md`:** System overview, data flow diagram, agent chain
-2. **`docs/agents.md`:** Each agent's purpose, prompt, input/output schema
-3. **`docs/usage.md`:** How to run the pipeline, configure models, add custom agents
-4. **`docs/api.md`:** `ModelClient`, `PipelineAgent`, `AgentRunner` interfaces
+#### 7.3.1 (`docs/architecture.md`)
+
+- **7.3.1.1** Write a **system overview** — the 7-agent chain (JD→Resume Parsing→Gap Analysis→Resume Rewrite→ATS→Tone→Cover), the two provider backends, and the renderer/formatter layers.
+- **7.3.1.2** Add a **data-flow diagram** (ASCII or Mermaid) showing the input files, agent order, intermediate Pydantic models, and output artifacts (`output_files`).
+- **7.3.1.3** Describe the **agent chain** and each transition's input/output contract (mirror the pipeline-flow block in `AGENTS.md`), plus where `ResumeRenderer` hooks in.
+
+#### 7.3.2 (`docs/agents.md`)
+
+- **7.3.2.1** For each of the 7 agents add: **purpose**, the **prompt** it sends, and its **input/output schema** (referencing `client/models.py` model names, e.g. `JDParsingOutput`, `RewriteOutput`).
+- **7.3.2.2** Note the **fallback path** per agent (regex for parsing agents, deterministic templates for rewrite/cover) and when it triggers.
+- **7.3.2.3** Cross-link each to its implementation file under `client/templates/` (or `client/agents/`) so the doc stays truthful to the code.
+
+#### 7.3.3 (`docs/usage.md`)
+
+- **7.3.3.1** **Quickstart** — prereqs (`ollama pull`, `uv sync`), the command to run `uv run python test_pipeline.py`/`pipeline.py`, expected outputs (files + console summary).
+- **7.3.3.2** **Model configuration** — env-var overrides (`MODEL_PROVIDER`, `MODEL_NAME`, and per-agent `{AGENT}_MODEL`/`{AGENT}_PROVIDER`), how `config/agents.py` picks them.
+- **7.3.3.3** **Adding a custom agent** — steps and the `DEFAULT_AGENT_CLASSES` / registry harness a new class must satisfy.
+
+#### 7.3.4 (`docs/api.md`)
+
+- **7.3.4.1** Document the **`ModelClient`** ABC (`chat()`, `response_format`, optional `json_schema`) and the `OllamaClient`/`OpenAIClient` implementations.
+- **7.3.4.2** Document **`Agent`**/`PipelineAgent`/`AgentRunner` — constructor signatures, `run()`/`__call__`, the `purpose`/`inputs`/`output`/`rules` contract.
+- **7.3.4.3** Document **`ResumeRenderer`** public API (`render_plaintext`, `render_markdown`, `render_cover_letter_*`, `render_docx`, `render_pdf`, `render_all`, `build_output_path`) and the `formatter` helpers.
+
+**Files changed:** new files `docs/architecture.md`, `docs/agents.md`, `docs/usage.md`, `docs/api.md`
 
 **Files changed:** new files `docs/architecture.md`, `docs/agents.md`, `docs/usage.md`, `docs/api.md`
 
@@ -278,5 +334,9 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 16 | 6.B.8.1-6.B.8.3: wire renderer into pipeline | ❌ TODO | Step 15 | 1 |
 | 17 | 6.B.9.1-6.B.9.6: renderer unit tests | ❌ TODO | Steps 1-16 | 1 |
 | 18 | 7.1: `test_real_files.py` integration test | ❌ TODO | Step 16 | 1 |
-| 19 | 7.2 (remaining): Unit tests for agents + pipeline | ❌ TODO | Step 16 | 2 |
-| 20 | 7.3: Documentation (`docs/`) | ❌ TODO | All | 4 |
+| 19 | 7.2.1: agent unit tests (`tests/test_agent_*.py` or `test_agents.py`) | ❌ TODO | Step 16 | 7 to 8 |
+| 20 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ❌ TODO | Step 19, 16 | 1 |
+| 21 | 7.3.1: `docs/architecture.md` | ❌ TODO | All | 1 |
+| 22 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
+| 23 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
+| 24 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |
