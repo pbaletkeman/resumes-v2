@@ -4,7 +4,7 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.6 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX + PDF generation), and 268 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.8 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX + PDF generation + `render_all()` + pipeline wiring), and 268 unit tests. The items below are what remains.
 
 ---
 
@@ -92,11 +92,13 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 ## Phase 6: Output & Validation
 
-Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering), 6.B.4 (`build_output_path()`), 6.B.5 (DOCX generation), and 6.B.6 (PDF generation) are complete; the remaining work is 6.B.7–6.B.9 below. 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
+Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3–6.B.8 are complete; the remaining work is 6.B.9 below. 6.B.9 depends on 6.B.1–6.B.7.
 
 ### 6.B — Template-Based Multi-Format Renderer (remaining work)
 
-Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()`, the static `build_output_path()`/`_slugify()` helpers, `render_docx()` (page setup, Calibri 11pt, `_populate_docx_paragraphs()`, `_docx_heading()`/`_docx_bullet()`), and `render_pdf()` (letter, 1-inch margins, `_pdf_styles()`, `_populate_pdf_flowables()`, graceful reportlab import guard). The `python-docx` and `reportlab` dependencies are installed. `render_all()` remains.
+Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()`, the static `build_output_path()`/`_slugify()` helpers, `render_docx()` (page setup, Calibri 11pt, `_populate_docx_paragraphs()`, `_docx_heading()`/`_docx_bullet()`), `render_pdf()` (letter, 1-inch margins, `_pdf_styles()`, `_populate_pdf_flowables()`, graceful reportlab import guard), and `render_all()` (wires the 4 resume + up to 2 cover letter formats to `build_output_path()`, eagerly creates `output_dir`, skips the letter formats when `cover_letter` is `None`/empty, with private `_write_text()` helper). The `python-docx` and `reportlab` dependencies are installed.
+
+Current state of `pipeline.py`: `run_resume_pipeline()` now accepts keyword-only `candidate_name`/`company_name`, renders files via `ResumeRenderer.render_all()` into `Path("output")` when `candidate_name` is non-empty (via `_to_rewrite_output()`), and returns the format→path mapping under an `"output_files"` result key (empty dict when rendering is skipped).
 
 ---
 
@@ -178,7 +180,7 @@ Use `reportlab` to render `RewriteOutput` as a `.pdf` file. ReportLab builds the
 
 #### 6.B.7 Add `render_all()` convenience method
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Takes `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and output directory. Generates all 4 resume formats (plaintext, markdown, DOCX, PDF) + 2 cover letter formats (plaintext, markdown). Returns `dict[str, Path]` mapping format name to file path.
 
@@ -186,9 +188,9 @@ Takes `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and ou
 
 **Sub-tasks:**
 
-- **6.B.7.1** Add `render_all(resume, cover_letter, *, candidate_name, company_name, output_dir, resume_template="modern") -> dict[str, Path]` — wire together `render_plaintext`, `render_markdown`, `render_docx`, `render_pdf`, `render_cover_letter_plaintext`, `render_cover_letter_markdown`, each writing to `build_output_path(...)`.
-- **6.B.7.2** Ensure `output_dir` exists (`Path.mkdir(parents=True, exist_ok=True)`) before writing; handle a missing/empty `cover_letter` gracefully (skip the two letter formats rather than error).
-- **6.B.7.3** Return the `dict[str, Path]` keyed by format name (`"resume_plaintext"`, `"resume_markdown"`, `"resume_docx"`, `"resume_pdf"`, `"cover_letter_plaintext"`, `"cover_letter_markdown"`). Verify all 6 keys present and files non-empty via a quick manual run.
+- **6.B.7.1** ✅ Add `render_all(resume, cover_letter, *, candidate_name, company_name, output_dir, resume_template="modern") -> dict[str, Path]` — wire together `render_plaintext`, `render_markdown`, `render_docx`, `render_pdf`, `render_cover_letter_plaintext`, `render_cover_letter_markdown`, each writing to `build_output_path(...)`. Note: `output_dir` is created eagerly inside `render_all` (this preempts part of 6.B.7.2).
+- **6.B.7.2** ✅ Ensure `output_dir` exists (`Path.mkdir(parents=True, exist_ok=True)`) before writing; handle a missing/empty `cover_letter` gracefully (skip the two letter formats rather than error). `cover_letter` is now `CoverLetterOutput | None`; the two letter formats are added only when it is non-`None` and non-empty.
+- **6.B.7.3** ✅ Return the `dict[str, Path]` keyed by format name (`"resume_plaintext"`, `"resume_markdown"`, `"resume_docx"`, `"resume_pdf"`, `"cover_letter_plaintext"`, `"cover_letter_markdown"`). Verify all 6 keys present and files non-empty via a quick manual run.
 
 **Files changed:** `client/templates/renderer.py`
 
@@ -196,7 +198,7 @@ Takes `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and ou
 
 #### 6.B.8 Wire renderer into pipeline (`pipeline.py`)
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Add `candidate_name: str` and `company_name: str` parameters to `run_resume_pipeline()`. After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()` and store output paths in the pipeline result dict.
 
@@ -204,9 +206,9 @@ Add `candidate_name: str` and `company_name: str` parameters to `run_resume_pipe
 
 **Sub-tasks:**
 
-- **6.B.8.1** Add `candidate_name: str = ""` and `company_name: str = ""` parameters to `run_resume_pipeline()` (and thread through any caller, e.g., `sample_run()` / `wip_testing/test_cover_letter.py`).
-- **6.B.8.2** After the tone polishing and cover letter agents complete, instantiate `ResumeRenderer()` and call `render_all(...)` with the collected `polished_resume`/`cover_letter` outputs. Skip rendering when `candidate_name` is empty (log at INFO).
-- **6.B.8.3** Store the returned `dict[str, Path]` in the pipeline result dict under an `"output_files"` key (alongside the existing agent output keys).
+- **6.B.8.1** ✅ Add `candidate_name: str = ""` and `company_name: str = ""` parameters to `run_resume_pipeline()` (and thread through any caller, e.g., `sample_run()` / `wip_testing/test_cover_letter.py`).
+- **6.B.8.2** ✅ After the tone polishing and cover letter agents complete, instantiate `ResumeRenderer()` and call `render_all(...)` with the collected `polished_resume`/`cover_letter` outputs. Skip rendering when `candidate_name` is empty (log at INFO). A `_to_rewrite_output()` helper converts the parsed resume into a `RewriteOutput`. `output_dir` is `Path("output")`; the resulting paths are captured in a local `output_files` dict (returned under the result dict in 6.B.8.3).
+- **6.B.8.3** ✅ Store the returned `dict[str, Path]` in the pipeline result dict under an `"output_files"` key (alongside the existing agent output keys).
 
 **Files changed:** `pipeline.py`
 
@@ -406,8 +408,8 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 12 | 6.B.6.3: `render_pdf()` | ✅ DONE | Steps 10-11 | 1 |
 | 13 | 6.B.6.4: `_populate_pdf_flowables()` | ✅ DONE | Step 12 | 1 |
 | 14 | 6.B.6.5: import guard + verify on Windows | ✅ DONE | Step 12 | 1 |
-| 15 | 6.B.7.1-6.B.7.3: `render_all()` | ❌ TODO | Steps 2-14 | 1 |
-| 16 | 6.B.8.1-6.B.8.3: wire renderer into pipeline | ❌ TODO | Step 15 | 1 |
+| 15 | 6.B.7.1-6.B.7.3: `render_all()` | ✅ DONE | Steps 2-14 | 1 |
+| 16 | 6.B.8.1-6.B.8.3: wire renderer into pipeline | ✅ DONE | Step 15 | 1 |
 | 17 | 6.B.9.1-6.B.9.6: renderer unit tests | ❌ TODO | Steps 1-16 | 1 |
 | 18 | 7.1: `test_real_files.py` integration test | ❌ TODO | Step 16 | 1 |
 | 19 | 7.2.1: agent unit tests (`tests/test_agent_*.py` or `test_agents.py`) | ❌ TODO | Step 16 | 7 to 8 |

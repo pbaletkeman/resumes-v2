@@ -18,6 +18,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Protocol, cast
 
 from client.agents import (
@@ -31,6 +32,8 @@ from client.agents import (
 )
 from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
+from client.models import CoverLetterOutput, ResumeParsingOutput, RewriteOutput
+from client.templates.renderer import ResumeRenderer
 from config.agents import build_registry
 from logging_config import configure_logging
 
@@ -227,10 +230,35 @@ def _extract_field(result: Any, *fields: str) -> Any:
     return cast(Any, result)
 
 
+def _to_rewrite_output(parsed_resume: Any) -> RewriteOutput:
+    """Convert the Resume Parsing output into a ``RewriteOutput``.
+
+    The pipeline uses the structured ``ResumeParsingOutput`` as the basis
+    for the final rendered resume (fields match ``RewriteOutput``).  Handles
+    both a validated Pydantic model and a raw dict from a generic agent.
+
+    Args:
+        parsed_resume: The Resume Parsing stage output (model or dict).
+
+    Returns:
+        A ``RewriteOutput`` with the parsed resume data.
+    """
+    if isinstance(parsed_resume, ResumeParsingOutput):
+        return RewriteOutput.model_validate(parsed_resume.model_dump())
+    if isinstance(parsed_resume, RewriteOutput):
+        return parsed_resume
+    if isinstance(parsed_resume, dict):
+        return RewriteOutput.model_validate(parsed_resume)
+    return RewriteOutput()
+
+
 def run_resume_pipeline(
     runner: AgentRunner,
     job_description: str,
     resume: str,
+    *,
+    candidate_name: str = "",
+    company_name: str = "",
 ) -> dict[str, Any]:
     """Run the full 7-agent resume optimization pipeline.
 
@@ -238,11 +266,16 @@ def run_resume_pipeline(
         runner: An ``AgentRunner`` instance with all 7 agents registered.
         job_description: Raw job description text.
         resume: Raw resume text.
+        candidate_name: Candidate name for rendered output headers and
+            filenames.  When empty, file rendering is skipped.
+        company_name: Target company name for rendered output filenames.
 
     Returns:
         Dictionary with keys: ``parsed_job_description``, ``parsed_resume``,
         ``tailoring_strategy``, ``rewritten_resume``, ``ats_optimized_resume``,
-        ``polished_resume``, ``cover_letter``.
+        ``polished_resume``, ``cover_letter``, and ``output_files`` (a
+        ``dict[str, Path]`` mapping format name to written file, empty when
+        ``candidate_name`` was not provided).
     """
     configure_logging()
 
@@ -341,6 +374,27 @@ def run_resume_pipeline(
     )
     cover_letter: Any = _extract_field(cover_result, "cover_letter")
 
+    # Optional file output via ResumeRenderer.  Skipped when no candidate
+    # name was provided (candidate_name is the gate for rendering).
+    output_files: dict[str, Path] = {}
+    if candidate_name:
+        resume_data = _to_rewrite_output(parsed_resume)
+        letter_data = (
+            CoverLetterOutput(cover_letter=cover_letter) if cover_letter else None
+        )
+        output_dir = Path("output")
+        renderer = ResumeRenderer()
+        output_files = renderer.render_all(
+            resume_data,
+            letter_data,
+            candidate_name=candidate_name,
+            company_name=company_name,
+            output_dir=output_dir,
+        )
+        logger.info("Rendered %d output file(s) into %s", len(output_files), output_dir)
+    else:
+        logger.info("Skipping file rendering (candidate_name is empty)")
+
     total_time = time.monotonic() - pipeline_start
     logger.info(
         "Pipeline completed in %.1fs — %d/%d agents succeeded",
@@ -357,6 +411,7 @@ def run_resume_pipeline(
         "ats_optimized_resume": ats_optimized_resume,
         "polished_resume": polished_resume,
         "cover_letter": cover_letter,
+        "output_files": output_files,
     }
 
 
@@ -403,7 +458,13 @@ def sample_run() -> None:
     jd_text = "Paste JD here..."
     resume_text = "Paste resume here..."
 
-    results = run_resume_pipeline(runner_instance, jd_text, resume_text)
+    results = run_resume_pipeline(
+        runner_instance,
+        jd_text,
+        resume_text,
+        candidate_name="Your Name",
+        company_name="Company",
+    )
 
     print("=== Polished Resume ===")
     print(results["polished_resume"])

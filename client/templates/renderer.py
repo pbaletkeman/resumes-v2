@@ -278,6 +278,137 @@ class ResumeRenderer:
         doc.build(flowables)
         return path
 
+    def render_all(
+        self,
+        resume: RewriteOutput,
+        cover_letter: CoverLetterOutput | None,
+        *,
+        candidate_name: str,
+        company_name: str,
+        output_dir: str | Path,
+        resume_template: str = "modern",
+    ) -> dict[str, Path]:
+        """Render *resume* and, when available, *cover_letter* into formats.
+
+        Produces the four resume formats (plaintext, Markdown, DOCX, PDF).
+        When *cover_letter* is provided and non-empty, the two cover letter
+        formats (plaintext, Markdown) are produced as well; otherwise they
+        are skipped.  Each file is written to *output_dir* under a
+        timestamped, slugified filename built by :meth:`build_output_path`.
+
+        Args:
+            resume: Structured resume data from the Resume Rewrite Agent.
+            cover_letter: Structured letter data from the Cover Letter Agent,
+                or ``None`` to skip the letter formats.
+            candidate_name: Candidate name for headers and filenames.
+            company_name: Target company name for filenames.
+            output_dir: Directory the rendered files are written to.
+            resume_template: Template key for the resume text formats.
+
+        Returns:
+            Mapping of format name to the written ``Path``.
+        """
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        resume_plain = self.render_plaintext(
+            resume, name=candidate_name, template=resume_template
+        )
+        resume_md = self.render_markdown(
+            resume, name=candidate_name, template=resume_template
+        )
+        resume_docx = self.render_docx(
+            resume,
+            name=candidate_name,
+            template=resume_template,
+            output_path=self.build_output_path(
+                "resume",
+                candidate_name=candidate_name,
+                company_name=company_name,
+                output_dir=output_dir,
+                ext=".docx",
+            ),
+        )
+        resume_pdf = self.render_pdf(
+            resume,
+            name=candidate_name,
+            template=resume_template,
+            output_path=self.build_output_path(
+                "resume",
+                candidate_name=candidate_name,
+                company_name=company_name,
+                output_dir=output_dir,
+                ext=".pdf",
+            ),
+        )
+
+        paths = {
+            "resume_plaintext": self._write_text(
+                resume_plain,
+                "resume",
+                candidate_name,
+                company_name,
+                output_dir,
+                ".txt",
+            ),
+            "resume_markdown": self._write_text(
+                resume_md,
+                "resume",
+                candidate_name,
+                company_name,
+                output_dir,
+                ".md",
+            ),
+            "resume_docx": resume_docx,
+            "resume_pdf": resume_pdf,
+        }
+
+        if cover_letter is not None and cover_letter.cover_letter.strip():
+            letter_plain = self.render_cover_letter_plaintext(
+                cover_letter, name=candidate_name, company=company_name
+            )
+            letter_md = self.render_cover_letter_markdown(
+                cover_letter, name=candidate_name, company=company_name
+            )
+            paths["cover_letter_plaintext"] = self._write_text(
+                letter_plain,
+                "cover_letter",
+                candidate_name,
+                company_name,
+                output_dir,
+                ".txt",
+            )
+            paths["cover_letter_markdown"] = self._write_text(
+                letter_md,
+                "cover_letter",
+                candidate_name,
+                company_name,
+                output_dir,
+                ".md",
+            )
+
+        return paths
+
+    @staticmethod
+    def _write_text(
+        content: str,
+        document_type: str,
+        candidate_name: str,
+        company_name: str,
+        output_dir: Path,
+        ext: str,
+    ) -> Path:
+        """Write *content* to a timestamped output file and return its path."""
+        path = ResumeRenderer.build_output_path(
+            document_type,
+            candidate_name=candidate_name,
+            company_name=company_name,
+            output_dir=output_dir,
+            ext=ext,
+        )
+        path.write_text(content, encoding="utf-8")
+        return path
+
     @staticmethod
     def build_output_path(
         document_type: str,
