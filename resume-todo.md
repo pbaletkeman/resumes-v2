@@ -4,7 +4,7 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.5 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX generation), and 268 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.6 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX + PDF generation), and 268 unit tests. The items below are what remains.
 
 ---
 
@@ -16,7 +16,7 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 >
 > Phase 6.B.1 (renderer skeleton + `render_plaintext()`) and 6.B.2 (`render_markdown()`) are **complete** — archived in `resume-done.md` §6.3.
 >
-> Phase 6.B.3 (cover letter rendering), 6.B.4 (`build_output_path()`), and 6.B.5 (DOCX generation via `render_docx()`) are **complete**.
+> Phase 6.B.3 (cover letter rendering), 6.B.4 (`build_output_path()`), 6.B.5 (DOCX via `render_docx()`), and 6.B.6 (PDF via `render_pdf()`) are **complete**.
 
 ---
 
@@ -92,11 +92,11 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 ## Phase 6: Output & Validation
 
-Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering), 6.B.4 (`build_output_path()`), and 6.B.5 (DOCX generation) are complete; the remaining work is 6.B.6–6.B.9 below. 6.B.4–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
+Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering), 6.B.4 (`build_output_path()`), 6.B.5 (DOCX generation), and 6.B.6 (PDF generation) are complete; the remaining work is 6.B.7–6.B.9 below. 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
 
 ### 6.B — Template-Based Multi-Format Renderer (remaining work)
 
-Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()`, the static `build_output_path()`/`_slugify()` helpers, and `render_docx()` (page setup, Calibri 11pt, `_populate_docx_paragraphs()`, `_docx_heading()`/`_docx_bullet()`). The `python-docx` dependency is installed. PDF and `render_all()` remain.
+Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()`, the static `build_output_path()`/`_slugify()` helpers, `render_docx()` (page setup, Calibri 11pt, `_populate_docx_paragraphs()`, `_docx_heading()`/`_docx_bullet()`), and `render_pdf()` (letter, 1-inch margins, `_pdf_styles()`, `_populate_pdf_flowables()`, graceful reportlab import guard). The `python-docx` and `reportlab` dependencies are installed. `render_all()` remains.
 
 ---
 
@@ -158,7 +158,7 @@ Use `python-docx` to render `RewriteOutput` as a `.docx` file. Professional font
 
 #### 6.B.6 Add PDF generation (`render_pdf()`)
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Use `reportlab` to render `RewriteOutput` as a `.pdf` file. ReportLab builds the PDF **directly** with the Platypus framework (`SimpleDocTemplate`, `Paragraph`, `Spacer`, `ListFlowable`) — no HTML/Markdown intermediate, so the `markdown` package is **not** needed. Same professional styling as DOCX (Calibri/Arial-equivalent Helvetica, 10–11pt body, 14pt name, bold section headers, 1-inch margins, single spacing).
 
@@ -166,11 +166,11 @@ Use `reportlab` to render `RewriteOutput` as a `.pdf` file. ReportLab builds the
 
 **Sub-tasks:**
 
-- **6.B.6.1** Add `reportlab>=4.0` to `pyproject.toml` and run `uv sync`. If you plan to add a **profile photo, icons, or complex graphical decorations** to the resume, also install `pillow` alongside ReportLab (Platypus uses PIL to draw and size embedded images) — add `pillow>=10.0` to `pyproject.toml` and `uv sync`. Do **not** add `markdown>=3.5` — ReportLab does not use an HTML pipeline.
-- **6.B.6.2** Add PDF styling helpers — a `_pdf_styles()` static helper that returns a dict of `ParagraphStyle` objects (name at 14pt bold, section headers bold, body at 10–11pt, Helvetica family, single leading) so the styling lives in one place. Note ReportLab's built-in Helvetica/Helvetica-Bold is a Type-1 base-14 font (fine for the project's ASCII-only convention) — switch to an embedded TTF font only if non-Latin text is ever required.
-- **6.B.6.3** Add `render_pdf(resume, *, name="", title="", template="modern", output_path=None) -> Path` — create a `SimpleDocTemplate` (letter size, 1-inch margins), build a list of Platypus flowables from `_build_context()` (header paragraph, summary, skills, per-experience blocks, projects, certifications, education), call `doc.build(flowables)`, and return the written `Path`.
-- **6.B.6.4** Add a `_populate_pdf_flowables(context, styles)` helper — returns the `list[Flowable]` (paragraphs, spacers, bullet `ListFlowable`) for the resume body, mirroring the DOCX `_populate_docx_paragraphs` structure.
-- **6.B.6.5** Add a graceful import guard — `reportlab` and `pillow` install cleanly cross-platform (no system deps like WeasyPrint's `pango`), but still wrap imports so a missing package raises a clear `ImportError`/log message naming the missing library rather than failing deep in the pipeline. Confirm `from reportlab.platypus import SimpleDocTemplate` imports under `uv run` on this machine before marking done.
+- **6.B.6.1** ✅ Add `reportlab>=4.0` to `pyproject.toml` and run `uv sync`. If you plan to add a **profile photo, icons, or complex graphical decorations** to the resume, also install `pillow` alongside ReportLab (Platypus uses PIL to draw and size embedded images) — add `pillow>=10.0` to `pyproject.toml` and `uv sync`. Do **not** add `markdown>=3.5` — ReportLab does not use an HTML pipeline.
+- **6.B.6.2** ✅ Add PDF styling helpers — a `_pdf_styles()` static helper that returns a dict of `ParagraphStyle` objects (name at 14pt bold, section headers bold, body at 10–11pt, Helvetica family, single leading) so the styling lives in one place. Note ReportLab's built-in Helvetica/Helvetica-Bold is a Type-1 base-14 font (fine for the project's ASCII-only convention) — switch to an embedded TTF font only if non-Latin text is ever required.
+- **6.B.6.3** ✅ Add `render_pdf(resume, *, name="", title="", template="modern", output_path=None) -> Path` — create a `SimpleDocTemplate` (letter size, 1-inch margins), build a list of Platypus flowables from `_build_context()` (header paragraph, summary, skills, per-experience blocks, projects, certifications, education), call `doc.build(flowables)`, and return the written `Path`.
+- **6.B.6.4** ✅ Add a `_populate_pdf_flowables(context, styles)` helper — returns the `list[Flowable]` (paragraphs, spacers, bullet `ListFlowable`) for the resume body, mirroring the DOCX `_populate_docx_paragraphs` structure.
+- **6.B.6.5** ✅ Add a graceful import guard — `reportlab` and `pillow` install cleanly cross-platform (no system deps like WeasyPrint's `pango`), but still wrap imports so a missing package raises a clear `ImportError`/log message naming the missing library rather than failing deep in the pipeline. Confirmed `from reportlab.platypus import SimpleDocTemplate` imports under `uv run` on this machine.
 
 **Files changed:** `client/templates/renderer.py`, `pyproject.toml` (add `reportlab>=4.0`; add `pillow>=10.0` only if graphics are added)
 
@@ -401,11 +401,11 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 7 | 6.B.5.2: `render_docx()` + page setup | ✅ DONE | Step 6 | 1 |
 | 8 | 6.B.5.3: `_populate_docx_paragraphs()` | ✅ DONE | Step 7 | 1 |
 | 9 | 6.B.5.4: `_docx_heading()`/`_docx_bullet()` | ✅ DONE | Step 7 | 1 |
-| 10 | 6.B.6.1: add `reportlab` dep (+`pillow` if graphics) | ❌ TODO | 6.B.1 | 1 |
-| 11 | 6.B.6.2: `_pdf_styles()` | ❌ TODO | 6.B.2 | 1 |
-| 12 | 6.B.6.3: `render_pdf()` | ❌ TODO | Steps 10-11 | 1 |
-| 13 | 6.B.6.4: `_populate_pdf_flowables()` | ❌ TODO | Step 12 | 1 |
-| 14 | 6.B.6.5: import guard + verify on Windows | ❌ TODO | Step 12 | 1 |
+| 10 | 6.B.6.1: add `reportlab` dep (+`pillow` if graphics) | ✅ DONE | 6.B.1 | 1 |
+| 11 | 6.B.6.2: `_pdf_styles()` | ✅ DONE | 6.B.2 | 1 |
+| 12 | 6.B.6.3: `render_pdf()` | ✅ DONE | Steps 10-11 | 1 |
+| 13 | 6.B.6.4: `_populate_pdf_flowables()` | ✅ DONE | Step 12 | 1 |
+| 14 | 6.B.6.5: import guard + verify on Windows | ✅ DONE | Step 12 | 1 |
 | 15 | 6.B.7.1-6.B.7.3: `render_all()` | ❌ TODO | Steps 2-14 | 1 |
 | 16 | 6.B.8.1-6.B.8.3: wire renderer into pipeline | ❌ TODO | Step 15 | 1 |
 | 17 | 6.B.9.1-6.B.9.6: renderer unit tests | ❌ TODO | Steps 1-16 | 1 |

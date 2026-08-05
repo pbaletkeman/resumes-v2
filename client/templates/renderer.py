@@ -12,13 +12,33 @@ import re
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
+from xml.sax.saxutils import escape
 
 from docx import Document as create_document
 from docx.document import Document as DocumentType
 from docx.shared import Inches, Pt
 from docx.styles.style import ParagraphStyle
 from jinja2 import BaseLoader, Environment, StrictUndefined
+
+try:
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle as PdfParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (
+        Flowable,
+        ListFlowable,
+        ListItem,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+    )
+except ImportError as exc:  # pragma: no cover
+    raise ImportError(
+        "ReportLab is required for PDF rendering. Install it with "
+        "`uv sync` (adds `reportlab>=4.0` to the project dependencies)."
+    ) from exc
 
 from client.models import CoverLetterOutput, RewriteOutput
 from client.templates import TEMPLATES
@@ -216,6 +236,48 @@ class ResumeRenderer:
         doc.save(str(path))
         return path
 
+    def render_pdf(
+        self,
+        resume: RewriteOutput,
+        *,
+        name: str = "",
+        title: str = "",
+        template: str = "modern",
+        output_path: str | Path | None = None,
+    ) -> Path:
+        """Render *resume* as a professionally styled PDF document.
+
+        ReportLab builds the PDF directly with Platypus (no HTML/Markdown
+        intermediate).  Letter-size pages with 1-inch margins and the
+        shared :meth:`_pdf_styles` styling.  When *output_path* is ``None``
+        a temporary path is used.
+
+        Args:
+            resume: Structured resume data from the Resume Rewrite Agent.
+            name: Candidate name for the header.
+            title: Candidate title for the header.
+            template: Accepted for API consistency (styling is fixed).
+            output_path: Destination file. Defaults to a temp file.
+
+        Returns:
+            The ``Path`` the document was written to.
+        """
+        path = Path(output_path) if output_path is not None else _temp_pdf_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        doc = SimpleDocTemplate(
+            str(path),
+            pagesize=letter,
+            leftMargin=inch,
+            rightMargin=inch,
+            topMargin=inch,
+            bottomMargin=inch,
+        )
+        context = self._build_context(resume, name=name, title=title)
+        flowables = self._populate_pdf_flowables(context, self._pdf_styles())
+        doc.build(flowables)
+        return path
+
     @staticmethod
     def build_output_path(
         document_type: str,
@@ -370,6 +432,121 @@ class ResumeRenderer:
         para.add_run(text)
 
     @staticmethod
+    def _pdf_styles() -> dict[str, PdfParagraphStyle]:
+        """Return the shared set of ReportLab ``ParagraphStyle`` objects.
+
+        Uses Helvetica / Helvetica-Bold (Type-1 base-14 fonts), a 14pt bold
+        name, bold section headings, and 10.5pt single-spaced body text --
+        matching the professional DOCX layout.  Base-14 fonts cannot render
+        Unicode/emoji, which is fine given the project's ASCII-only rule.
+        """
+        return {
+            "name": PdfParagraphStyle(
+                name="ResumeName",
+                fontName="Helvetica-Bold",
+                fontSize=14,
+                leading=18,
+                spaceAfter=2,
+                alignment=TA_LEFT,
+            ),
+            "title": PdfParagraphStyle(
+                name="ResumeTitle",
+                fontName="Helvetica",
+                fontSize=11,
+                leading=14,
+                spaceAfter=8,
+                alignment=TA_LEFT,
+            ),
+            "heading": PdfParagraphStyle(
+                name="SectionHeading",
+                fontName="Helvetica-Bold",
+                fontSize=12,
+                leading=15,
+                spaceBefore=10,
+                spaceAfter=4,
+                alignment=TA_LEFT,
+            ),
+            "body": PdfParagraphStyle(
+                name="Body",
+                fontName="Helvetica",
+                fontSize=10.5,
+                leading=13,
+                spaceAfter=4,
+                alignment=TA_LEFT,
+            ),
+            "bullet": PdfParagraphStyle(
+                name="Bullet",
+                fontName="Helvetica",
+                fontSize=10.5,
+                leading=13,
+                leftIndent=14,
+                spaceAfter=2,
+                alignment=TA_LEFT,
+            ),
+        }
+
+    @staticmethod
+    def _populate_pdf_flowables(
+        context: dict[str, object], styles: dict[str, PdfParagraphStyle]
+    ) -> list[Flowable]:
+        """Build the Platypus flowables for the resume body in *context*.
+
+        Mirrors :meth:`_populate_docx_paragraphs`: a name/title header,
+        summary paragraph, skills line, per-experience blocks, and bulleted
+        projects / certifications / education.  Text is XML-escaped for
+        ReportLab's ``Paragraph`` markup parser.
+        """
+        flowables: list[Flowable] = []
+        name = str(context.get("name", ""))
+        title = str(context.get("title", ""))
+
+        if name:
+            flowables.append(Paragraph(escape(name), styles["name"]))
+        if title:
+            flowables.append(Paragraph(escape(title), styles["title"]))
+
+        summary = str(context.get("summary", "")).strip()
+        if summary:
+            flowables.append(Paragraph("Summary", styles["heading"]))
+            flowables.append(Paragraph(escape(summary), styles["body"]))
+
+        skills = cast(list[str], context.get("skills", []))
+        if skills:
+            flowables.append(Paragraph("Skills", styles["heading"]))
+            flowables.append(Paragraph(escape(", ".join(skills)), styles["body"]))
+
+        experience = cast(list[dict[str, object]], context.get("experience", []))
+        if experience:
+            flowables.append(Paragraph("Experience", styles["heading"]))
+            for job in experience:
+                job_title = str(job.get("title", ""))
+                company = str(job.get("company", ""))
+                dates = str(job.get("dates", ""))
+
+                header_parts = [part for part in (job_title, company, dates) if part]
+                if header_parts:
+                    joined = escape(" - ".join(header_parts))
+                    flowables.append(Paragraph(joined, styles["body"]))
+
+                for key in ("responsibilities", "achievements", "metrics"):
+                    items = cast(list[str], job.get(key, []))
+                    if items:
+                        flowables.append(_bullet_list([text for text in items], styles))
+                flowables.append(Spacer(1, 6))
+
+        for section, label in (
+            ("projects", "Projects"),
+            ("certifications", "Certifications"),
+            ("education", "Education"),
+        ):
+            items = cast(list[str], context.get(section, []))
+            if items:
+                flowables.append(Paragraph(label, styles["heading"]))
+                flowables.append(_bullet_list(items, styles))
+
+        return flowables
+
+    @staticmethod
     def _populate_docx_paragraphs(
         doc: DocumentType, context: dict[str, object]
     ) -> None:
@@ -479,6 +656,19 @@ def _temp_docx_path() -> Path:
     fd, name = tempfile.mkstemp(suffix=".docx")
     os.close(fd)
     return Path(name)
+
+
+def _temp_pdf_path() -> Path:
+    """Return a fresh temporary ``.pdf`` path not tied to the workspace."""
+    fd, name = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd)
+    return Path(name)
+
+
+def _bullet_list(items: list[str], styles: dict[str, PdfParagraphStyle]) -> Flowable:
+    """Build a bulleted ``ListFlowable`` from *items* using *styles*."""
+    flowables = [ListItem(Paragraph(escape(item), styles["bullet"])) for item in items]
+    return ListFlowable(cast(Any, flowables), bulletType="bullet")
 
 
 def _split_paragraphs(text: str) -> list[str]:
