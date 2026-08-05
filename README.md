@@ -45,17 +45,46 @@ See `docs/TESTING.md` for detailed testing instructions (individual agents, Open
 
 ## Pipeline flow
 
-```plaintext
-JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
-                            ↓
-                    [3. Gap Analysis]
-                            ↓
-                    [4. Resume Rewrite]
-                            ↓
-                    [5. ATS Compliance]
-                            ↓
-                    [6. Tone Polishing] → polished_resume
-                    [7. Cover Letter] → cover_letter
+```mermaid
+flowchart TD
+    %% --- Swimlanes (using subgraphs) ---
+    subgraph JD_Lane [JD Track]
+        JD([JD])
+        A[1. JD Parsing]
+    end
+
+    subgraph Resume_Lane [Resume Track]
+        Resume([Resume])
+        B[2. Resume Parsing]
+    end
+
+    subgraph Analysis_Lane [Analysis & Rewrite]
+        C[3. Gap Analysis]
+        D[4. Resume Rewrite]
+        E[5. ATS Compliance]
+        F[6. Tone Polishing]
+    end
+
+    subgraph Output_Lane [Outputs]
+        polished_resume([polished_resume])
+        G[7. Cover Letter]
+        cover_letter([cover_letter])
+    end
+
+    %% --- Flows ---
+    JD --> A
+    A --> B
+    Resume --> B
+
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> polished_resume
+
+    F --> G
+    G --> cover_letter
+
 ```
 
 ## Architecture

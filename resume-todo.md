@@ -72,7 +72,7 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
   - In `ResumeParsingAgent._regex_fallback()`, set `name=parsed.name` from the `FormatDetector` result (already extracted).
   - For the LLM path (`_try_llm`), add `name` to `_SYSTEM_PROMPT` field list + a rule "Extract the candidate's full name exactly as it appears at the top of the resume; empty string if absent."
   - Ensure no duplicate: `ResumeParsingOutput` already validates a `str` field via its own validator; add `name` to the schema's field list in the prompt.
-- **9.3.2** In `cover_letter.py` `_try_llm()`, when `_apply`-ing the candidate name post-output `result`, read the candidate name from `resume_json` (not a placeholder). Add `_apply_candidate_name(result, resume_json) -> CoverLetterOutput` that replaces `[Your Name]` / `[Your Name]`→ resolved name residue with the resolved resume name. If the name resolves empty, leave untouched. 
+- **9.3.2** In `cover_letter.py` `_try_llm()`, when `_apply`-ing the candidate name post-output `result`, read the candidate name from `resume_json` (not a placeholder). Add `_apply_candidate_name(result, resume_json) -> CoverLetterOutput` that replaces `[Your Name]` / `[Your Name]`→ resolved name residue with the resolved resume name. If the name resolves empty, leave untouched.
 - **9.3.3** In `_build_fallback_cover_letter()` the existing `_read_str(resume_data, "name").strip() or "Candidate"` now resolves to the real name once 9.3.1 lands.
 - **9.3.4** Add tests — `name` flows LLM-regex → `ResumeParsingOutput.name`; placeholder `[Your Name]` replaced; empty name leaves the letter unchanged (or emits "Candidate"/nothing).
 
@@ -252,3 +252,61 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 9 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
 | 10 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
 | 11 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 8–10 | 2 |
+
+---
+Normalization of skills
+
+
+Here is the exact instruction you should include in your JD–Resume matching prompt:
+
+“Normalize all skills by mapping synonyms, variations, and related phrases to a single canonical skill. Treat any phrasing differences as equivalent if they refer to the same underlying capability.
+Example: ‘REST API’, ‘RESTFul API’, ‘REST API Development’, and ‘REST API Endpoint Development’ must all be treated as the same skill: REST API.”
+
+Then add the general rule:
+
+“Apply this normalization rule to all skills, technologies, tools, and methodologies found in the job description and resume. If two phrases refer to the same capability, treat them as equivalent even if wording differs.”
+
+🛠️ A more complete version (recommended for production)
+You can embed this block into your JD–Resume matching pipeline:
+
+Skill Normalization Rule:
+
+Map all skill synonyms, abbreviations, plurals, and variations to a single canonical skill name.
+
+Treat different phrasings as equivalent if they refer to the same underlying capability.
+
+Examples:
+
+REST API = RESTFul API = REST API Development = REST API Endpoint Development
+
+CI/CD = Continuous Integration and Continuous Deployment
+
+Microservices = Microservice Architecture
+
+Node.js = Node = NodeJS
+
+Apply this rule consistently across both the job description and the resume.
+
+This tells the LLM to generalize beyond REST API.
+
+🔍 Why this works
+LLMs are excellent at semantic grouping when explicitly instructed.
+Without instructions, they treat phrases literally.
+With instructions, they cluster them conceptually.
+
+🧪 Optional: Add a canonicalization step
+If you want the model to output a clean list of normalized skills:
+
+“After extracting skills, convert all skills to their canonical form using the normalization rules.”
+
+This ensures:
+
+JD skills → canonical
+
+Resume skills → canonical
+
+Gap analysis → canonical
+
+Matching → canonical
+
+Everything aligns.
