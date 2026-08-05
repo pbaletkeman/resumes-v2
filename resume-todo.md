@@ -4,7 +4,7 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.2 (renderer skeleton + `render_plaintext`/`render_markdown`), and 268 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.3 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering), and 268 unit tests. The items below are what remains.
 
 ---
 
@@ -90,17 +90,17 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 ## Phase 6: Output & Validation
 
-Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). The remaining work is 6.B.3–6.B.9 below. 6.B.3–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
+Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering) is complete; the remaining work is 6.B.4–6.B.9 below. 6.B.4–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
 
 ### 6.B — Template-Based Multi-Format Renderer (remaining work)
 
-Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, template loading from `client.templates.TEMPLATES`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), and `_clean_output()`. No cover letter rendering, DOCX/PDF, or output paths yet.
+Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, template loading from `client.templates.TEMPLATES`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()` (with `_build_cover_letter_context()`). DOCX/PDF, output paths, and `render_all()` remain.
 
 ---
 
 #### 6.B.3 Add `render_cover_letter_plaintext()` and `render_cover_letter_markdown()`
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Render `CoverLetterOutput` using the `COVER_LETTER` template. Two methods for plaintext and markdown variants. Follow the existing `render_plaintext()`/`render_markdown()` pattern (lookup template dict key, `_env.from_string(...).render(**context)`, `_clean_output`).
 
@@ -108,9 +108,11 @@ Render `CoverLetterOutput` using the `COVER_LETTER` template. Two methods for pl
 
 **Sub-tasks:**
 
-- **6.B.3.1** Add `_build_cover_letter_context()` helper to `ResumeRenderer` — converts a `CoverLetterOutput` (plus candidate name / company name) into the context dict expected by the `COVER_LETTER` template. Inspect `client/templates/cover_letter.py` first to match its template variables exactly.
-- **6.B.3.2** Add `render_cover_letter_plaintext(cover_letter, *, name="", company="")` — render against the `COVER_LETTER` template's `"plaintext"` key, run through `_clean_output()`. Follow the exact signature/style of `render_plaintext()`.
-- **6.B.3.3** Add `render_cover_letter_markdown(cover_letter, *, name="", company="")` — same as 6.B.3.2 against the `"markdown"` key.
+- **6.B.3.1** ✅ Add `_build_cover_letter_context()` helper to `ResumeRenderer` — converts a `CoverLetterOutput` (plus candidate name / company name) into the context dict expected by the `COVER_LETTER` template. Inspect `client/templates/cover_letter.py` first to match its template variables exactly. The context supplies `candidate_name`, `company`, `date` (today via `date.today()`), and `opening_paragraph`/`body_paragraph`/`closing_paragraph` split from the letter body on blank lines.
+- **6.B.3.2** ✅ Add `render_cover_letter_plaintext(cover_letter, *, name="", company="")` — render against the `COVER_LETTER` template's `"plaintext"` key, run through `_clean_output()`. Follow the exact signature/style of `render_plaintext()`.
+- **6.B.3.3** ✅ Add `render_cover_letter_markdown(cover_letter, *, name="", company="")` — same as 6.B.3.2 against the `"markdown"` key.
+
+The letter body is normalized by `_split_paragraphs()` before rendering: the `COVER_LETTER` template renders its own salutation and signature, so a leading `Dear ...` line and a trailing `Sincerely, ...` block embedded in the agent's letter text are stripped to avoid duplication.
 
 **Files changed:** `client/templates/renderer.py`
 
@@ -388,9 +390,9 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | 6.B.3.1: `_build_cover_letter_context()` | ❌ TODO | 6.B.1 | 1 |
-| 2 | 6.B.3.2: `render_cover_letter_plaintext()` | ❌ TODO | Step 1 | 1 |
-| 3 | 6.B.3.3: `render_cover_letter_markdown()` | ❌ TODO | Step 2 | 1 |
+| 1 | 6.B.3.1: `_build_cover_letter_context()` | ✅ DONE | 6.B.1 | 1 |
+| 2 | 6.B.3.2: `render_cover_letter_plaintext()` | ✅ DONE | Step 1 | 1 |
+| 3 | 6.B.3.3: `render_cover_letter_markdown()` | ✅ DONE | Step 2 | 1 |
 | 4 | 6.B.4.1: `_slugify()` helper | ❌ TODO | 6.B.1 | 1 |
 | 5 | 6.B.4.2: `build_output_path()` | ❌ TODO | Step 4 | 1 |
 | 6 | 6.B.5.1: add `python-docx` dep | ❌ TODO | 6.B.1 | 1 |
