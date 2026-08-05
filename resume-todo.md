@@ -16,6 +16,78 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 >
 > Phase 6.B.1 (renderer skeleton + `render_plaintext()`) and 6.B.2 (`render_markdown()`) are **complete** — archived in `resume-done.md` §6.3.
 
+---
+
+## Phase 9: Cover Letter Creation Fixes (a/b/c)
+
+Fixes for three defects in cover letter creation that surface on live runs: experience entries coming back out of chronological order, the company name being taken from the candidate's resume (or left as `[Company Name]`), and the candidate name left as `[Your Name]`. All three are handled with **pure Python post-processing — no additional LLM calls**.
+
+### 9.1 Chronological ordering of experience (in `resume_rewrite.py`)
+
+**Status:** ❌ NOT DONE
+
+Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chronological(result)` and **rejects** the whole rewrite when the experiences are out of order, which drops the entire LLM result and falls back to `_parsed_to_rewrite()`. Instead of rejecting, we should **intercept and sort** the experience section so the rest of the LLM's work is preserved.
+
+**Sub-tasks:**
+
+- **9.1.1** Replace the reject path in `_try_llm()` (currently lines 228–230: `if not _validate_chronological(result): logger.warning("Output experiences not in chronological order -- rejecting"); return None`) with a call to a new `_ensure_chronological(result)` post-processor. Log the ordering message, but reorder the entries in place instead of returning `None`.
+- **9.1.2** Add `_ensure_chronological(result: RewriteOutput) -> RewriteOutput` — sorts `result.experience` by `_extract_start_year(entry.dates)` descending (most-recent-first). Entries whose start year is `None` (unparseable dates) are treated as preserved at the end in their original relative order — do **not** drop entries. Use `sorted()` with a key that falls back to the entry's original index so the sort is stable and lossless. No LLM call.
+- **9.1.3** Keep `_validate_chronological` only as an early signal/log (optional `DEBUG`); the post-processor is the source of truth. If a start year is missing for **all** entries, leave the list unchanged (nothing to sort).
+- **9.1.4** Consider sorting the **input** `parsed_resume` experience once in `ResumeParsingAgent._regex_fallback()` (and/or after LLM parse) so downstream agents always receive most-recent-first data, making the rewrite sort a cheap idempotent no-op in the common case.
+- **9.1.5** Add tests in `tests/test_resume_rewrite_validation.py` — entries sorted correctly including a None-year entry preserved at the tail; a fully-unsortable list left unchanged; the existing out-of-order tests that previously asserted `None` (rejection) are updated to assert a sorted result is returned instead.
+
+**Files changed:** `client/agents/resume_rewrite.py`, `client/agents/resume_parsing.py`, `tests/test_resume_rewrite_validation.py`
+
+---
+
+### 9.2 Company Name must come from the JD, not the candidate's resume
+
+**Context:** The cover letter occasionally uses a **company name pulled from the candidate's resume** (a past employer), or the literal placeholder `[Company Name]`. The source of truth is `JDParsingOutput.company_name` (Phase 4.3.F — employer name exactly as written in the JD), already surfaced through the shared `_company_from()` helper in `cover_letter.py`. Two failure modes to fix:
+
+1. **Wrong company from the resume:** The `_try_llm()` prompt feeds the JD, and the LLM segfaults into using a resume company or a generic phrase instead of the target employer.
+2. **Literal `[Company Name] placeholder** emitted by the letter (or its name).**
+
+**Sub-tasks:**
+
+- **9.2.2 Strengthen the prompt so the LLM never picks / restates a wrong name:** Rename prompt-driven refs. In `cover_letter.py` `_try_llm()` (normal rules), after validating, add the company name. When the emitted letter's name is missing / wrong, post-fix it.
+- **9.2.2 Add a deterministic company-name normalizer** `_apply_company_name(result: CoverLetterOutput, jd_json: str) -> CoverLetterOutput` that:
+  - Resolves the target via `_company_from(jd_data)` (top-level `company_name`, else `company_signals["company_name"]`).
+  - Accepts a check first via `_check_company`;/ only warn when mismatched.
+- **9.2.3** If the letter still reads `[Company Name]` (or `[Company]`, `<Company Name>`, `[Employer Name]`), replace that token with the resolved JD company name via `str.replace`.
+- **9.2.4** When the target company is **not present** in the letter and the letter instead names a **candidate-resume company** (i.e., a company from `parsed_resume.experience[*].company` appears but the JD company does not), substitute the first occurrence of the resume-company token with the JD company name. Only apply this when the substitution target differs from the JD name, and log the substitution at `INFO`. Do not run a second LLM call.
+- **9.2.5** In `_build_fallback_cover_letter()`, confirm the fallback already uses `_company_from` (it does) and never emits `[Company Name]` (verify/reassert).
+- **9.2.6** Add tests in `tests/test_cover_letter_validation.py` — `[Company Name]` placeholder replaced; letter naming a resume-company substituted with the JD company; letter already correct left unchanged.
+
+**Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
+
+---
+
+### 9.3 Candidate Name must come from the candidate's resume
+
+**Context:** The cover letter's signature / opening sometimes contains `[Your Name]`. The candidate name is not currently carried through the pipeline — `ResumeParsingOutput` (in `client/models.py`) has **no `name` field**, even though `FormatDetector` already extracts `ParsedResume.name`. So the cover letter agent cannot know the candidate's real name. The fallback `_build_fallback_cover_letter()` already does `_read_str(resume_data, "name").strip() or "Candidate"`, which returns `"Candidate"` today because the field is absent.
+
+**Sub-tasks:**
+
+- **9.3.1** Add `name: str = ""` to `ResumeParsingOutput` in `client/models.py` and thread it through:
+  - In `ResumeParsingAgent._regex_fallback()`, set `name=parsed.name` from the `FormatDetector` result (already extracted).
+  - For the LLM path (`_try_llm`), add `name` to `_SYSTEM_PROMPT` field list + a rule "Extract the candidate's full name exactly as it appears at the top of the resume; empty string if absent."
+  - Ensure no duplicate: `ResumeParsingOutput` already validates a `str` field via its own validator; add `name` to the schema's field list in the prompt.
+- **9.3.2** In `cover_letter.py` `_try_llm()`, when `_apply`-ing the candidate name post-output `result`, read the candidate name from `resume_json` (not a placeholder). Add `_apply_candidate_name(result, resume_json) -> CoverLetterOutput` that replaces `[Your Name]` / `[Your Name]`→ resolved name residue with the resolved resume name. If the name resolves empty, leave untouched. 
+- **9.3.3** In `_build_fallback_cover_letter()` the existing `_read_str(resume_data, "name").strip() or "Candidate"` now resolves to the real name once 9.3.1 lands.
+- **9.3.4** Add tests — `name` flows LLM-regex → `ResumeParsingOutput.name`; placeholder `[Your Name]` replaced; empty name leaves the letter unchanged (or emits "Candidate"/nothing).
+
+**Files changed:** `client/models.py`, `client/agents/resume_parsing.py`, `client/agents/cover_letter.py`, `tests/test_resume_rewrite_validation.py` (no), `tests/test_cover_letter_validation.py` (name-replacement)
+
+---
+
+### 9.4 Cross-cutting notes
+
+- `_try_llm()` must stay pure (serialize/validate only, no side effects) per the AGENTS.md convention; all string replacement/sorting runs on the validated `CoverLetterOutput`/`RewriteOutput` inside `_try_llm` **after** Pydantic validation, mirroring how `_coerce_*` validators and `_sanitize_skills` already work.
+- The ASCII-only convention applies to any new placeholder/token matching the LLM output. Use straight tokens like `[Company Name]` / `[Your Name]`.
+- Verify with `uv run pytest`, `uv run ruff check .`, `uv run pyright .`, and a manual `uv run python wip_testing/test_cover_letter.py` / `test_resume_rewrite.py` run.
+
+---
+
 ## Phase 6: Output & Validation
 
 Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). The remaining work is 6.B.3–6.B.9 below. 6.B.3–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
@@ -340,3 +412,7 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 22 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
 | 23 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
 | 24 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |
+| 25 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
+| 26 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
+| 27 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
+| 28 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | 25–27 | 2 |
