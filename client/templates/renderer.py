@@ -7,7 +7,8 @@ Jinja2 templates to produce plaintext and Markdown output.  DOCX/PDF
 support will be added in subsequent phases.
 """
 
-from datetime import date
+import re
+from datetime import date, datetime
 from pathlib import Path
 
 from jinja2 import BaseLoader, Environment, StrictUndefined
@@ -161,9 +162,65 @@ class ResumeRenderer:
         rendered = self._env.from_string(tpl_source).render(**context)
         return self._clean_output(rendered)
 
+    @staticmethod
+    def build_output_path(
+        document_type: str,
+        *,
+        candidate_name: str,
+        company_name: str,
+        output_dir: str | Path,
+        ext: str | None = None,
+    ) -> Path:
+        """Build a timestamped output file path for *document_type*.
+
+        The returned path has the form::
+
+            {output_dir}/{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}
+
+        Names are slugified (see :meth:`_slugify`) so the result is safe
+        to write on any filesystem.  Pure path logic -- no file I/O.
+
+        Args:
+            document_type: Type of document, e.g. ``"resume"`` or
+                ``"cover_letter"``.
+            candidate_name: Candidate name for the path segment.
+            company_name: Company name for the path segment.
+            output_dir: Directory the file will live in.
+            ext: File extension including the leading dot.  When ``None``,
+                a default is chosen per *document_type*.
+
+        Returns:
+            The resolved ``Path`` under *output_dir*.
+        """
+        resolved_ext = ext or _default_extension(document_type)
+        if not resolved_ext.startswith("."):
+            resolved_ext = f".{resolved_ext}"
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        slug_candidate = ResumeRenderer._slugify(candidate_name)
+        slug_company = ResumeRenderer._slugify(company_name)
+        slug_type = ResumeRenderer._slugify(document_type) or "output"
+
+        filename = (
+            f"{timestamp}_{slug_candidate}_{slug_company}_{slug_type}{resolved_ext}"
+        )
+        return Path(output_dir) / filename
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _slugify(text: str) -> str:
+        """Normalize *text* to a filename-safe ASCII token.
+
+        Lowercases the input, replaces runs of non-alphanumeric characters
+        with a single ``-``, and strips leading/trailing hyphens.  Returns
+        an empty string when nothing usable remains.
+        """
+        ascii_text = text.encode("ascii", errors="ignore").decode("ascii")
+        slug = re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
+        return slug
 
     @staticmethod
     def _build_context(
@@ -248,6 +305,24 @@ _SIGNATURE_PREFIXES = (
     "yours sincerely",
     "respectfully",
 )
+
+_DEFAULT_EXTENSIONS: dict[str, str] = {
+    "resume_plaintext": ".txt",
+    "resume_markdown": ".md",
+    "resume_docx": ".docx",
+    "resume_pdf": ".pdf",
+    "cover_letter_plaintext": ".txt",
+    "cover_letter_markdown": ".md",
+    "plaintext": ".txt",
+    "markdown": ".md",
+    "docx": ".docx",
+    "pdf": ".pdf",
+}
+
+
+def _default_extension(document_type: str) -> str:
+    """Return the default file extension for *document_type*."""
+    return _DEFAULT_EXTENSIONS.get(document_type, ".txt")
 
 
 def _split_paragraphs(text: str) -> list[str]:

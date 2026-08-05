@@ -4,7 +4,7 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.3 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering), and 268 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B.1–6.B.4 (renderer skeleton + `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()`), and 268 unit tests. The items below are what remains.
 
 ---
 
@@ -15,6 +15,8 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 > Phase 6.A (output formatting helpers — `client/formatter.py` + `tests/test_formatter.py`) is **complete** — archived in `resume-done.md` §6.2.
 >
 > Phase 6.B.1 (renderer skeleton + `render_plaintext()`) and 6.B.2 (`render_markdown()`) are **complete** — archived in `resume-done.md` §6.3.
+>
+> Phase 6.B.3 (cover letter rendering) and 6.B.4 (`build_output_path()`) are **complete**.
 
 ---
 
@@ -90,11 +92,11 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 ## Phase 6: Output & Validation
 
-Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering) is complete; the remaining work is 6.B.4–6.B.9 below. 6.B.4–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
+Phase 6 produces clean, formatted output from the pipeline. It breaks into two workstreams: **6.A** (simple formatting helpers) and **6.B** (template-based multi-format renderer). 6.A is complete (see `resume-done.md` §6.2). 6.B.3 (cover letter rendering) and 6.B.4 (`build_output_path()`) are complete; the remaining work is 6.B.5–6.B.9 below. 6.B.4–6.B.6 are independent of each other; 6.B.7 depends on 6.B.2–6.B.6; 6.B.8 depends on 6.B.7; 6.B.9 depends on 6.B.1–6.B.7.
 
 ### 6.B — Template-Based Multi-Format Renderer (remaining work)
 
-Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, template loading from `client.templates.TEMPLATES`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()` (with `_build_cover_letter_context()`). DOCX/PDF, output paths, and `render_all()` remain.
+Current state of `client/templates/renderer.py`: `ResumeRenderer` with `__init__`, template loading from `client.templates.TEMPLATES`, `render_plaintext()`, `render_markdown()` (Jinja2 against template dicts), `_build_context()` (Pydantic → dict), `_clean_output()`, `render_cover_letter_plaintext()`/`render_cover_letter_markdown()` (with `_build_cover_letter_context()`), and the static `build_output_path()`/`_slugify()` helpers. DOCX/PDF and `render_all()` remain.
 
 ---
 
@@ -120,7 +122,7 @@ The letter body is normalized by `_split_paragraphs()` before rendering: the `CO
 
 #### 6.B.4 Add `build_output_path()` static method
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Static utility to build timestamped file paths: `{date}_{candidate_name}_{company_name}_{document_type}.{ext}`. Date format `YYYYMMDD_HHMM`. Pure path logic, no I/O. Must be filename-safe (sanitize spaces, invalid chars, empty segments).
 
@@ -128,8 +130,8 @@ Static utility to build timestamped file paths: `{date}_{candidate_name}_{compan
 
 **Sub-tasks:**
 
-- **6.B.4.1** Add a `_slugify()` static helper — normalize a name/company string to a filename-safe ASCII token (lowercase, non-alphanumerics → `-`, collapse repeats, strip leading/trailing hyphens, empty → `""`).
-- **6.B.4.2** Implement `build_output_path(document_type, *, candidate_name, company_name, output_dir, ext=None)` — build `{output_dir}/{YYYYMMDD_HHMM}_{slug(candidate)}_{slug(company)}_{document_type}.{ext}`, defaulting `ext` per document type (e.g., `.txt`, `.md`, `.docx`, `.pdf`). Return `Path`. No file I/O.
+- **6.B.4.1** ✅ Add a `_slugify()` static helper — normalize a name/company string to a filename-safe ASCII token (lowercase, non-alphanumerics → `-`, collapse repeats, strip leading/trailing hyphens, empty → `""`).
+- **6.B.4.2** ✅ Implement `build_output_path(document_type, *, candidate_name, company_name, output_dir, ext=None)` — build `{output_dir}/{YYYYMMDD_HHMM}_{slug(candidate)}_{slug(company)}_{document_type}.{ext}`, defaulting `ext` per document type (e.g., `.txt`, `.md`, `.docx`, `.pdf`). Return `Path`. No file I/O.
 
 **Files changed:** `client/templates/renderer.py`
 
@@ -393,8 +395,8 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 1 | 6.B.3.1: `_build_cover_letter_context()` | ✅ DONE | 6.B.1 | 1 |
 | 2 | 6.B.3.2: `render_cover_letter_plaintext()` | ✅ DONE | Step 1 | 1 |
 | 3 | 6.B.3.3: `render_cover_letter_markdown()` | ✅ DONE | Step 2 | 1 |
-| 4 | 6.B.4.1: `_slugify()` helper | ❌ TODO | 6.B.1 | 1 |
-| 5 | 6.B.4.2: `build_output_path()` | ❌ TODO | Step 4 | 1 |
+| 4 | 6.B.4.1: `_slugify()` helper | ✅ DONE | 6.B.1 | 1 |
+| 5 | 6.B.4.2: `build_output_path()` | ✅ DONE | Step 4 | 1 |
 | 6 | 6.B.5.1: add `python-docx` dep | ❌ TODO | 6.B.1 | 1 |
 | 7 | 6.B.5.2: `render_docx()` + page setup | ❌ TODO | Step 6 | 1 |
 | 8 | 6.B.5.3: `_populate_docx_paragraphs()` | ❌ TODO | Step 7 | 1 |
