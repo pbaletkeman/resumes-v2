@@ -22,12 +22,12 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `client/models.py` — All Pydantic models: `ParsedResume`, `ParsedJobDescription`, `JDParsingOutput` (with `company_name`), `ExperienceEntry`, `ResumeParsingOutput`, `GapAnalysisOutput`, `RewriteOutput`, `ATSComplianceOutput`, `TonePolishingOutput`, `CoverLetterOutput`
 - `client/model_registry.py` — Per-agent model assignment registry
 - `logging_config.py` — Centralized logging (dictConfig, LOG_LEVEL env var)
-- `client/templates/` — Jinja2 resume/cover letter templates (no renderer class yet — see todo Phase 6.3)
+- `client/templates/` — Jinja2 resume/cover letter templates + `ResumeRenderer` (renderer.py, Phase 6.3)
 - `client/agents/` — All 7 dedicated agent classes (JDParsingAgent, ResumeParsingAgent, GapAnalysisAgent, ResumeRewriteAgent, ATSComplianceAgent, TonePolishingAgent, CoverLetterAgent)
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo (JSON mode)
-- `tests/` — 268 tests across 7 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter)
+- `tests/` — 306 tests across 8 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer)
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
 - `docs/TESTING.md` — Testing guide
@@ -576,7 +576,7 @@ All 7 agent output schemas plus `ParsedResume` (with `projects`, `keywords` fiel
 
 **Files changed:** `client/models.py`
 
-> Phase 6.2 (output formatter) and Phase 6.3 (template renderer) are partially done — the formatter (§6.A all four items) and the renderer skeleton + Markdown (`render_plaintext`/`render_markdown`, §6.B.1–6.B.2) are complete. Cover letter rendering, output paths, DOCX/PDF, `render_all()`, pipeline wiring, and renderer tests (§6.B.3–6.B.9) remain — see `resume-todo.md`.
+> Phase 6.2 (output formatter) and Phase 6.3 (template renderer) are **complete** — the formatter (§6.A all four items) and the full 6.B renderer (plaintext/Markdown, cover letter rendering, `build_output_path()`, DOCX, PDF, `render_all()`, pipeline wiring, and renderer tests) are done.
 
 ### 6.2 Output Formatting Helpers (Phase 6.A)
 
@@ -622,9 +622,9 @@ Clean up cover letter text: normalize whitespace, fix encoding artifacts, ensure
 
 ---
 
-### 6.3 Template-Based Multi-Format Renderer (Phase 6.B) — partial
+### 6.3 Template-Based Multi-Format Renderer (Phase 6.B)
 
-**Status:** ⚠️ PARTIAL — 6.B.1 and 6.B.2 DONE; 6.B.3–6.B.9 remain (see `resume-todo.md`)
+**Status:** ✅ COMPLETE — 6.B.1–6.B.9 all DONE
 
 #### 6.B.1 `ResumeRenderer` class skeleton (`client/templates/renderer.py`)
 
@@ -645,6 +645,119 @@ Render `RewriteOutput` using the template's `"markdown"` key. Same Jinja2 approa
 **Depends on:** 6.B.1 (same class)
 
 **Files changed:** `client/templates/renderer.py`
+
+#### 6.B.3 Add `render_cover_letter_plaintext()` and `render_cover_letter_markdown()`
+
+Render `CoverLetterOutput` using the `COVER_LETTER` template. Two methods for plaintext and markdown variants, following the `render_plaintext()`/`render_markdown()` pattern (lookup template dict key, `_env.from_string(...).render(**context)`, `_clean_output`).
+
+**Depends on:** 6.B.1 (same class)
+
+**Sub-tasks:**
+
+- **6.B.3.1** ✅ Add `_build_cover_letter_context()` helper — converts a `CoverLetterOutput` (plus candidate name / company name) into the context dict expected by the `COVER_LETTER` template (supplies `candidate_name`, `company`, `date` via `date.today()`, and `opening_paragraph`/`body_paragraph`/`closing_paragraph` split from the letter body on blank lines).
+- **6.B.3.2** ✅ Add `render_cover_letter_plaintext(cover_letter, *, name="", company="")` — render against the `COVER_LETTER` template's `"plaintext"` key, through `_clean_output()`.
+- **6.B.3.3** ✅ Add `render_cover_letter_markdown(cover_letter, *, name="", company="")` — same as 6.B.3.2 against the `"markdown"` key.
+
+The letter body is normalized by `_split_paragraphs()` before rendering: the `COVER_LETTER` template renders its own salutation and signature, so a leading `Dear ...` line and a trailing `Sincerely, ...` block embedded in the agent's letter text are stripped to avoid duplication.
+
+**Files changed:** `client/templates/renderer.py`
+
+#### 6.B.4 Add `build_output_path()` static method
+
+Static utility to build timestamped file paths: `{date}_{candidate_name}_{company_name}_{document_type}.{ext}`. Date format `YYYYMMDD_HHMM`. Pure path logic, no I/O; filename-safe (sanitizes spaces, invalid chars, empty segments).
+
+**Depends on:** 6.B.1 (same class)
+
+**Sub-tasks:**
+
+- **6.B.4.1** ✅ Add a `_slugify()` static helper — normalize a name/company string to a filename-safe ASCII token (lowercase, non-alphanumerics → `-`, collapse repeats, strip leading/trailing hyphens, empty → `""`).
+- **6.B.4.2** ✅ Implement `build_output_path(document_type, *, candidate_name, company_name, output_dir, ext=None)` — build `{output_dir}/{YYYYMMDD_HHMM}_{slug(candidate)}_{slug(company)}_{document_type}.{ext}`, defaulting `ext` per document type (`.txt`, `.md`, `.docx`, `.pdf`). Returns `Path`. No file I/O.
+
+**Files changed:** `client/templates/renderer.py`
+
+#### 6.B.5 Add DOCX generation (`render_docx()`)
+
+Use `python-docx` to render `RewriteOutput` as a `.docx` file. Professional font (Calibri/Arial), 10–11pt body, 14pt name, bold section headers, 1-inch margins, single spacing.
+
+**Depends on:** 6.B.1 (same class)
+
+**Sub-tasks:**
+
+- **6.B.5.1** ✅ Add `python-docx>=1.0.0` to `pyproject.toml` and run `uv sync`.
+- **6.B.5.2** ✅ Add `render_docx(resume, *, name="", title="", template="modern", output_path=None) -> Path` — create the `Document`, apply page setup (1-inch margins, letter size), set default font (Calibri 11pt), write to `output_path` (or a temp path when `None`), return the written `Path`.
+- **6.B.5.3** ✅ Add `_populate_docx_paragraphs(doc, context)` helper — walk the `_build_context()` dict and add body content: summary paragraph, skills line/bullets, per-experience blocks (title bold, company + dates, responsibilities/achievements/metrics bullets), projects, certifications, education. Name rendered at 14pt bold.
+- **6.B.5.4** ✅ Add `_docx_heading(doc, text)` + `_docx_bullet(doc, text)` helpers — encapsulate the run-level font/bold/spacing styling so the styling rules live in one place.
+
+**Files changed:** `client/templates/renderer.py`, `pyproject.toml` (add `python-docx>=1.0.0`)
+
+#### 6.B.6 Add PDF generation (`render_pdf()`)
+
+Use `reportlab` to render `RewriteOutput` as a `.pdf` file. ReportLab builds the PDF **directly** with the Platypus framework (`SimpleDocTemplate`, `Paragraph`, `Spacer`, `ListFlowable`) — no HTML/Markdown intermediate, so the `markdown` package is **not** needed. Same professional styling as DOCX (Helvetica, 10–11pt body, 14pt name, bold section headers, 1-inch margins, single spacing).
+
+**Depends on:** 6.B.1 (same class)
+
+**Sub-tasks:**
+
+- **6.B.6.1** ✅ Add `reportlab>=4.0` to `pyproject.toml` and run `uv sync`. (Add `pillow>=10.0` only if a profile photo, icons, or complex graphical decorations are ever added — Platypus uses PIL to draw and size embedded images.) Do **not** add `markdown>=3.5`.
+- **6.B.6.2** ✅ Add PDF styling helpers — a `_pdf_styles()` static helper returning a dict of `ParagraphStyle` objects (name at 14pt bold, section headers bold, body at 10–11pt, Helvetica family, single leading). ReportLab's built-in Helvetica/Helvetica-Bold is a Type-1 base-14 font (fine for the project's ASCII-only convention) — switch to an embedded TTF font only if non-Latin text is ever required.
+- **6.B.6.3** ✅ Add `render_pdf(resume, *, name="", title="", template="modern", output_path=None) -> Path` — create a `SimpleDocTemplate` (letter size, 1-inch margins), build a list of Platypus flowables from `_build_context()` (header paragraph, summary, skills, per-experience blocks, projects, certifications, education), call `doc.build(flowables)`, return the written `Path`.
+- **6.B.6.4** ✅ Add a `_populate_pdf_flowables(context, styles)` helper — returns the `list[Flowable]` (paragraphs, spacers, bullet `ListFlowable`) for the resume body, mirroring `_populate_docx_paragraphs`.
+- **6.B.6.5** ✅ Add a graceful import guard — `reportlab` and `pillow` install cleanly cross-platform (no system deps like WeasyPrint's `pango`), but imports are wrapped so a missing package raises a clear `ImportError`/log message naming the missing library. Confirmed `from reportlab.platypus import SimpleDocTemplate` imports under `uv run` on this machine.
+
+**Files changed:** `client/templates/renderer.py`, `pyproject.toml` (add `reportlab>=4.0`; `pillow>=10.0` only if graphics added)
+
+#### 6.B.7 Add `render_all()` convenience method
+
+Takes `RewriteOutput`, `CoverLetterOutput`, candidate name, company name, and output directory. Generates all 4 resume formats (plaintext, markdown, DOCX, PDF) + 2 cover letter formats (plaintext, markdown). Returns `dict[str, Path]` mapping format name to file path.
+
+**Depends on:** 6.B.2–6.B.6
+
+**Sub-tasks:**
+
+- **6.B.7.1** ✅ Add `render_all(resume, cover_letter, *, candidate_name, company_name, output_dir, resume_template="modern") -> dict[str, Path]` — wire `render_plaintext`/`render_markdown`/`render_docx`/`render_pdf`/`render_cover_letter_plaintext`/`render_cover_letter_markdown`, each writing to `build_output_path(...)`; `output_dir` is created eagerly inside `render_all`.
+- **6.B.7.2** ✅ Ensure `output_dir` exists (`Path.mkdir(parents=True, exist_ok=True)`) before writing; handle a missing/empty `cover_letter` gracefully (`CoverLetterOutput | None`, letter formats added only when non-`None`/non-empty).
+- **6.B.7.3** ✅ Return the `dict[str, Path]` keyed by format name (`"resume_plaintext"`, `"resume_markdown"`, `"resume_docx"`, `"resume_pdf"`, `"cover_letter_plaintext"`, `"cover_letter_markdown"`). Verified all 6 keys present and files non-empty.
+
+**Files changed:** `client/templates/renderer.py`
+
+#### 6.B.8 Wire renderer into pipeline (`pipeline.py`)
+
+Add `candidate_name: str` and `company_name: str` parameters to `run_resume_pipeline()`. After tone polishing and cover letter agents complete, call `ResumeRenderer.render_all()` and store output paths in the pipeline result dict.
+
+**Depends on:** 6.B.7
+
+**Sub-tasks:**
+
+- **6.B.8.1** ✅ Add `candidate_name: str = ""` and `company_name: str = ""` parameters to `run_resume_pipeline()` (threaded through `sample_run()`).
+- **6.B.8.2** ✅ After the tone polishing and cover letter agents complete, instantiate `ResumeRenderer()` and call `render_all(...)` with the collected `polished_resume`/`cover_letter` outputs. Skip rendering when `candidate_name` is empty (INFO log). A `_to_rewrite_output()` helper converts the parsed resume into a `RewriteOutput`; `output_dir` is `Path("output")`; paths are captured in a local `output_files` dict.
+- **6.B.8.3** ✅ Store the returned `dict[str, Path]` in the pipeline result dict under an `"output_files"` key (alongside the agent output keys).
+
+**Files changed:** `pipeline.py`
+
+#### 6.B.9 Add unit tests for `ResumeRenderer`
+
+**Depends on:** 6.B.1–6.B.7
+
+**Sub-tasks:**
+
+- **6.B.9.1** ✅ Create `tests/test_renderer.py` with a sample `RewriteOutput` fixture (patterns from `tests/test_formatter.py` / `tests/conftest.py`).
+- **6.B.9.2** ✅ Template loading, `render_plaintext()`, `render_markdown()` — sections present, ordering, `_clean_output()` behavior, unknown-template `KeyError`. 15 tests.
+- **6.B.9.3** ✅ `render_cover_letter_plaintext()` / `render_cover_letter_markdown()` — body text, salutation (`Dear Hiring Manager,`), `Sincerely,` + candidate signature, rendered date. 7 tests.
+- **6.B.9.4** ✅ `build_output_path()` — naming pattern, `YYYYMMDD_HHMM` date format, slugification, extension defaults, output dir joining. 8 tests.
+- **6.B.9.5** ✅ `render_all()` with `tmp_path` + mocked individual renderer methods — 6 files written with the naming pattern, all 6 keys returned. 5 tests.
+- **6.B.9.6** ✅ DOCX/PDF smoke tests — render to a real `tmp_path` file and assert a non-empty file is produced (skip if optional deps unavailable; `pytest.importorskip`). 2 tests: `.docx` produced & non-empty, PDF produced with a `%PDF` magic header.
+
+**Files changed:** new file `tests/test_renderer.py`
+
+### 6.10 Dependency Library Notes & Cautions
+
+Caveats from adding the 6.B dependencies:
+
+- **`reportlab` + `pillow`:** Both are pure wheels, install cleanly cross-platform, with **no system-level deps** (unlike WeasyPrint, which needs `pango`/`cairo`). If a profile photo, icons, or complex graphical decorations are ever added, **`pillow` must be installed alongside `reportlab`** — Platypus embeds and sizes images through PIL (`_img_utils`, `Image` flowable). (Once Pillow 10+ is installed, ReportLab 4.x resolves a known wheel/pillow naming collision automatically.)
+- **ReportLab built-in fonts (base-14):** Helvetica/Helvetica-Bold/Times are Type-1 fonts that **cannot render Unicode/emoji** (the ASCII-only convention sidesteps this). If non-Latin text is ever needed, register a TTF via `pdfmetrics.registerFont(TTFont(...))`.
+- **`python-docx`:** Pure Python, no system deps or font-caching — the lowest-risk dependency in 6.B. Only writes OOXML.
+- **`jinja2`:** No system issues; templates validated once per render with a single cached `Environment` (in `ResumeRenderer.__init__`). `StrictUndefined` surfaces template bugs.
+- **`pytest.importorskip` for 6.B.9.6:** DOCX/PDF smoke tests skip (not fail) when `python-docx`/`reportlab` are unavailable (and the `markdown` package is no longer needed — dropped from 6.B.6.1).
 
 ---
 
@@ -759,13 +872,13 @@ client/
   models.py                        # EXISTS ✅ (ParsedResume, ParsedJobDescription, JDParsingOutput, + all agent output models)
   templates/                       # EXISTS ✅ (renderer.py added — Phase 6.3)
     __init__.py                    # EXISTS
-    renderer.py                    # EXISTS ✅ (ResumeRenderer: render_plaintext/markdown; DOCX/PDF still todo)
+    renderer.py                    # EXISTS ✅ (ResumeRenderer: render_plaintext/markdown, cover letter, DOCX, PDF, render_all — Phase 6.3)
     modern.py                      # EXISTS
     classic.py                     # EXISTS
     minimal.py                     # EXISTS
     cover_letter.py                # EXISTS
   agents/                          # EXISTS ✅ (all 7 agents done)
-    __init__.py                    # EXISTS (docstring only, no exports)
+    __init__.py                    # EXISTS ✅ (exports all 7 agent classes)
     jd_parsing.py                  # EXISTS ✅ - Agent 1 (JDParsingAgent)
     resume_parsing.py              # EXISTS ✅ - Agent 2 (ResumeParsingAgent)
     gap_analysis.py                # EXISTS ✅ - Agent 3 (GapAnalysisAgent)
@@ -784,6 +897,7 @@ tests/
   test_resume_rewrite_validation.py # EXISTS ✅ (56 tests)
   test_cover_letter_validation.py  # EXISTS ✅ (80 tests)
   test_formatter.py                # EXISTS ✅ (41 tests — Phase 6.2)
+  test_renderer.py                 # EXISTS ✅ (38 tests — Phase 6.3)
   test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
   test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
 docs/

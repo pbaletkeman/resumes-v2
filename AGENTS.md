@@ -23,7 +23,7 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 | Lint (auto-fix) | `uv run ruff check --fix .` |
 | Format check | `uv run ruff format --check .` |
 | Format (auto-fix) | `uv run ruff format .` |
-| Typecheck | `uv run pyright .` |
+| Typecheck | `uv run pyright` (no `.` — see Toolchain quirks) |
 | Test | `uv run pytest` |
 | Test (verbose) | `uv run pytest -v` |
 | Test (single file) | `uv run pytest tests/test_format_detector.py` |
@@ -45,8 +45,10 @@ client/
   model_registry.py  # Per-agent model assignment (ModelClientRegistry)
   json_utils.py      # Shared parse_json_response + model_to_json_schema helpers
   format_detector.py # Regex parser with LLM fallback (connected)
+  formatter.py       # Output formatting helpers (format_resume_markdown/plain, format_cover_letter)
   models.py          # All Pydantic models (Parsed*, JDParsingOutput, ResumeParsingOutput, etc.)
-  templates/         # Jinja2 resume/cover letter templates + ResumeRenderer class
+  templates/         # Jinja2 templates (modern/classic/minimal/cover_letter) + renderer.py
+    renderer.py      # ResumeRenderer: plaintext/markdown/cover-letter/docx/pdf + render_all()
   agents/
     jd_parsing.py    # JD Parsing Agent (Agent 1) - dedicated class, LLM + regex fallback
     resume_parsing.py # Resume Parsing Agent (Agent 2) - dedicated class, LLM + regex fallback
@@ -62,6 +64,8 @@ tests/
   test_cover_letter_validation.py  # Cover Letter post-validation tests (80 tests)
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + JSON Schema helper tests (15 tests)
+  test_formatter.py                # format_* helpers (41 tests)
+  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (38 tests)
 wip_testing/
   test_parsing.py            # Regex + LLM parsing demo (both modes)
   test_job_description.py  # JD Parsing Agent test
@@ -113,17 +117,17 @@ Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compli
 
 ## Toolchain quirks
 
-- **pyright** runs in `strict` mode and **excludes `tests/`**. New code under `tests/` won't be type-checked.
+- **pyright** runs in `strict` mode and **excludes `tests/`**. New code under `tests/` won't be type-checked. Use `uv run pyright` with **no path arg** — passing `.` makes pyright recurse into `.venv/` and spew thousands of third-party errors. `pyproject.toml` sets `include = ["client", "config", "pipeline.py", "basic.py"]`.
 - **ruff** selects rules: `E`, `F`, `I`, `UP`, `B`, `SIM`. Line length 88.
 - **pytest** uses `asyncio_mode = "auto"` — async test functions run without decorators.
 - Python 3.14+ required (`pyproject.toml`).
 
 ## Testing
 
-pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 268 tests across 7 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter). Sample files in `sample/jobs/` and `sample/resume/`.
+pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 306 tests across 8 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer). Sample files in `sample/jobs/` and `sample/resume/`.
 
 Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_compliance.py` runs agents 1-5). Run with `uv run python wip_testing/test_<agent>.py`.
 
 ## Status
 
-Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Every LLM call uses provider-native JSON mode (`response_format="json"`), with optional Strict Structured Outputs via `json_schema=model_to_json_schema(<OutputModel>)` (see `client/json_utils.py`). All 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()` (which defaults to `DEFAULT_AGENT_CLASSES`). Phase 4.3 (LLM fallback falsehoods: validation, fallback templates, logging, prompt strengthening, `company_name`) is complete. See `resume-done.md` for completed work and `resume-todo.md` for remaining work (Phase 6: output formatting, Phase 7: testing and docs).
+Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Every LLM call uses provider-native JSON mode (`response_format="json"`), with optional Strict Structured Outputs via `json_schema=model_to_json_schema(<OutputModel>)` (see `client/json_utils.py`). All 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()` (which defaults to `DEFAULT_AGENT_CLASSES`). Phase 4.3 (LLM fallback falsehoods: validation, fallback templates, logging, prompt strengthening, `company_name`) and Phase 6 (output formatting: `client/formatter.py` + `ResumeRenderer` with `render_all()`) are complete. `run_resume_pipeline()` takes optional `candidate_name`/`company_name` and writes rendered files to `Path("output")`, returned under the `"output_files"` result key. See `resume-done.md` for completed work and `resume-todo.md` for remaining work (Phase 7: testing and docs; Phase 9: cover letter fixes).

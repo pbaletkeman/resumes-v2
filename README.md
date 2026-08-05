@@ -36,7 +36,7 @@ uv run python pipeline.py
 | Lint (auto-fix) | `uv run ruff check --fix .` |
 | Format check | `uv run ruff format --check .` |
 | Format (auto-fix) | `uv run ruff format .` |
-| Typecheck | `uv run pyright .` |
+| Typecheck | `uv run pyright` (no `.` — passes `.` recurses into `.venv/`) |
 | Test | `uv run pytest` |
 | Test (verbose) | `uv run pytest -v` |
 | Test (single file) | `uv run pytest tests/test_format_detector.py` |
@@ -73,6 +73,7 @@ client/
   model_registry.py    # Per-agent model assignment (ModelClientRegistry)
   json_utils.py        # Shared parse_json_response + model_to_json_schema helpers
   format_detector.py   # Regex parser with LLM fallback (connected)
+  formatter.py         # Output formatting helpers (format_resume_markdown/plain, format_cover_letter)
   models.py            # All Pydantic models
   agents/
     jd_parsing.py        # JD Parsing Agent (Agent 1) - dedicated class
@@ -82,7 +83,8 @@ client/
     ats_compliance.py    # ATS Compliance Agent (Agent 5) - dedicated class
     tone_polishing.py    # Tone Polishing Agent (Agent 6) - dedicated class
     cover_letter.py      # Cover Letter Agent (Agent 7) - dedicated class
-  templates/             # Jinja2 resume/cover letter templates (no renderer yet)
+  templates/             # Jinja2 templates (modern/classic/minimal/cover_letter)
+    renderer.py          # ResumeRenderer: plaintext/markdown/cover-letter/docx/pdf + render_all()
 tests/
   test_format_detector.py          # FormatDetector regex parsing tests (46 tests)
   test_jd_parsing.py               # JD Parsing company_name extraction/sync tests (19 tests)
@@ -90,6 +92,8 @@ tests/
   test_cover_letter_validation.py  # Cover Letter post-validation tests (80 tests)
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + JSON Schema helper tests (15 tests)
+  test_formatter.py                # format_* helpers (41 tests)
+  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (38 tests)
 wip_testing/
   test_job_description.py  # JD Parsing Agent test
   test_resume_parsing.py   # Resume Parsing Agent test
@@ -112,7 +116,7 @@ wip_testing/
 
 - `sample/jobs/` - Sample job descriptions for testing
 - `sample/resume/` - Sample resume for testing
-- `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter)
+- `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter) + `renderer.py` (`ResumeRenderer`)
 - `docs/models.md` - Quick reference for all Pydantic models
 - `docs/TESTING.md` - Detailed testing guide
 - `docs/logging-info.md` - Logging implementation plan and status

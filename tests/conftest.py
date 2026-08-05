@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from client.models import CoverLetterOutput, ExperienceEntry, RewriteOutput
+
 SAMPLE_DIR = Path(__file__).resolve().parent.parent / "sample"
 
 
@@ -79,3 +81,41 @@ Nice to Have
 - Kubernetes experience
 - GraphQL knowledge
 """
+
+
+@pytest.fixture
+def rewrite_output() -> RewriteOutput:
+    """A RewriteOutput populated with every section."""
+    return RewriteOutput(
+        summary="Senior engineer with 10+ years experience.",
+        skills=["Python", "Rust", "Kubernetes"],
+        experience=[
+            ExperienceEntry(
+                title="Staff Engineer",
+                company="Acme Corp",
+                dates="2020-2024",
+                responsibilities=["Led platform team"],
+                achievements=["Reduced costs 40%"],
+                metrics=["$2M annual savings"],
+            ),
+            ExperienceEntry(
+                title="Senior Engineer",
+                company="Globex",
+                dates="2016-2020",
+                responsibilities=["Built microservices"],
+            ),
+        ],
+        projects=["Open-source CLI tool"],
+        certifications=["AWS Solutions Architect"],
+        education=["B.Sc. Computer Science, U of T"],
+    )
+
+
+@pytest.fixture
+def cover_letter_output() -> CoverLetterOutput:
+    """A CoverLetterOutput with body and closing text."""
+    return CoverLetterOutput(
+        cover_letter="Dear Hiring Manager,\n\n"
+        "I am excited to apply for the role.\n\n"
+        "Best regards,\nJane Doe"
+    )
