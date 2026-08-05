@@ -27,7 +27,7 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo (JSON mode)
-- `tests/` — 227 tests across 6 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils)
+- `tests/` — 268 tests across 7 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter)
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
 - `docs/TESTING.md` — Testing guide
@@ -546,6 +546,24 @@ The `AgentRunner` class is fully implemented with:
 
 > Phase 5.2 (wire the 7-agent pipeline with dedicated classes for agents 3-7) is **complete** — all 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()`. `client/agents/__init__.py` exports all 7 classes. `run_resume_pipeline()` handles both dict and Pydantic model returns via `_extract_field()`.
 
+### 5.2 Wire up the 7-agent pipeline
+
+**Status:** ✅ COMPLETE — all 7 agents wired as dedicated classes; both dict and Pydantic model returns handled
+
+`run_resume_pipeline()` chains all 7 agents sequentially:
+
+1. JD Parsing → `parsed_job_description`
+2. Resume Parsing → `parsed_resume`
+3. Gap Analysis → `tailoring_strategy`
+4. Resume Rewrite → `rewritten_resume`
+5. ATS Compliance → `ats_optimized_resume`
+6. Tone Polishing → `polished_resume`
+7. Cover Letter → `cover_letter`
+
+**What works:** `sample_run()` now wires all 7 dedicated classes via `create_runner_from_config()`, which defaults to `DEFAULT_AGENT_CLASSES` (all 7 dedicated classes) and builds a `ModelClientRegistry` from the environment. The `_extract_field()` helper handles both dict returns (from generic `PipelineAgent`) and Pydantic model returns (from dedicated classes).
+
+**What changed:** `client/agents/__init__.py` now exports all 7 agent classes. `pipeline.py` imports from the package, defines `DEFAULT_AGENT_CLASSES` constant, and `create_runner_from_config()` defaults to the full set when `agent_classes=None`.
+
 ---
 
 ## Phase 6: Output & Validation
@@ -558,7 +576,75 @@ All 7 agent output schemas plus `ParsedResume` (with `projects`, `keywords` fiel
 
 **Files changed:** `client/models.py`
 
-> Phase 6.2 (output formatter) and Phase 6.3 (template renderer) are NOT done — see `resume-todo.md`.
+> Phase 6.2 (output formatter) and Phase 6.3 (template renderer) are partially done — the formatter (§6.A all four items) and the renderer skeleton + Markdown (`render_plaintext`/`render_markdown`, §6.B.1–6.B.2) are complete. Cover letter rendering, output paths, DOCX/PDF, `render_all()`, pipeline wiring, and renderer tests (§6.B.3–6.B.9) remain — see `resume-todo.md`.
+
+### 6.2 Output Formatting Helpers (Phase 6.A)
+
+**Status:** ✅ COMPLETE — 6.A.1–6.A.4 all DONE
+
+#### 6.A.1 `format_resume_markdown()` (`client/formatter.py`)
+
+**Status:** ✅ DONE
+
+Convert a `RewriteOutput` to clean Markdown. Handles: name/title header, summary, skills as bullet list, experience blocks (title, company, dates, responsibilities, achievements, metrics), certifications, projects, education. No external dependencies.
+
+**Files changed:** new file `client/formatter.py`
+
+#### 6.A.2 `format_resume_plain()` (`client/formatter.py`)
+
+**Status:** ✅ DONE
+
+Convert a `RewriteOutput` (or `ATSComplianceOutput`'s `final_resume`) to plain-text ATS-friendly format. No Markdown syntax, no special characters. Suitable for ATS upload and as input to DOCX/PDF rendering.
+
+**Depends on:** 6.A.1 (same file)
+
+**Files changed:** `client/formatter.py`
+
+#### 6.A.3 `format_cover_letter()` (`client/formatter.py`)
+
+**Status:** ✅ DONE
+
+Clean up cover letter text: normalize whitespace, fix encoding artifacts, ensure consistent paragraph spacing. Takes a `CoverLetterOutput` or raw string, returns clean string.
+
+**Depends on:** 6.A.1 (same file)
+
+**Files changed:** `client/formatter.py`
+
+#### 6.A.4 Unit tests for formatting helpers
+
+**Status:** ✅ DONE
+
+41 tests covering `format_resume_markdown()` (empty resume, headers, all sections, ordering, edge cases), `format_resume_plain()` (same coverage), `format_cover_letter()` (model input, raw string, whitespace normalization, encoding artifacts, empty input), and `_fix_encoding()` (all replacements, no-op, empty string).
+
+**Depends on:** 6.A.1–6.A.3
+
+**Files changed:** new file `tests/test_formatter.py`
+
+---
+
+### 6.3 Template-Based Multi-Format Renderer (Phase 6.B) — partial
+
+**Status:** ⚠️ PARTIAL — 6.B.1 and 6.B.2 DONE; 6.B.3–6.B.9 remain (see `resume-todo.md`)
+
+#### 6.B.1 `ResumeRenderer` class skeleton (`client/templates/renderer.py`)
+
+**Status:** ✅ DONE
+
+`ResumeRenderer` with `__init__`, template loading from `client.templates.TEMPLATES`, `render_plaintext()` (Jinja2 rendering of `RewriteOutput` against template dicts), `_build_context()` helper to convert Pydantic models to plain dicts, and `_clean_output()` to collapse excess blank lines. No DOCX/PDF yet.
+
+**Depends on:** None (independent of 6.A)
+
+**Files changed:** new file `client/templates/renderer.py`, `pyproject.toml` (added `jinja2>=3.1.0`)
+
+#### 6.B.2 `render_markdown()` on `ResumeRenderer`
+
+**Status:** ✅ DONE
+
+Render `RewriteOutput` using the template's `"markdown"` key. Same Jinja2 approach as `render_plaintext()`. Present in `renderer.py`.
+
+**Depends on:** 6.B.1 (same class)
+
+**Files changed:** `client/templates/renderer.py`
 
 ---
 
@@ -669,9 +755,11 @@ client/
   ollama_client.py                 # EXISTS ✅ (configurable timeout, default 300s)
   open_ai_client.py                # EXISTS ✅
   format_detector.py               # EXISTS ✅ (expanded with projects, metrics, keywords)
+  formatter.py                     # EXISTS ✅ (format_resume_markdown/plain, format_cover_letter — Phase 6.2)
   models.py                        # EXISTS ✅ (ParsedResume, ParsedJobDescription, JDParsingOutput, + all agent output models)
-  templates/                       # EXISTS ⚠️ needs renderer.py (Phase 6.3 — todo)
+  templates/                       # EXISTS ✅ (renderer.py added — Phase 6.3)
     __init__.py                    # EXISTS
+    renderer.py                    # EXISTS ✅ (ResumeRenderer: render_plaintext/markdown; DOCX/PDF still todo)
     modern.py                      # EXISTS
     classic.py                     # EXISTS
     minimal.py                     # EXISTS
@@ -695,6 +783,7 @@ tests/
   test_jd_parsing.py               # EXISTS ✅ (19 tests)
   test_resume_rewrite_validation.py # EXISTS ✅ (56 tests)
   test_cover_letter_validation.py  # EXISTS ✅ (80 tests)
+  test_formatter.py                # EXISTS ✅ (41 tests — Phase 6.2)
   test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
   test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
 docs/
