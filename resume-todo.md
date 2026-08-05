@@ -254,6 +254,31 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 11 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 8–10 | 2 |
 
 ---
+
+**get:**
+
+- Phone Number
+- Email
+- linkedIn
+- Github
+for cover letter generation
+
+---
+
+**falsehoods**
+Do not add skills not in the resume to the coverletter:
+
+- e.g. pytest, and flask are not in the incoming resume it should not be a skill or platform listed in the generated coverletter or resume
+- not all diagrams are the same UML != C4 != ArchiMate, etc
+
+---
+
+**fallback:**
+
+If any one section is missing e.g. Output missing certifications from input, only replace that section with the fallback value if possible
+
+---
+
 Normalization of skills
 
 
