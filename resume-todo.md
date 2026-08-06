@@ -132,11 +132,34 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 **Sub-tasks:**
 
-- **9.1.1** Replace the reject path in `_try_llm()` (currently lines 228–230: `if not _validate_chronological(result): logger.warning("Output experiences not in chronological order -- rejecting"); return None`) with a call to a new `_ensure_chronological(result)` post-processor. Log the ordering message, but reorder the entries in place instead of returning `None`.
-- **9.1.2** Add `_ensure_chronological(result: RewriteOutput) -> RewriteOutput` — sorts `result.experience` by `_extract_start_year(entry.dates)` descending (most-recent-first). Entries whose start year is `None` (unparseable dates) are treated as preserved at the end in their original relative order — do **not** drop entries. Use `sorted()` with a key that falls back to the entry's original index so the sort is stable and lossless. No LLM call.
-- **9.1.3** Keep `_validate_chronological` only as an early signal/log (optional `DEBUG`); the post-processor is the source of truth. If a start year is missing for **all** entries, leave the list unchanged (nothing to sort).
-- **9.1.4** Consider sorting the **input** `parsed_resume` experience once in `ResumeParsingAgent._regex_fallback()` (and/or after LLM parse) so downstream agents always receive most-recent-first data, making the rewrite sort a cheap idempotent no-op in the common case.
-- **9.1.5** Add tests in `tests/test_resume_rewrite_validation.py` — entries sorted correctly including a None-year entry preserved at the tail; a fully-unsortable list left unchanged; the existing out-of-order tests that previously asserted `None` (rejection) are updated to assert a sorted result is returned instead.
+- **9.1.1** Replace the reject path in `_try_llm()` with a call to `_ensure_chronological(result)`.
+  - [ ] Read `_try_llm()` in `client/agents/resume_rewrite.py` and locate the current reject block (~lines 228–230: `if not _validate_chronological(result): logger.warning("Output experiences not in chronological order -- rejecting"); return None`).
+  - [ ] Confirm the exact current line range in the file (line numbers may have shifted).
+  - [ ] Replace the reject branch with `result = _ensure_chronological(result)`.
+  - [ ] Replace the `logger.warning("... -- rejecting")` message with an ordering-fix log (e.g. "Output experiences out of chronological order -- sorting").
+  - [ ] Ensure the branch no longer `return None` (fallback `_parsed_to_rewrite()` is NOT invoked for ordering).
+  - [ ] Keep the rest of the LLM output preserved end-to-end.
+- **9.1.2** Add `_ensure_chronological(result: RewriteOutput) -> RewriteOutput`.
+  - [ ] Define the helper in `client/agents/resume_rewrite.py` (no LLM call — pure Python).
+  - [ ] Sort `result.experience` by `_extract_start_year(entry.dates)` descending (most-recent-first).
+  - [ ] Treat entries whose start year is `None` (unparseable dates) as preserved at the end in their original relative order.
+  - [ ] Use `sorted()` with a key that falls back to the entry's original index so the sort is stable and lossless.
+  - [ ] Never drop entries — input list length == output list length.
+  - [ ] Return the sorted `RewriteOutput`.
+- **9.1.3** Keep `_validate_chronological` only as an early signal/log.
+  - [ ] Downgrade `_validate_chronological` to an optional `DEBUG`-level signal only (early log).
+  - [ ] Make `_ensure_chronological` the source of truth (post-processor wins).
+  - [ ] Guard: if a start year is missing for **all** entries, return the list unchanged (nothing to sort).
+- **9.1.4** Sort the **input** `parsed_resume` experience (idempotency).
+  - [ ] In `ResumeParsingAgent._regex_fallback()`, sort `parsed_resume.experience` most-recent-first once.
+  - [ ] Consider sorting after the LLM parse path as well (idempotent).
+  - [ ] Verify downstream agents receive most-recent-first data.
+  - [ ] Confirm the rewrite sort becomes a cheap no-op in the common case.
+- **9.1.5** Add/update tests in `tests/test_resume_rewrite_validation.py`.
+  - [ ] Test: entries sorted correctly, including a None-year entry preserved at the tail.
+  - [ ] Test: fully-unsortable list (all None-year) left unchanged.
+  - [ ] Update existing out-of-order tests that previously asserted `None` (rejection) to assert a **sorted** result is returned instead.
+  - [ ] Run `uv run pytest tests/test_resume_rewrite_validation.py`.
 
 **Files changed:** `client/agents/resume_rewrite.py`, `client/agents/resume_parsing.py`, `tests/test_resume_rewrite_validation.py`
 
@@ -151,14 +174,33 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 **Sub-tasks:**
 
-- **9.2.2 Strengthen the prompt so the LLM never picks / restates a wrong name:** Rename prompt-driven refs. In `cover_letter.py` `_try_llm()` (normal rules), after validating, add the company name. When the emitted letter's name is missing / wrong, post-fix it.
-- **9.2.2 Add a deterministic company-name normalizer** `_apply_company_name(result: CoverLetterOutput, jd_json: str) -> CoverLetterOutput` that:
-  - Resolves the target via `_company_from(jd_data)` (top-level `company_name`, else `company_signals["company_name"]`).
-  - Accepts a check first via `_check_company`;/ only warn when mismatched.
-- **9.2.3** If the letter still reads `[Company Name]` (or `[Company]`, `<Company Name>`, `[Employer Name]`), replace that token with the resolved JD company name via `str.replace`.
-- **9.2.4** When the target company is **not present** in the letter and the letter instead names a **candidate-resume company** (i.e., a company from `parsed_resume.experience[*].company` appears but the JD company does not), substitute the first occurrence of the resume-company token with the JD company name. Only apply this when the substitution target differs from the JD name, and log the substitution at `INFO`. Do not run a second LLM call.
-- **9.2.5** In `_build_fallback_cover_letter()`, confirm the fallback already uses `_company_from` (it does) and never emits `[Company Name]` (verify/reassert).
-- **9.2.6** Add tests in `tests/test_cover_letter_validation.py` — `[Company Name]` placeholder replaced; letter naming a resume-company substituted with the JD company; letter already correct left unchanged.
+- **9.2.2 Strengthen the prompt so the LLM never picks / restates a wrong name.**
+  - [ ] Locate `_try_llm()` normal-rules in `client/agents/cover_letter.py`.
+  - [ ] Rename prompt-driven refs that could pull a resume-company or generic phrase.
+  - [ ] After validation, explicitly inject/assert the target company name in the prompt context.
+  - [ ] Add post-fix path for when the emitted letter's name is missing / wrong.
+- **9.2.2 Add a deterministic company-name normalizer** `_apply_company_name(result: CoverLetterOutput, jd_json: str) -> CoverLetterOutput`.
+  - [ ] Resolve target via `_company_from(jd_data)` (top-level `company_name`, else `company_signals["company_name"]`).
+  - [ ] Add `_check_company` and only `logger.warning` when mismatched (do not reject).
+  - [ ] Return normalized `CoverLetterOutput` deterministically (no LLM call).
+- **9.2.3** Replace literal placeholder tokens.
+  - [ ] Match tokens: `[Company Name]`, `[Company]`, `<Company Name>`, `[Employer Name]`.
+  - [ ] Replace matched token with the resolved JD company name via `str.replace`.
+  - [ ] Handle token variants case-insensitively if needed (ASCII tokens only).
+- **9.2.4** Substitute wrong resume-company present in the letter.
+  - [ ] Detect: target JD company NOT present AND a company from `parsed_resume.experience[*].company` IS present.
+  - [ ] Replace the **first** occurrence of the resume-company token with the JD company name.
+  - [ ] Guard: only apply when the substitution target differs from the JD name.
+  - [ ] Log the substitution at `INFO`.
+  - [ ] Do not run a second LLM call.
+- **9.2.5** `_build_fallback_cover_letter()`.
+  - [ ] Confirm it already uses `_company_from` (verify in code).
+  - [ ] Verify/reassert it never emits `[Company Name]`.
+- **9.2.6** Add tests in `tests/test_cover_letter_validation.py`.
+  - [ ] Test: `[Company Name]` placeholder replaced with the JD company.
+  - [ ] Test: letter naming a resume-company substituted with the JD company.
+  - [ ] Test: letter already correct left unchanged.
+  - [ ] Run `uv run pytest tests/test_cover_letter_validation.py`.
 
 **Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
 
@@ -170,13 +212,25 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 **Sub-tasks:**
 
-- **9.3.1** Add `name: str = ""` to `ResumeParsingOutput` in `client/models.py` and thread it through:
-  - In `ResumeParsingAgent._regex_fallback()`, set `name=parsed.name` from the `FormatDetector` result (already extracted).
-  - For the LLM path (`_try_llm`), add `name` to `_SYSTEM_PROMPT` field list + a rule "Extract the candidate's full name exactly as it appears at the top of the resume; empty string if absent."
-  - Ensure no duplicate: `ResumeParsingOutput` already validates a `str` field via its own validator; add `name` to the schema's field list in the prompt.
-- **9.3.2** In `cover_letter.py` `_try_llm()`, when `_apply`-ing the candidate name post-output `result`, read the candidate name from `resume_json` (not a placeholder). Add `_apply_candidate_name(result, resume_json) -> CoverLetterOutput` that replaces `[Your Name]` / `[Your Name]`→ resolved name residue with the resolved resume name. If the name resolves empty, leave untouched.
-- **9.3.3** In `_build_fallback_cover_letter()` the existing `_read_str(resume_data, "name").strip() or "Candidate"` now resolves to the real name once 9.3.1 lands.
-- **9.3.4** Add tests — `name` flows LLM-regex → `ResumeParsingOutput.name`; placeholder `[Your Name]` replaced; empty name leaves the letter unchanged (or emits "Candidate"/nothing).
+- **9.3.1** Add `name: str = ""` to `ResumeParsingOutput` and thread it through.
+  - [ ] Add `name: str = ""` field to `ResumeParsingOutput` in `client/models.py`.
+  - [ ] In `ResumeParsingAgent._regex_fallback()`, set `name=parsed.name` from the `FormatDetector` result (already extracted).
+  - [ ] For the LLM path (`_try_llm`), add `name` to `_SYSTEM_PROMPT` field list.
+  - [ ] Add prompt rule: "Extract the candidate's full name exactly as it appears at the top of the resume; empty string if absent."
+  - [ ] Ensure no duplicate — add `name` to the schema's field list; confirm the `str` validator handles it.
+- **9.3.2** `_apply_candidate_name(result, resume_json)` in `cover_letter.py` `_try_llm()`.
+  - [ ] Read the candidate name from `resume_json` (NOT a placeholder).
+  - [ ] Add `_apply_candidate_name(result: CoverLetterOutput, resume_json) -> CoverLetterOutput`.
+  - [ ] Replace `[Your Name]` / residue with the resolved resume name.
+  - [ ] If the name resolves empty, leave the letter untouched.
+  - [ ] No LLM call.
+- **9.3.3** `_build_fallback_cover_letter()`.
+  - [ ] Verify the existing `_read_str(resume_data, "name").strip() or "Candidate"` resolves to the real name once 9.3.1 lands.
+- **9.3.4** Add tests.
+  - [ ] Test: `name` flows regex → `ResumeParsingOutput.name`.
+  - [ ] Test: placeholder `[Your Name]` replaced.
+  - [ ] Test: empty name leaves the letter unchanged (or emits "Candidate"/nothing).
+  - [ ] Run `uv run pytest tests/test_cover_letter_validation.py` (name-replacement).
 
 **Files changed:** `client/models.py`, `client/agents/resume_parsing.py`, `client/agents/cover_letter.py`, `tests/test_resume_rewrite_validation.py` (no), `tests/test_cover_letter_validation.py` (name-replacement)
 
@@ -184,9 +238,17 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 ### 9.4 Cross-cutting notes
 
-- `_try_llm()` must stay pure (serialize/validate only, no side effects) per the AGENTS.md convention; all string replacement/sorting runs on the validated `CoverLetterOutput`/`RewriteOutput` inside `_try_llm` **after** Pydantic validation, mirroring how `_coerce_*` validators and `_sanitize_skills` already work.
-- The ASCII-only convention applies to any new placeholder/token matching the LLM output. Use straight tokens like `[Company Name]` / `[Your Name]`.
-- Verify with `uv run pytest`, `uv run ruff check .`, `uv run pyright .`, and a manual `uv run python wip_testing/test_cover_letter.py` / `test_resume_rewrite.py` run.
+- `_try_llm()` must stay pure (serialize/validate only, no side effects) per the AGENTS.md convention.
+  - [ ] Confirm all string replacement/sorting runs on the validated `CoverLetterOutput`/`RewriteOutput` inside `_try_llm` **after** Pydantic validation.
+  - [ ] Mirror how `_coerce_*` validators and `_sanitize_skills` already work.
+- The ASCII-only convention applies to any new placeholder/token matching the LLM output.
+  - [ ] Use straight tokens like `[Company Name]` / `[Your Name]`.
+- Final verification for 9.1–9.3.
+  - [ ] `uv run pytest`
+  - [ ] `uv run ruff check .`
+  - [ ] `uv run pyright .`
+  - [ ] Manual `uv run python wip_testing/test_cover_letter.py`
+  - [ ] Manual `uv run python wip_testing/test_resume_rewrite.py`
 
 ---
 
@@ -210,22 +272,52 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 
 **Sub-tasks:**
 
-- **7.1.1** Create `test_real_files.py` at repo root with a `main()`-style entry (`if __name__ == "__main__":`) so it doubles as a runnable script and a pytest module. Include `configure_logging()` at import/module scope.
-- **7.1.2** Add a **file-loading helper** (`_load_job()`/`_load_resume()`, or inline `Path(...).read_text(...)`) that reads `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt`, asserting both files exist first with a clear `FileNotFoundError` message.
-- **7.1.3** Call `run_resume_pipeline(job_description, resume_text)` with both texts. Capture the returned result dict.
-- **7.1.4** **Structure-existence assertions** — assert all 7 agent output keys are present in the result dict: `parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_compliance`, `polished_resume`, `cover_letter`.
-- **7.1.5** **JD parsing assertions** — assert `result["parsed_job_description"]["role_title"]` is non-empty and `result["parsed_job_description"]["required_skills"]` is a non-empty list.
-- **7.1.6** **Resume parsing assertions** — assert `result["parsed_resume"]["experience"]` is a list (and non-empty), and that the parsed name matches/corresponds to the input file.
-- **7.1.7** **Gap analysis assertions** — assert `result["tailoring_strategy"]["missing_skills"]` exists (list, at least one entry on a normal 3Pillar run).
-- **7.1.8** **Rewrite/ATS/polish assertions** — assert `ats_optimized_resume` and `polished_resume` are truthy non-empty (accept a dict, NOT a string), per the final output models.
-- **7.1.9** **Cover letter word-count assertion** — assert the `cover_letter` output is 450–600 words. Compute word count on the text content (strip Markdown) and log the computed count.
-- **7.1.10** **Chronological ordering assertion** — assert `parsed_resume.experience` is ordered most-recent-first by comparing parsed date ranges; log the ordering it found.
-- **7.1.11** **No-added-experience assertion** — compare the set of company/role titles in the input resume vs. the rewritten/polished output; assert nothing new was introduced (no fabricated experience).
-- **7.1.12** **Certification-preservation assertion** — assert every certification present in the input resume text still appears in the output (compare normalized lowercase names).
-- **7.1.13** **Output-file assertions** — a second call (or reuse) with `candidate_name="..."` and `company_name="..."` so `render_all()` writes files; assert the returned `output_files` dict has the 6 expected keys and that each written `Path` exists and is non-empty.
-- **7.1.14** **Naming-pattern assertion** — assert each output filename matches `{YYYYMMDD_HHMM}_{slug(candidate)}_{slug(company)}_{doc_type}.{ext}` (e.g. regex `^\d{8}_\d{4}_.+$`), i.e. exercises the `build_output_path()` format for real files.
-- **7.1.15** **Summary print** — at the end, `print()` a compact summary table (per-agent non-empty ✓/✗, cover letter word count, output file list, total elapsed time) so a human can eyeball it at a glance.
-- **7.1.16** **Deterministic guard** — add an env-var/module flag (e.g. `RUN_LIVE_PIPELINE`) so the test is skipped (not failed) under the deterministic `pytest` run when live Ollama is unavailable, guarding against the suite being broken on stripped/offline machines.
+- **7.1.1** Create `test_real_files.py` at repo root.
+  - [ ] Create `test_real_files.py` at repo root (outside `tests/`).
+  - [ ] Add `main()`-style entry (`if __name__ == "__main__":`) so it doubles as runnable script + pytest module.
+  - [ ] Call `configure_logging()` at import/module scope.
+- **7.1.2** Add a file-loading helper.
+  - [ ] Add `_load_job()`/`_load_resume()` (or inline `Path(...).read_text(...)`).
+  - [ ] Read `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt`.
+  - [ ] Assert both files exist first with a clear `FileNotFoundError` message.
+- **7.1.3** Run the pipeline.
+  - [ ] Call `run_resume_pipeline(job_description, resume_text)` with both texts.
+  - [ ] Capture the returned result dict.
+- **7.1.4** Structure-existence assertions.
+  - [ ] Assert all 7 agent output keys present: `parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_compliance`, `polished_resume`, `cover_letter`.
+- **7.1.5** JD parsing assertions.
+  - [ ] Assert `result["parsed_job_description"]["role_title"]` is non-empty.
+  - [ ] Assert `result["parsed_job_description"]["required_skills"]` is a non-empty list.
+- **7.1.6** Resume parsing assertions.
+  - [ ] Assert `result["parsed_resume"]["experience"]` is a list (and non-empty).
+  - [ ] Assert the parsed name matches/corresponds to the input file.
+- **7.1.7** Gap analysis assertions.
+  - [ ] Assert `result["tailoring_strategy"]["missing_skills"]` exists (list, ≥1 entry on a normal 3Pillar run).
+- **7.1.8** Rewrite/ATS/polish assertions.
+  - [ ] Assert `ats_optimized_resume` and `polished_resume` are truthy non-empty (accept a dict, NOT a string).
+- **7.1.9** Cover letter word-count assertion.
+  - [ ] Assert the `cover_letter` output is 450–600 words.
+  - [ ] Compute word count on text content (strip Markdown).
+  - [ ] Log the computed count.
+- **7.1.10** Chronological ordering assertion.
+  - [ ] Assert `parsed_resume.experience` ordered most-recent-first by comparing parsed date ranges.
+  - [ ] Log the ordering it found.
+- **7.1.11** No-added-experience assertion.
+  - [ ] Compare the set of company/role titles in input resume vs. rewritten/polished output.
+  - [ ] Assert nothing new was introduced (no fabricated experience).
+- **7.1.12** Certification-preservation assertion.
+  - [ ] Assert every certification in the input resume text still appears in the output (compare normalized lowercase names).
+- **7.1.13** Output-file assertions.
+  - [ ] Second call (or reuse) with `candidate_name="..."` and `company_name="..."` so `render_all()` writes files.
+  - [ ] Assert the returned `output_files` dict has the 6 expected keys.
+  - [ ] Assert each written `Path` exists and is non-empty.
+- **7.1.14** Naming-pattern assertion.
+  - [ ] Assert each output filename matches `{YYYYMMDD_HHMM}_{slug(candidate)}_{slug(company)}_{doc_type}.{ext}` (e.g. regex `^\d{8}_\d{4}_.+$`).
+  - [ ] Exercises `build_output_path()` format for real files.
+- **7.1.15** Summary print.
+  - [ ] `print()` a compact summary table (per-agent non-empty ✓/✗, cover letter word count, output file list, total elapsed time).
+- **7.1.16** Deterministic guard.
+  - [ ] Add env-var/module flag (e.g. `RUN_LIVE_PIPELINE`) so the test is skipped (not failed) under deterministic `pytest` run when live Ollama is unavailable.
 
 **Files changed:** new file `test_real_files.py`
 
@@ -257,15 +349,39 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 
 Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()` → validation → fallback contract against a fake client that injects canned responses, with **no real LLM**. Because the built-in structured outputs enforce provider JSON, some of these are the only place the parse/validation layer is exercised off-network.
 
-**Pre-requisites.** Define a `FakeClient` (or reuse a `StubModel` from `tests/conftest.py`) whose `chat()` returns a fixed payload from a fixture map keyed by `purpose`, and record the call args so each test can assert the `json_schema`/`response_format`/`purpose`/`output` was passed as specified in AGENTS.md.
+**Pre-requisites.** Define a `FakeClient` (or reuse a `StubModel` from `tests/conftest.py`).
+- [ ] Create a `FakeClient`/`StubModel` whose `chat()` returns a fixed payload from a fixture map keyed by `purpose`.
+- [ ] Record the call args so each test can assert `json_schema`/`response_format`/`purpose`/`output` as specified in AGENTS.md.
+- [ ] Add `FakeClient` fixture to `tests/conftest.py` (if none exists).
 
-- **7.2.1.1** Create `tests/test_agent_jd_parsing.py` — JD Parsing: valid JSON → `JDParsingOutput`; malformed JSON → fallback; `LLMConnectionError` → fallback; `strict=True` retry round on second exception.
-- **7.2.1.2** Create `tests/test_agent_resume_parsing.py` — Resume Parsing: valid parse, malformed JSON fallback, missing `experience` key fallback, dict-where-list coercion via `_coerce_str_list`.
-- **7.2.1.3** Create `tests/test_agent_gap_analysis.py` — Gap Analysis: LLM happy path, LLM returning `None` → deterministic missing-skills fallback, prompt receives `missing_skills`.
-- **7.2.1.4** Create `tests/test_agent_resume_rewrite.py` — Resume Rewrite: post-validation path (§4.3.A) applies, strict-mode retry toggles, invalid-date/empty-tone coercion.
-- **7.2.1.5** Create `tests/test_agent_ats_compliance.py` — ATS: compliance checks run on a non-compliant payload and return fix suggestions; fallback when the frame is absent.
-- **7.2.1.6** Create `tests/test_agent_tone_polishing.py` — Tone: `tone_guidance` dict→string coercion (`_coerce_tone_guidance`), fallback when LLM fails.
-- **7.2.1.7** Create `tests/test_agent_cover_letter.py` — Cover Letter: uses `_sync_company_name`-style verification, word-count/fallback-builder, `CoverLetterOutput` fill.
+- **7.2.1.1** Create `tests/test_agent_jd_parsing.py`.
+  - [ ] Test: valid JSON → `JDParsingOutput`.
+  - [ ] Test: malformed JSON → fallback.
+  - [ ] Test: `LLMConnectionError` → fallback.
+  - [ ] Test: `strict=True` retry round on second exception.
+- **7.2.1.2** Create `tests/test_agent_resume_parsing.py`.
+  - [ ] Test: valid parse.
+  - [ ] Test: malformed JSON → fallback.
+  - [ ] Test: missing `experience` key → fallback.
+  - [ ] Test: dict-where-list coercion via `_coerce_str_list`.
+- **7.2.1.3** Create `tests/test_agent_gap_analysis.py`.
+  - [ ] Test: LLM happy path.
+  - [ ] Test: LLM returning `None` → deterministic missing-skills fallback.
+  - [ ] Test: prompt receives `missing_skills`.
+- **7.2.1.4** Create `tests/test_agent_resume_rewrite.py`.
+  - [ ] Test: post-validation path (§4.3.A) applies.
+  - [ ] Test: strict-mode retry toggles.
+  - [ ] Test: invalid-date / empty-tone coercion.
+- **7.2.1.5** Create `tests/test_agent_ats_compliance.py`.
+  - [ ] Test: compliance checks run on a non-compliant payload and return fix suggestions.
+  - [ ] Test: fallback when the frame is absent.
+- **7.2.1.6** Create `tests/test_agent_tone_polishing.py`.
+  - [ ] Test: `tone_guidance` dict→string coercion (`_coerce_tone_guidance`).
+  - [ ] Test: fallback when LLM fails.
+- **7.2.1.7** Create `tests/test_agent_cover_letter.py`.
+  - [ ] Test: uses `_sync_company_name`-style verification.
+  - [ ] Test: word-count / fallback-builder.
+  - [ ] Test: `CoverLetterOutput` fill.
 
 **(Alternate, factored layout)** — If preferred, one slim `tests/test_agents.py` module with parametrized fixtures that cover items 7.2.1.1–7.2.1.7 above, rather than 7 separate files; the AGENTS.md convention favors function-specific modules, so pick the one that matches `tests/test_jd_parsing.py`/`tests/test_formatter.py` style.
 
@@ -275,11 +391,22 @@ Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()
 
 **What it covers:** `AgentRunner` and `run_resume_pipeline()` orchestration (not the real LLM). Because the real agents are instantiated by the runner via `DEFAULT_AGENT_CLASSES`, the cleanest seam is to either (a) patch/`@mock.patch` the agent classes in the module, or (b) swap `DEFAULT_AGENT_CLASSES` with a list of minimal fakes. This validates ordering, input/output threading, and the `output_files` dict without touching Ollama.
 
-- **7.2.2.1 — async end-to-end** — `async` test that runs `run_resume_pipeline(jd, resume, candidate_name=..., company_name=...)` with stub agents that return fixed `ParsedJDOutput`/`ParsedResumeOutput`/etc.; assert the 7 keys + `output_files` (6 keys) are present.
-- **7.2.2.2 — dependency threading** — test that each agent in the chain receives the preceding agent's output (assert via stub `run()` that records its `inputs` argument).
-- **7.2.2.3 — error propagation** — stub an agent that raises `LLMConnectionError`; assert `run_resume_pipeline()` surfaces/logs the failure and does not hallucinate a missing output key.
-- **7.2.2.4 — `company`/`candidate` passthrough** — verify the `name`/`company` args reach the renderer call and `render_all()` and that an empty `candidate_name` skips rendering (no `output_files`).
-- **7.2.2.5 — `AgentRunner` unit** — `AgentRunner.run(..)` calls the right agent, carries `purpose`/`inputs`/`output`/`response_format`/`json_schema`, and maps LLM failures to the documented error-type handling.
+- **7.2.2.1 — async end-to-end.**
+  - [ ] `async` test that runs `run_resume_pipeline(jd, resume, candidate_name=..., company_name=...)` with stub agents returning fixed `ParsedJDOutput`/`ParsedResumeOutput`/etc.
+  - [ ] Assert the 7 keys + `output_files` (6 keys) are present.
+- **7.2.2.2 — dependency threading.**
+  - [ ] Test that each agent in the chain receives the preceding agent's output.
+  - [ ] Assert via stub `run()` that records its `inputs` argument.
+- **7.2.2.3 — error propagation.**
+  - [ ] Stub an agent that raises `LLMConnectionError`.
+  - [ ] Assert `run_resume_pipeline()` surfaces/logs the failure and does not hallucinate a missing output key.
+- **7.2.2.4 — `company`/`candidate` passthrough.**
+  - [ ] Verify the `name`/`company` args reach the renderer call and `render_all()`.
+  - [ ] Assert an empty `candidate_name` skips rendering (no `output_files`).
+- **7.2.2.5 — `AgentRunner` unit.**
+  - [ ] `AgentRunner.run(..)` calls the right agent.
+  - [ ] It carries `purpose`/`inputs`/`output`/`response_format`/`json_schema`.
+  - [ ] It maps LLM failures to the documented error-type handling.
 
 **Files changed:** new files `tests/test_agents.py` (+7 split files per layout), `tests/test_pipeline.py` (or the 7.1 `test_pipeline.py` reused), plus `tests/conftest.py` if no `FakeClient` fixture exists yet.
 
@@ -293,27 +420,59 @@ Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()
 
 #### 7.3.1 (`docs/architecture.md`)
 
-- **7.3.1.1** Write a **system overview** — the 7-agent chain (JD→Resume Parsing→Gap Analysis→Resume Rewrite→ATS→Tone→Cover), the two provider backends, and the renderer/formatter layers.
-- **7.3.1.2** Add a **data-flow diagram** (ASCII or Mermaid) showing the input files, agent order, intermediate Pydantic models, and output artifacts (`output_files`).
-- **7.3.1.3** Describe the **agent chain** and each transition's input/output contract (mirror the pipeline-flow block in `AGENTS.md`), plus where `ResumeRenderer` hooks in.
+- **7.3.1.1** Write a **system overview**.
+  - [ ] Describe the 7-agent chain (JD→Resume Parsing→Gap Analysis→Resume Rewrite→ATS→Tone→Cover).
+  - [ ] Describe the two provider backends (Ollama / OpenAI).
+  - [ ] Describe the renderer/formatter layers.
+- **7.3.1.2** Add a **data-flow diagram** (ASCII or Mermaid).
+  - [ ] Show input files.
+  - [ ] Show agent order.
+  - [ ] Show intermediate Pydantic models.
+  - [ ] Show output artifacts (`output_files`).
+- **7.3.1.3** Describe the **agent chain** and each transition's input/output contract.
+  - [ ] Mirror the pipeline-flow block in `AGENTS.md`.
+  - [ ] Note where `ResumeRenderer` hooks in.
+  - [ ] End file with a `## References` section.
 
 #### 7.3.2 (`docs/agents.md`)
 
-- **7.3.2.1** For each of the 7 agents add: **purpose**, the **prompt** it sends, and its **input/output schema** (referencing `client/models.py` model names, e.g. `JDParsingOutput`, `RewriteOutput`).
-- **7.3.2.2** Note the **fallback path** per agent (regex for parsing agents, deterministic templates for rewrite/cover) and when it triggers.
-- **7.3.2.3** Cross-link each to its implementation file under `client/templates/` (or `client/agents/`) so the doc stays truthful to the code.
+- **7.3.2.1** For each of the 7 agents add **purpose**, the **prompt** it sends, and **input/output schema**.
+  - [ ] Reference `client/models.py` model names (e.g. `JDParsingOutput`, `RewriteOutput`).
+- **7.3.2.2** Note the **fallback path** per agent.
+  - [ ] Regex fallback for parsing agents.
+  - [ ] Deterministic templates for rewrite/cover.
+  - [ ] When each fallback triggers.
+- **7.3.2.3** Cross-link each agent to its implementation file.
+  - [ ] Link to `client/templates/` (or `client/agents/`) files so the doc stays truthful to the code.
+  - [ ] End file with a `## References` section.
 
 #### 7.3.3 (`docs/usage.md`)
 
-- **7.3.3.1** **Quickstart** — prereqs (`ollama pull`, `uv sync`), the command to run `uv run python test_pipeline.py`/`pipeline.py`, expected outputs (files + console summary).
-- **7.3.3.2** **Model configuration** — env-var overrides (`MODEL_PROVIDER`, `MODEL_NAME`, and per-agent `{AGENT}_MODEL`/`{AGENT}_PROVIDER`), how `config/agents.py` picks them.
-- **7.3.3.3** **Adding a custom agent** — steps and the `DEFAULT_AGENT_CLASSES` / registry harness a new class must satisfy.
+- **7.3.3.1** **Quickstart.**
+  - [ ] Document prereqs (`ollama pull`, `uv sync`).
+  - [ ] Document the command to run `uv run python test_pipeline.py`/`pipeline.py`.
+  - [ ] Document expected outputs (files + console summary).
+- **7.3.3.2** **Model configuration.**
+  - [ ] Document env-var overrides (`MODEL_PROVIDER`, `MODEL_NAME`, per-agent `{AGENT}_MODEL`/`{AGENT}_PROVIDER`).
+  - [ ] Explain how `config/agents.py` picks them.
+- **7.3.3.3** **Adding a custom agent.**
+  - [ ] Document the steps.
+  - [ ] Document the `DEFAULT_AGENT_CLASSES` / registry harness a new class must satisfy.
+  - [ ] End file with a `## References` section.
 
 #### 7.3.4 (`docs/api.md`)
 
-- **7.3.4.1** Document the **`ModelClient`** ABC (`chat()`, `response_format`, optional `json_schema`) and the `OllamaClient`/`OpenAIClient` implementations.
-- **7.3.4.2** Document **`Agent`**/`PipelineAgent`/`AgentRunner` — constructor signatures, `run()`/`__call__`, the `purpose`/`inputs`/`output`/`rules` contract.
-- **7.3.4.3** Document **`ResumeRenderer`** public API (`render_plaintext`, `render_markdown`, `render_cover_letter_*`, `render_docx`, `render_pdf`, `render_all`, `build_output_path`) and the `formatter` helpers.
+- **7.3.4.1** Document the **`ModelClient`** ABC.
+  - [ ] `chat()`, `response_format`, optional `json_schema`.
+  - [ ] `OllamaClient`/`OpenAIClient` implementations.
+- **7.3.4.2** Document **`Agent`**/`PipelineAgent`/`AgentRunner`.
+  - [ ] Constructor signatures.
+  - [ ] `run()`/`__call__`.
+  - [ ] The `purpose`/`inputs`/`output`/`rules` contract.
+- **7.3.4.3** Document **`ResumeRenderer`** public API + `formatter` helpers.
+  - [ ] `render_plaintext`, `render_markdown`, `render_cover_letter_*`, `render_docx`, `render_pdf`, `render_all`, `build_output_path`.
+  - [ ] The `formatter` helpers.
+  - [ ] End file with a `## References` section.
 
 **Files changed:** new files `docs/architecture.md`, `docs/agents.md`, `docs/usage.md`, `docs/api.md`
 
