@@ -4,7 +4,7 @@ Everything still left to implement. For the archive of what is complete, see [re
 
 ## Overview
 
-The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B (template renderer: `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX + PDF generation + `render_all()` + pipeline wiring + unit tests), and 306 unit tests. The items below are what remains.
+The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B (template renderer: `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX + PDF generation + `render_all()` + pipeline wiring + unit tests), Phase 8-contact info (contact extraction + cover letter integration — see `resume-done.md`), and 322 unit tests. The items below are what remains.
 
 ---
 
@@ -15,60 +15,14 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 > Phase 6.A (output formatting helpers — `client/formatter.py` + `tests/test_formatter.py`) is **complete** — archived in `resume-done.md` §6.2.
 >
 > Phase 6.B (template renderer — `render_plaintext`/`render_markdown` + cover letter rendering + `build_output_path()` + DOCX + PDF + `render_all()` + pipeline wiring + `tests/test_renderer.py`) is **complete** — archived in `resume-done.md` §6.3.
+>
+> Phase 8 contact info (8.1 contact fields in `ResumeParsingOutput`, 8.2 cover letter templates with contact line, 8.3 contact info threaded through the Cover Letter agent) is **complete** — archived in `resume-done.md` §8 (Contact Info).
 
 ---
 
 ## Phase 8: Contact Information Extraction & Cover Letter Integration
 
-Extract phone number, email address, LinkedIn URL, and GitHub URL from the parsed resume and use them in cover letter generation. Update cover letter templates to include these contact details.
-
-### '8.1 Add contact fields to ResumeParsingOutput'
-
-**Status:** ✅ DONE
-
-Add optional contact fields to `ResumeParsingOutput` in `client/models.py` and populate them from `FormatDetector` extraction.
-
-**Sub-tasks:**
-
-- **8.1.1** ~~Add `phone: str = ""`, `email: str = ""`, `linkedin: str = ""`, `github: str = ""` to `ResumeParsingOutput` in `client/models.py`.~~ ✅ DONE
-- **8.1.2** ~~In `ResumeParsingAgent._regex_fallback()` (in `client/agents/resume_parsing.py`), extract these fields from `FormatDetector` parsed output and assign to the model.~~ ✅ DONE
-- **8.1.3** ~~For the LLM path (`_try_llm`), add contact fields to the system prompt field list with rules: "Extract the candidate's phone number, email address, LinkedIn profile URL, and GitHub profile URL exactly as they appear in the resume; empty string if absent."~~ ✅ DONE
-- **8.1.4** ~~Ensure validators/coercion handles dict→string if LLM returns structured contact object.~~ ✅ DONE
-
-**Files changed:** `client/models.py`, `client/agents/resume_parsing.py`
-
----
-
-### 8.2 Update cover letter templates to include contact information
-
-**Status:** ✅ DONE
-
-Modify the Jinja2 cover letter templates in `client/templates/` to render the candidate's contact details (phone, email, LinkedIn, GitHub) in the letter header/footer.
-
-**Sub-tasks:**
-
-- **8.2.1** ~~Update `client/templates/cover_letter.j2` (and any variants: modern, classic, minimal) to include contact fields in the header area.~~ ✅ DONE
-- **8.2.2** ~~Ensure templates gracefully handle missing/empty contact fields (don't render empty lines).~~ ✅ DONE
-- **8.2.3** ~~Verify template rendering with `ResumeRenderer.render_cover_letter_markdown/plain/docx/pdf`.~~ ✅ DONE
-
-**Files changed:** `client/templates/cover_letter.j2` (and variants)
-
----
-
-### 8.3 Pass contact info to cover letter agent and use in generation
-
-**Status:** ✅ DONE
-
-Thread the contact fields through the pipeline to the Cover Letter agent and use them when building the cover letter.
-
-**Sub-tasks:**
-
-- **8.3.1** ~~In `cover_letter.py` `_try_llm()`, read contact fields from `resume_json` and pass them in the prompt/context so the LLM can include them.~~ ✅ DONE
-- **8.3.2** ~~In `_apply_candidate_name()` (from 9.3.2) or a new `_apply_contact_info()`, post-process the LLM output to inject contact details if the template didn't render them.~~ ✅ DONE
-- **8.3.3** ~~In `_build_fallback_cover_letter()`, ensure contact fields from `resume_data` are used in the fallback template.~~ ✅ DONE
-- **8.3.4** ~~Add tests in `tests/test_cover_letter_validation.py` — contact fields appear in output; missing fields don't break rendering.~~ ✅ DONE
-
-**Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
+**✅ COMPLETE** — archived in `resume-done.md` §8 (Contact Info). Contact fields (`phone`, `email`, `linkedin`, `github`) were added to `ResumeParsingOutput`, extracted by `FormatDetector` and `_regex_fallback`, wired into the cover letter templates as a contact header line, and post-processed into the Cover Letter agent output (`_apply_contact_info`) and fallback signature via `_contact_from_resume`.
 
 ---
 
@@ -281,16 +235,16 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 
 **Status:** ⚠️ PARTIAL — existing deterministic tests are done; agent + pipeline tests remain
 
-**What exists now:** 306 tests across 8 files:
+**What exists now:** 322 tests across 8 files:
 
 - `tests/test_format_detector.py` — 46 tests covering all `FormatDetector` static extraction methods + regex-only parse flows
 - `tests/test_jd_parsing.py` — 19 tests (`_extract_company_name` + `_sync_company_name`)
 - `tests/test_resume_rewrite_validation.py` — 56 tests (§4.3.A checks + §C skill tailoring + §D fallback logging)
-- `tests/test_cover_letter_validation.py` — 80 tests (§4.3.B checks + §C fallback builder + §D fallback logging)
+- `tests/test_cover_letter_validation.py` — 91 tests (§4.3.B checks + §C fallback builder + §D fallback logging + Phase 8 contact-info post-processing)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 15 tests (shared parser + JSON Schema helpers)
 - `tests/test_formatter.py` — 41 tests (Phase 6.A formatting helpers)
-- `tests/test_renderer.py` — 38 tests (Phase 6.B renderer — archived in `resume-done.md` §6.3)
+- `tests/test_renderer.py` — 43 tests (Phase 6.B renderer + Phase 8 contact-line rendering — archived in `resume-done.md` §6.3 and §8)
 
 **Still needed:**
 
@@ -389,23 +343,20 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | 8.1: contact fields in ResumeParsingOutput | ✅ DONE | 6.B.1 | 2 |
-| 2 | 8.2: cover letter templates with contact info | ✅ DONE | 8.1 | 1-3 |
-| 3 | 8.3: pass contact info to cover letter agent | ✅ DONE | 8.1, 8.2 | 2 |
-| 4 | 8.5.1: skill normalizer module + taxonomy | ❌ TODO | 6.B.1 | 4 |
-| 5 | 8.5.2: integrate into JD Parsing | ❌ TODO | 8.5.1 | 1 |
-| 6 | 8.5.3: integrate into Resume Parsing | ❌ TODO | 8.5.1 | 1 |
-| 7 | 8.5.4: integrate into Gap Analysis | ❌ TODO | 8.5.1 | 1 |
-| 8 | 8.5.5: integrate into Resume Rewrite | ❌ TODO | 8.5.1 | 1 |
-| 9 | 8.5.6: integrate into Cover Letter | ❌ TODO | 8.5.1 | 1 |
-| 10 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
-| 11 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
-| 12 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
-| 13 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 10–12 | 2 |
-| 14 | 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1–13 (all features) | 1 |
-| 15 | 7.2.1: agent unit tests (`tests/test_agent_*.py` or `test_agents.py`) | ❌ TODO | Steps 1–13 | 7 to 8 |
-| 16 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ❌ TODO | Step 15 | 1 |
-| 17 | 7.3.1: `docs/architecture.md` | ❌ TODO | All | 1 |
-| 18 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
-| 19 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
-| 20 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |
+| 1 | 8.5.1: skill normalizer module + taxonomy | ❌ TODO | 6.B.1 | 4 |
+| 2 | 8.5.2: integrate into JD Parsing | ❌ TODO | 8.5.1 | 1 |
+| 3 | 8.5.3: integrate into Resume Parsing | ❌ TODO | 8.5.1 | 1 |
+| 4 | 8.5.4: integrate into Gap Analysis | ❌ TODO | 8.5.1 | 1 |
+| 5 | 8.5.5: integrate into Resume Rewrite | ❌ TODO | 8.5.1 | 1 |
+| 6 | 8.5.6: integrate into Cover Letter | ❌ TODO | 8.5.1 | 1 |
+| 7 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
+| 8 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
+| 9 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
+| 10 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 7–9 | 2 |
+| 11 | 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1–10 (all features) | 1 |
+| 12 | 7.2.1: agent unit tests (`tests/test_agent_*.py` or `test_agents.py`) | ❌ TODO | Steps 1–10 | 7 to 8 |
+| 13 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ❌ TODO | Step 12 | 1 |
+| 14 | 7.3.1: `docs/architecture.md` | ❌ TODO | All | 1 |
+| 15 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
+| 16 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
+| 17 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |

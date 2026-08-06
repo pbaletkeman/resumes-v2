@@ -27,7 +27,7 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo (JSON mode)
-- `tests/` — 306 tests across 8 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer)
+- `tests/` — 322 tests across 8 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer)
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
 - `docs/TESTING.md` — Testing guide
@@ -524,7 +524,7 @@ Root-cause mitigation so the LLM is less likely to fabricate in the first place 
 
 - `tests/test_jd_parsing.py` — covers `_extract_company_name` + `_sync_company_name` (19 tests)
 - `tests/test_resume_rewrite_validation.py` — covers the A checks + §C `_tailor_skills`/`_parsed_to_rewrite` + §D fallback logging (56 tests)
-- `tests/test_cover_letter_validation.py` — covers the B checks + §C fallback builder helpers + §D fallback logging (80 tests)
+- `tests/test_cover_letter_validation.py` — covers the B checks + §C fallback builder helpers + §D fallback logging + Phase 8 contact-info post-processing (91 tests)
 
 ---
 
@@ -856,6 +856,50 @@ Verification — **COMPLETE (Ollama)**, model-version dependent:
 
 ---
 
+## Phase 8 (Contact Info): Contact Information Extraction & Cover Letter Integration
+
+**Status:** Complete — archived 2026-08-06 (8.1-8.3 all DONE)
+
+**Goal:** Extract the candidate's phone number, email address, LinkedIn URL, and GitHub URL from the parsed resume and thread them through to cover letter generation. Update the cover letter templates to render these contact details, and post-process LLM output so the contact line always lands in the finished letter. Pure-Python wiring of existing infrastructure — no new LLM calls.
+
+### 8.1 Add contact fields to `ResumeParsingOutput`
+
+**Status:** DONE
+
+- `ResumeParsingOutput` in `client/models.py` gains optional contact fields: `phone: str = ""`, `email: str = ""`, `linkedin: str = ""`, `github: str = ""` (mirrored on `ParsedResume`).
+- `FormatDetector` gains `_extract_phone()`, `_extract_email()`, `_extract_linkedin()`, `_extract_github()` (with regex patterns); `parse_resume()` / `_llm_parse_resume()` populate the four fields.
+- `ResumeParsingAgent._regex_fallback()` assigns the `FormatDetector` contact values onto `ResumeParsingOutput`.
+- LLM path: `_SYSTEM_PROMPT` (`purpose`) lists `phone, email, linkedin, github` with the rule "Extract the candidate's phone number, email address, LinkedIn profile URL, and GitHub profile URL exactly as they appear in the resume; empty string if absent."
+- Coercion: new `_coerce_str()` helper in `client/models.py` handles dict→string (and list→string) inputs, applied to the four contact fields via a validator — so an LLM returning a structured contact object still validates.
+
+**Files changed:** `client/models.py`, `client/format_detector.py`, `client/agents/resume_parsing.py`
+
+### 8.2 Update cover letter templates to include contact info
+
+**Status:** DONE
+
+- `client/templates/cover_letter.py`: the shared `COVER_LETTER` template (`plaintext` and `markdown` keys) renders an optional header contact line via `{% if contact_line %}{{ contact_line }}` (the `*...*`-italicized form in markdown). Note: there is no `cover_letter.j2` file and no per-style variants — cover letter styling lives in this one dict; `modern`/`classic`/`minimal` are resume-only templates.
+- Renderer thread-through: `client/templates/renderer.py` — `render_cover_letter_plaintext()` / `render_cover_letter_markdown()` / `render_all()` accept optional `phone`/`email`/`linkedin`/`github` kwargs; `_build_cover_letter_context()` joins the non-empty values on ` | ` into `contact_line`. (No `render_cover_letter_docx/pdf` — letters render as plaintext + markdown only.)
+- Empty/absent contact fields render neither the line nor a spurious blank line (`test_cover_letter_no_blank_line_between_name_and_date`).
+- `test_renderer.py` additions: cover letter plaintext/markdown include contact line; line omitted when empty; `render_all` letter files include contact info.
+
+**Files changed:** `client/templates/cover_letter.py`, `client/templates/renderer.py`, `tests/test_renderer.py`
+
+### 8.3 Pass contact info to the Cover Letter agent and use it in generation
+
+**Status:** DONE
+
+- `client/agents/cover_letter.py`: `_contact_from_resume(resume_json)` builds a `CANDIDATE CONTACT INFORMATION` block; `_try_llm()` passes it into the prompt with the constraint that the listed details are the *only* contact info the model may use (never invent contact details), and may close with a contact line.
+- `_apply_contact_info(result, resume_json)` post-processes the validated `CoverLetterOutput` inside `_try_llm` (after Pydantic validation + length check): when at least one contact value exists and none appears in the letter, it appends a ` | `-joined contact line after the signature and logs at INFO. When values are already present or no contact info exists, the letter is returned unchanged.
+- Fallback: `_contact_signature_line(resume_data)` joins the resume's contact fields; `_build_fallback_cover_letter()` appends it to the signature (`Sincerely,\n<Name>\n<contact line>`). Missing fields degrade gracefully (no line).
+- Tests in `tests/test_cover_letter_validation.py`: `TestApplyContactInfo` (inject-when-absent, leave-unused-when-present, no-contact unchanged, invalid JSON unchanged, missing input breaks nothing), fallback contact-line / signature-line cases, and LLM-success path that injects the contact block.
+
+**Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
+
+**Verification:** `uv run pytest tests/ -q` 322 passed (up from 306; +11 cover letter validation = 91, +5 renderer = 43); `uv run ruff check .` clean; `uv run pyright` (strict) 0 errors. The LSP "private member used outside class" warnings inside tests are pre-existing pyright-strict noise under the `tests/` exclusion (see AGENTS.md Toolchain quirks).
+
+---
+
 ## File Structure (Current State)
 
 ```plaintext
@@ -895,9 +939,9 @@ tests/
   test_format_detector.py          # EXISTS ✅ (46 tests)
   test_jd_parsing.py               # EXISTS ✅ (19 tests)
   test_resume_rewrite_validation.py # EXISTS ✅ (56 tests)
-  test_cover_letter_validation.py  # EXISTS ✅ (80 tests)
+  test_cover_letter_validation.py  # EXISTS ✅ (91 tests)
   test_formatter.py                # EXISTS ✅ (41 tests — Phase 6.2)
-  test_renderer.py                 # EXISTS ✅ (38 tests — Phase 6.3)
+  test_renderer.py                 # EXISTS ✅ (43 tests — Phase 6.3)
   test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
   test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
 docs/
