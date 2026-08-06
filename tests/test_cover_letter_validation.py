@@ -6,6 +6,7 @@ from typing import Any
 
 from client.agents.cover_letter import (
     CoverLetterAgent,
+    _apply_company_name,
     _apply_contact_info,
     _build_fallback_cover_letter,
     _check_company,
@@ -129,6 +130,89 @@ class TestCheckCompany:
     def test_invalid_json_no_warning(self, caplog) -> None:
         _check_company(_letter("anything"), "not json")
         assert "does not mention target company" not in caplog.text
+
+
+class TestApplyCompanyName:
+    @staticmethod
+    def _resume_with_companies(*companies: str) -> str:
+        return json.dumps(
+            {
+                "skills": [],
+                "experience": [{"company": company} for company in companies],
+            }
+        )
+
+    def test_placeholder_replaced_with_jd_company(self) -> None:
+        jd = _jd_json(company_name="3Pillar")
+        result = _apply_company_name(
+            _letter("I want to join [Company Name] as an engineer."), jd
+        )
+        assert "3Pillar" in result.cover_letter
+        assert "[Company Name]" not in result.cover_letter
+
+    def test_bracket_variant_replaced(self) -> None:
+        jd = _jd_json(company_name="Acme")
+        result = _apply_company_name(_letter("Join [Company] today!"), jd)
+        assert result.cover_letter == "Join Acme today!"
+
+    def test_angle_bracket_variant_replaced(self) -> None:
+        jd = _jd_json(company_name="Acme")
+        result = _apply_company_name(
+            _letter("I admire <Company Name> for its work."), jd
+        )
+        assert result.cover_letter == "I admire Acme for its work."
+
+    def test_employer_placeholder_replaced(self) -> None:
+        jd = _jd_json(company_name="Acme")
+        result = _apply_company_name(_letter("I want to work at [Employer Name]."), jd)
+        assert result.cover_letter == "I want to work at Acme."
+
+    def test_resume_company_substituted_with_jd_company(self) -> None:
+        jd = _jd_json(company_name="3Pillar")
+        resume = self._resume_with_companies("Globex")
+        result = _apply_company_name(
+            _letter("I worked at Globex and would love to dedicate myself."), jd, resume
+        )
+        assert "3Pillar" in result.cover_letter
+        assert "Globex" not in result.cover_letter
+
+    def test_only_first_resume_company_occurrence_substituted(self) -> None:
+        jd = _jd_json(company_name="3Pillar")
+        resume = self._resume_with_companies("Globex")
+        letter_text = "At Globex I grew a lot. Globex taught me resilience."
+        result = _apply_company_name(_letter(letter_text), jd, resume)
+        assert result.cover_letter.count("3Pillar") == 1
+        assert result.cover_letter.count("Globex") == 1
+
+    def test_already_correct_left_unchanged(self) -> None:
+        jd = _jd_json(company_name="Acme")
+        letter_text = "I want to work at Acme because of its mission."
+        result = _apply_company_name(_letter(letter_text), jd)
+        assert result.cover_letter == letter_text
+
+    def test_partial_token_mention_left_unchanged(self) -> None:
+        jd = _jd_json(company_name="Acme Corporation")
+        letter_text = "I admire Acme for its values."
+        result = _apply_company_name(_letter(letter_text), jd)
+        assert result.cover_letter == letter_text
+
+    def test_no_target_company_unchanged(self) -> None:
+        letter_text = "I want to join [Company Name]."
+        result = _apply_company_name(_letter(letter_text), _jd_json())
+        assert result.cover_letter == letter_text
+
+    def test_no_resume_json_no_substitution(self) -> None:
+        jd = _jd_json(company_name="3Pillar")
+        letter_text = "I have grown a lot at my current company."
+        result = _apply_company_name(_letter(letter_text), jd)
+        assert result.cover_letter == letter_text
+
+    def test_ignores_resume_company_that_matches_target(self) -> None:
+        jd = _jd_json(company_name="Acme Corp")
+        resume = self._resume_with_companies("Acme")
+        letter_text = "I worked at Acme and loved it."
+        result = _apply_company_name(_letter(letter_text), jd, resume)
+        assert result.cover_letter == letter_text
 
 
 class TestSkillMentioned:

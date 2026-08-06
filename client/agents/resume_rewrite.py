@@ -226,8 +226,8 @@ class ResumeRewriteAgent:
             return None
 
         if not _validate_chronological(result):
-            logger.warning("Output experiences not in chronological order -- rejecting")
-            return None
+            logger.warning("Output experiences out of chronological order -- sorting")
+        result = _ensure_chronological(result)
 
         sanitized = _sanitize_skills(result, resume_json)
         if sanitized is None:
@@ -483,6 +483,40 @@ def _validate_chronological(result: RewriteOutput) -> bool:
             )
             return False
     return True
+
+
+def _ensure_chronological(result: RewriteOutput) -> RewriteOutput:
+    """Return a copy of ``result`` with experiences sorted most-recent-first.
+
+    A pure-Python post-processor (no LLM call) that fixes the ordering of
+    ``result.experience`` instead of rejecting.  Entries whose start year is
+    unparseable (``_extract_start_year`` returns ``None``) are preserved at
+    the tail in their original relative order.  The input list length is
+    always preserved (no entries are dropped).
+
+    If no entry has a parseable start year, the list is returned unchanged.
+
+    Args:
+        result: A validated ``RewriteOutput``.
+
+    Returns:
+        A ``RewriteOutput`` with ``experience`` sorted most-recent-first.
+    """
+    entries = result.experience
+    if not entries:
+        return result
+    if not any(_extract_start_year(entry.dates) is not None for entry in entries):
+        return result  # nothing to sort
+
+    def _sort_key(item: tuple[int, Any]) -> tuple[int, int]:
+        _, entry = item
+        year = _extract_start_year(entry.dates)
+        if year is None:
+            return (1, 0)  # no year: sink to the tail, stable keeps relative order
+        return (0, -year)  # most-recent-first
+
+    ordered = [entry for _, entry in sorted(enumerate(entries), key=_sort_key)]
+    return result.model_copy(update={"experience": ordered})
 
 
 def _extract_start_year(dates: str) -> int | None:

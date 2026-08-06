@@ -8,6 +8,7 @@ from client.agents.resume_rewrite import (
     ResumeRewriteAgent,
     _company_matches,
     _count_words,
+    _ensure_chronological,
     _extract_companies,
     _extract_start_year,
     _normalize_skill,
@@ -231,6 +232,138 @@ class TestValidateChronological:
             ]
         )
         assert _validate_chronological(result)
+
+
+class TestEnsureChronological:
+    def test_sorts_most_recent_first(self) -> None:
+        result = RewriteOutput(
+            summary="kept summary",
+            experience=[
+                ExperienceEntry(dates="2016 - 2017", company="Old"),
+                ExperienceEntry(dates="2020 - Present", company="New"),
+                ExperienceEntry(dates="2018 - 2019", company="Mid"),
+            ],
+        )
+        fixed = _ensure_chronological(result)
+        assert [e.company for e in fixed.experience] == ["New", "Mid", "Old"]
+        assert fixed.summary == "kept summary"
+        assert len(fixed.experience) == 3
+
+    def test_none_year_entry_preserved_at_tail(self) -> None:
+        result = RewriteOutput(
+            experience=[
+                ExperienceEntry(dates="Present", company="Unknown"),
+                ExperienceEntry(dates="2020 - Present", company="New"),
+                ExperienceEntry(dates="2016 - 2018", company="Old"),
+            ]
+        )
+        fixed = _ensure_chronological(result)
+        assert [e.company for e in fixed.experience] == ["New", "Old", "Unknown"]
+
+    def test_all_none_years_unchanged(self) -> None:
+        entries = [
+            ExperienceEntry(dates="Present", company="A"),
+            ExperienceEntry(dates="Current", company="B"),
+        ]
+        result = RewriteOutput(experience=entries)
+        fixed = _ensure_chronological(result)
+        assert fixed.experience is result.experience
+        assert [e.company for e in fixed.experience] == ["A", "B"]
+
+    def test_empty_experience_unchanged(self) -> None:
+        result = RewriteOutput()
+        fixed = _ensure_chronological(result)
+        assert fixed.experience == []
+
+    def test_does_not_drop_entries(self) -> None:
+        result = RewriteOutput(
+            experience=[
+                ExperienceEntry(dates="2018 - 2019", company="Mid"),
+                ExperienceEntry(dates="Present", company="U1"),
+                ExperienceEntry(dates="2016 - 2017", company="Old"),
+                ExperienceEntry(dates="Current", company="U2"),
+                ExperienceEntry(dates="2024 - Present", company="New"),
+            ]
+        )
+        fixed = _ensure_chronological(result)
+        assert len(fixed.experience) == 5
+        assert [e.company for e in fixed.experience] == [
+            "New",
+            "Mid",
+            "Old",
+            "U1",
+            "U2",
+        ]
+
+    def test_keeps_other_fields_unchanged(self) -> None:
+        result = RewriteOutput(
+            summary="s",
+            skills=["Python", "SQL"],
+            projects=["P"],
+            certifications=["C"],
+            education=["E"],
+            experience=[
+                ExperienceEntry(dates="2015", company="A"),
+                ExperienceEntry(dates="2022", company="B"),
+            ],
+        )
+        fixed = _ensure_chronological(result)
+        assert fixed.skills == ["Python", "SQL"]
+        assert fixed.projects == ["P"]
+        assert fixed.certifications == ["C"]
+        assert fixed.education == ["E"]
+
+
+class TestChronologicalFixInAgent:
+    async def test_out_of_order_output_is_sorted_not_rejected(self) -> None:
+        client = _MockClient(
+            response=json.dumps(
+                {
+                    "summary": "Improved summary",
+                    "skills": ["Python", "SQL"],
+                    "experience": [
+                        {
+                            "title": "Engineer",
+                            "company": "Acme",
+                            "dates": "2016 - 2017",
+                            "responsibilities": ["Old role"],
+                            "achievements": [],
+                            "metrics": [],
+                        },
+                        {
+                            "title": "Senior Engineer",
+                            "company": "Globex",
+                            "dates": "2020 - Present",
+                            "responsibilities": ["New role"],
+                            "achievements": [],
+                            "metrics": [],
+                        },
+                    ],
+                    "projects": [],
+                    "certifications": [],
+                    "education": [],
+                }
+            )
+        )
+        agent = ResumeRewriteAgent(client)
+        inputs = {
+            "parsed_resume": {
+                "summary": "Old summary",
+                "skills": ["Python", "SQL"],
+                "experience": [
+                    {"company": "Globex", "dates": "2020 - Present"},
+                    {"company": "Acme", "dates": "2016 - 2017"},
+                ],
+                "projects": [],
+                "certifications": [],
+                "education": [],
+            },
+            "tailoring_strategy": {},
+        }
+        result = await agent.run(inputs)
+        assert result.summary == "Improved summary"
+        assert [e.company for e in result.experience] == ["Globex", "Acme"]
+        assert result.skills == ["Python", "SQL"]
 
 
 class TestTailorSkills:

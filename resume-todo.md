@@ -126,40 +126,40 @@ Fixes for three defects in cover letter creation that surface on live runs: expe
 
 ### 9.1 Chronological ordering of experience (in `resume_rewrite.py`)
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
-Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chronological(result)` and **rejects** the whole rewrite when the experiences are out of order, which drops the entire LLM result and falls back to `_parsed_to_rewrite()`. Instead of rejecting, we should **intercept and sort** the experience section so the rest of the LLM's work is preserved.
+Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chronological(result)` and **rejects** the whole rewrite when the experiences are out of order, which drops the entire LLM result and falls back to `_parsed_to_rewrite()`. Now it **intercepts and sorts** the experience section so the rest of the LLM's work is preserved.
 
 **Sub-tasks:**
 
 - **9.1.1** Replace the reject path in `_try_llm()` with a call to `_ensure_chronological(result)`.
-  - [ ] Read `_try_llm()` in `client/agents/resume_rewrite.py` and locate the current reject block (~lines 228–230: `if not _validate_chronological(result): logger.warning("Output experiences not in chronological order -- rejecting"); return None`).
-  - [ ] Confirm the exact current line range in the file (line numbers may have shifted).
-  - [ ] Replace the reject branch with `result = _ensure_chronological(result)`.
-  - [ ] Replace the `logger.warning("... -- rejecting")` message with an ordering-fix log (e.g. "Output experiences out of chronological order -- sorting").
-  - [ ] Ensure the branch no longer `return None` (fallback `_parsed_to_rewrite()` is NOT invoked for ordering).
-  - [ ] Keep the rest of the LLM output preserved end-to-end.
+  - [x] Read `_try_llm()` in `client/agents/resume_rewrite.py` and locate the current reject block.
+  - [x] Confirm the exact current line range in the file (line numbers may have shifted).
+  - [x] Replace the reject branch with `result = _ensure_chronological(result)`.
+  - [x] Replace the `logger.warning("... -- rejecting")` message with an ordering-fix log ("Output experiences out of chronological order -- sorting").
+  - [x] Ensure the branch no longer `return None` (fallback `_parsed_to_rewrite()` is NOT invoked for ordering).
+  - [x] Keep the rest of the LLM output preserved end-to-end.
 - **9.1.2** Add `_ensure_chronological(result: RewriteOutput) -> RewriteOutput`.
-  - [ ] Define the helper in `client/agents/resume_rewrite.py` (no LLM call — pure Python).
-  - [ ] Sort `result.experience` by `_extract_start_year(entry.dates)` descending (most-recent-first).
-  - [ ] Treat entries whose start year is `None` (unparseable dates) as preserved at the end in their original relative order.
-  - [ ] Use `sorted()` with a key that falls back to the entry's original index so the sort is stable and lossless.
-  - [ ] Never drop entries — input list length == output list length.
-  - [ ] Return the sorted `RewriteOutput`.
+  - [x] Define the helper in `client/agents/resume_rewrite.py` (no LLM call — pure Python).
+  - [x] Sort `result.experience` by `_extract_start_year(entry.dates)` descending (most-recent-first).
+  - [x] Treat entries whose start year is `None` (unparseable dates) as preserved at the end in their original relative order.
+  - [x] Use `sorted()` with a key that falls back to the entry's original index so the sort is stable and lossless.
+  - [x] Never drop entries — input list length == output list length.
+  - [x] Return the sorted `RewriteOutput`.
 - **9.1.3** Keep `_validate_chronological` only as an early signal/log.
-  - [ ] Downgrade `_validate_chronological` to an optional `DEBUG`-level signal only (early log).
-  - [ ] Make `_ensure_chronological` the source of truth (post-processor wins).
-  - [ ] Guard: if a start year is missing for **all** entries, return the list unchanged (nothing to sort).
+  - [x] Downgrade `_validate_chronological` to an optional `DEBUG`-level signal only (early log).
+  - [x] Make `_ensure_chronological` the source of truth (post-processor wins).
+  - [x] Guard: if a start year is missing for **all** entries, return the list unchanged (nothing to sort).
 - **9.1.4** Sort the **input** `parsed_resume` experience (idempotency).
-  - [ ] In `ResumeParsingAgent._regex_fallback()`, sort `parsed_resume.experience` most-recent-first once.
-  - [ ] Consider sorting after the LLM parse path as well (idempotent).
-  - [ ] Verify downstream agents receive most-recent-first data.
-  - [ ] Confirm the rewrite sort becomes a cheap no-op in the common case.
+  - [x] In `ResumeParsingAgent._regex_fallback()`, sort `parsed_resume.experience` most-recent-first once.
+  - [x] Consider sorting after the LLM parse path as well (idempotent).
+  - [x] Verify downstream agents receive most-recent-first data.
+  - [x] Confirm the rewrite sort becomes a cheap no-op in the common case.
 - **9.1.5** Add/update tests in `tests/test_resume_rewrite_validation.py`.
-  - [ ] Test: entries sorted correctly, including a None-year entry preserved at the tail.
-  - [ ] Test: fully-unsortable list (all None-year) left unchanged.
-  - [ ] Update existing out-of-order tests that previously asserted `None` (rejection) to assert a **sorted** result is returned instead.
-  - [ ] Run `uv run pytest tests/test_resume_rewrite_validation.py`.
+  - [x] Test: entries sorted correctly, including a None-year entry preserved at the tail.
+  - [x] Test: fully-unsortable list (all None-year) left unchanged.
+  - [x] Update existing out-of-order tests that previously asserted `None` (rejection) to assert a **sorted** result is returned instead.
+  - [x] Run `uv run pytest tests/test_resume_rewrite_validation.py`.
 
 **Files changed:** `client/agents/resume_rewrite.py`, `client/agents/resume_parsing.py`, `tests/test_resume_rewrite_validation.py`
 
@@ -167,40 +167,39 @@ Currently `client/agents/resume_rewrite.py` `_try_llm()` calls `_validate_chrono
 
 ### 9.2 Company Name must come from the JD, not the candidate's resume
 
-**Context:** The cover letter occasionally uses a **company name pulled from the candidate's resume** (a past employer), or the literal placeholder `[Company Name]`. The source of truth is `JDParsingOutput.company_name` (Phase 4.3.F — employer name exactly as written in the JD), already surfaced through the shared `_company_from()` helper in `cover_letter.py`. Two failure modes to fix:
+**Status:** ✅ DONE
 
-1. **Wrong company from the resume:** The `_try_llm()` prompt feeds the JD, and the LLM segfaults into using a resume company or a generic phrase instead of the target employer.
-2. **Literal `[Company Name] placeholder** emitted by the letter (or its name).**
+The cover letter previously could use a **company name pulled from the candidate's resume** (a past employer), or the literal placeholder `[Company Name]`. The source of truth is `JDParsingOutput.company_name` (Phase 4.3.F — employer name exactly as written in the JD), surfaced through the shared `_company_from()` helper. Both failure modes are now fixed with deterministic post-processing (no additional LLM calls).
 
 **Sub-tasks:**
 
-- **9.2.2 Strengthen the prompt so the LLM never picks / restates a wrong name.**
-  - [ ] Locate `_try_llm()` normal-rules in `client/agents/cover_letter.py`.
-  - [ ] Rename prompt-driven refs that could pull a resume-company or generic phrase.
-  - [ ] After validation, explicitly inject/assert the target company name in the prompt context.
-  - [ ] Add post-fix path for when the emitted letter's name is missing / wrong.
-- **9.2.2 Add a deterministic company-name normalizer** `_apply_company_name(result: CoverLetterOutput, jd_json: str) -> CoverLetterOutput`.
-  - [ ] Resolve target via `_company_from(jd_data)` (top-level `company_name`, else `company_signals["company_name"]`).
-  - [ ] Add `_check_company` and only `logger.warning` when mismatched (do not reject).
-  - [ ] Return normalized `CoverLetterOutput` deterministically (no LLM call).
+- **9.2.1 Strengthen the prompt so the LLM never picks / restates a wrong name.**
+  - [x] Located `_try_llm()` normal-rules in `client/agents/cover_letter.py`.
+  - [x] Added `_company_directive()` which injects the exact target company name into the prompt context.
+  - [x] Added a rule explicitly forbidding the use of a company from the candidate's resume (e.g. a past employer) as the target.
+  - [x] Added a post-fix path (`_apply_company_name`) for when the emitted letter's name is missing / wrong.
+- **9.2.2 Add a deterministic company-name normalizer** `_apply_company_name(result: CoverLetterOutput, jd_json: str, resume_json: str = "") -> CoverLetterOutput`.
+  - [x] Resolves target via `_company_from(jd_data)` (top-level `company_name`, else `company_signals["company_name"]`).
+  - [x] `_check_company` (already present) only `logger.warning` when mismatched (does not reject).
+  - [x] Returns normalized `CoverLetterOutput` deterministically (no LLM call).
 - **9.2.3** Replace literal placeholder tokens.
-  - [ ] Match tokens: `[Company Name]`, `[Company]`, `<Company Name>`, `[Employer Name]`.
-  - [ ] Replace matched token with the resolved JD company name via `str.replace`.
-  - [ ] Handle token variants case-insensitively if needed (ASCII tokens only).
+  - [x] Match tokens: `[Company Name]`, `[Company]`, `<Company Name>`, `[Employer Name]` (via `_PLACEHOLDER_TOKENS`).
+  - [x] Replace matched token with the resolved JD company name via `str.replace`.
+  - [x] Tokens matched as ASCII literal strings.
 - **9.2.4** Substitute wrong resume-company present in the letter.
-  - [ ] Detect: target JD company NOT present AND a company from `parsed_resume.experience[*].company` IS present.
-  - [ ] Replace the **first** occurrence of the resume-company token with the JD company name.
-  - [ ] Guard: only apply when the substitution target differs from the JD name.
-  - [ ] Log the substitution at `INFO`.
-  - [ ] Do not run a second LLM call.
+  - [x] Detect: target JD company NOT present AND a company from `parsed_resume.experience[*].company` IS present (`_resume_company_in_letter`).
+  - [x] Replace the **first** occurrence of the resume-company token with the JD company name (`_replace_first_casefold`).
+  - [x] Guard: only apply when the substitution target differs from the JD name (ignores a resume company that matches the target).
+  - [x] Log the substitution at `INFO`.
+  - [x] No second LLM call.
 - **9.2.5** `_build_fallback_cover_letter()`.
-  - [ ] Confirm it already uses `_company_from` (verify in code).
-  - [ ] Verify/reassert it never emits `[Company Name]`.
-- **9.2.6** Add tests in `tests/test_cover_letter_validation.py`.
-  - [ ] Test: `[Company Name]` placeholder replaced with the JD company.
-  - [ ] Test: letter naming a resume-company substituted with the JD company.
-  - [ ] Test: letter already correct left unchanged.
-  - [ ] Run `uv run pytest tests/test_cover_letter_validation.py`.
+  - [x] Confirmed it uses `_company_from` (via `_company_from(jd_data)`).
+  - [x] Verified it never emits `[Company Name]` (company omitted when absent, never placeholder text).
+- **9.2.6** Add tests in `tests/test_cover_letter_validation.py` (new `TestApplyCompanyName` class).
+  - [x] Test: `[Company Name]` placeholder replaced with the JD company.
+  - [x] Test: letter naming a resume-company substituted with the JD company.
+  - [x] Test: letter already correct left unchanged.
+  - [x] Run `uv run pytest tests/test_cover_letter_validation.py` (102 passed).
 
 **Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
 
@@ -508,8 +507,8 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 4 | 8.5.4: integrate into Gap Analysis | ❌ TODO | 8.5.1 | 1 |
 | 5 | 8.5.5: integrate into Resume Rewrite | ❌ TODO | 8.5.1 | 1 |
 | 6 | 8.5.6: integrate into Cover Letter | ❌ TODO | 8.5.1 | 1 |
-| 7 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
-| 8 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
+| 7 | 9.1: chronological ordering (sort, don't reject) | ✅ DONE | 6.B.1 | 2 |
+| 8 | 9.2: company name from JD + placeholder fix | ✅ DONE | 9.1 | 1 |
 | 9 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
 | 10 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 7–9 | 2 |
 | 11 | 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1–10 (all features) | 1 |

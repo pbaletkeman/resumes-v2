@@ -70,6 +70,13 @@ _SCHEMA_HINT = (
     "cover_letter (string with the full cover letter text, 450-600 words)."
 )
 
+_PLACEHOLDER_TOKENS = (
+    "[Company Name]",
+    "[Company]",
+    "<Company Name>",
+    "[Employer Name]",
+)
+
 
 class CoverLetterAgent:
     """Agent that generates a tailored cover letter.
@@ -177,10 +184,13 @@ class CoverLetterAgent:
             "explicitly present in the resume.\n"
             "- Do not fabricate the company name, only use the exact company name from "
             "the job description.\n"
+            "- Never use a company from the candidate's resume (e.g. a past employer) "
+            "as the target company.\n"
             "- Use the exact role title from the job description.\n"
             "- The candidate's contact details (if provided below) are the ONLY "
             "phone number and email address you may mention; never invent contact "
             "information.\n\n"
+            f"{_company_directive(jd_json)}"
             "STRUCTURE:\n"
             "1. First paragraph: Mention [ROLE TITLE] at [COMPANY NAME]. "
             "Reference something specific about the company.\n"
@@ -273,6 +283,8 @@ class CoverLetterAgent:
 
         _check_company(result, jd_json)
 
+        result = _apply_company_name(result, jd_json, resume_json)
+
         _check_skills(result, resume_json, jd_json)
 
         if not _validate_length(result):
@@ -301,7 +313,7 @@ def _contact_from_resume(resume_json: str) -> str:
     """
     try:
         resume_data: dict[str, Any] = json.loads(resume_json)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return "(none available)"
     labels = (
         ("Phone", "phone"),
@@ -334,7 +346,7 @@ def _apply_contact_info(
     """
     try:
         resume_data: dict[str, Any] = json.loads(resume_json)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return result
     contact_values = [
         v.strip()
@@ -476,6 +488,134 @@ def _company_from(jd_data: dict[str, Any]) -> str:
         if name.strip():
             return name.strip()
     return ""
+
+
+def _company_directive(jd_json: str) -> str:
+    """Return a prompt directive pinning the exact target company name.
+
+    An empty string is returned when the JD has no resolvable company so the
+    prompt stays neutral.  The directive tells the LLM to name the target
+    company (never a past employer from the resume).
+    """
+    target = _get_company_name(jd_json)
+    if not target:
+        return ""
+    return (
+        f'The exact target company name is "{target}". '
+        "Your letter MUST name this exact company. "
+        "NEVER use a company from the candidate's resume (e.g. a past employer) "
+        "as the target company.\n"
+    )
+
+
+def _company_mentioned(letter_lower: str, company: str) -> bool:
+    """Return True if ``company`` appears in the letter.
+
+    Mirrors ``_check_company``: an exact case-insensitive match passes, or
+    at least one significant token of the company appears as a whole word.
+    """
+    if company.lower() in letter_lower:
+        return True
+    tokens = [t for t in re.findall(r"[a-z0-9]+", company.lower()) if len(t) >= 3]
+    return bool(tokens) and any(
+        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
+    )
+
+
+def _replace_placeholders(text: str, target: str) -> str:
+    """Replace literal company placeholder tokens with the target name."""
+    for token in _PLACEHOLDER_TOKENS:
+        if token in text:
+            text = text.replace(token, target)
+    return text
+
+
+def _resume_companies(resume_data: dict[str, Any]) -> list[str]:
+    """Extract non-empty company names from the resume's experience entries."""
+    experiences: Any = resume_data.get("experience", [])
+    if not isinstance(experiences, list):
+        return []
+    typed_experiences: list[Any] = experiences  # type: ignore[reportUnknownVariableType]
+    companies: list[str] = []
+    for exp in typed_experiences:
+        if isinstance(exp, dict):
+            company = exp.get("company", "")  # type: ignore[reportUnknownMemberType]
+        else:
+            company = getattr(exp, "company", "")
+        if isinstance(company, str) and company.strip():
+            companies.append(company.strip())
+    return companies
+
+
+def _resume_company_in_letter(letter_lower: str, resume_json: str, target: str) -> str:
+    """Return a resume company mentioned in the letter, or an empty string.
+
+    Only a company that differs from the target JD company is considered a
+    wrong mention.  Calls by the target (e.g. the same company under a
+    different name) are ignored.
+    """
+    if not resume_json:
+        return ""
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return ""
+    target_lower = target.lower()
+    for company in _resume_companies(resume_data):
+        company_lower = company.lower()
+        if (
+            company_lower
+            and company_lower not in target_lower
+            and target_lower not in company_lower
+            and _company_mentioned(letter_lower, company)
+        ):
+            return company
+    return ""
+
+
+def _replace_first_casefold(text: str, old: str, new: str) -> str:
+    """Replace the first (case-insensitive) occurrence of ``old`` in ``text``."""
+    idx = text.lower().find(old.lower())
+    if idx == -1:
+        return text
+    return text[:idx] + new + text[idx + len(old) :]
+
+
+def _apply_company_name(
+    result: CoverLetterOutput,
+    jd_json: str,
+    resume_json: str = "",
+) -> CoverLetterOutput:
+    """Deterministically fix the target company name in the letter.
+
+    Pure string post-processing (no LLM call).  Resolves the JD company via
+    ``_company_from``, replaces literal placeholder tokens (``[Company Name]``
+    and friends), and — when the letter instead names a company from the
+    candidate's resume — substitutes the first wrong mention with the JD
+    company.  A letter that is already correct (or has no target) is returned
+    unchanged.
+    """
+    target = _get_company_name(jd_json)
+    if not target:
+        return result
+    letter = result.cover_letter
+
+    letter = _replace_placeholders(letter, target)
+
+    letter_lower = letter.lower()
+    if not _company_mentioned(letter_lower, target):
+        wrong = _resume_company_in_letter(letter_lower, resume_json, target)
+        if wrong:
+            letter = _replace_first_casefold(letter, wrong, target)
+            logger.info(
+                "Substituted resume company %r with target company %r",
+                wrong,
+                target,
+            )
+
+    if letter == result.cover_letter:
+        return result
+    return CoverLetterOutput(cover_letter=letter)
 
 
 def _build_fallback_cover_letter(jd: Any, resume: Any, strategy: Any) -> str:

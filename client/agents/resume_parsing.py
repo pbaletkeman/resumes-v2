@@ -8,6 +8,7 @@ validation errors.
 """
 
 import logging
+import re
 from typing import Any
 
 from pydantic import ValidationError
@@ -142,7 +143,9 @@ class ResumeParsingAgent:
             return None
 
         try:
-            return ResumeParsingOutput(**data)
+            parsed = ResumeParsingOutput(**data)
+            parsed.experience = _sort_experience(parsed.experience)
+            return parsed
         except ValidationError:
             logger.warning("LLM output failed Pydantic validation")
             return None
@@ -183,6 +186,7 @@ class ResumeParsingAgent:
         experience: list[ExperienceEntry] = []
         for entry in parsed.experience:
             experience.append(_parse_experience_line(entry))
+        experience = _sort_experience(experience)
 
         return ResumeParsingOutput(
             summary=parsed.summary,
@@ -196,6 +200,34 @@ class ResumeParsingAgent:
             linkedin=parsed.linkedin,
             github=parsed.github,
         )
+
+
+def _extract_start_year(dates: str) -> int | None:
+    """Return the first 4-digit year in a dates string, or None."""
+    match = re.search(r"(\d{4})", dates)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def _sort_experience(entries: list[ExperienceEntry]) -> list[ExperienceEntry]:
+    """Sort experience entries most-recent-first (idempotent).
+
+    Entries without a parseable start year sink to the tail, preserving
+    their original relative order.  No entries are dropped.
+    """
+    if not entries:
+        return entries
+    if not any(_extract_start_year(entry.dates) is not None for entry in entries):
+        return entries  # nothing to sort
+
+    def _sort_key(entry: ExperienceEntry) -> tuple[int, int]:
+        year = _extract_start_year(entry.dates)
+        if year is None:
+            return (1, 0)  # no year: tail, stable keeps relative order
+        return (0, -year)  # most-recent-first
+
+    return sorted(entries, key=_sort_key)
 
 
 def _parse_experience_line(line: str) -> ExperienceEntry:
