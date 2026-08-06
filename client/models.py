@@ -157,6 +157,7 @@ class ResumeParsingOutput(BaseModel):
     projects: list[str] = Field(default_factory=list)
     certifications: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
+    name: str = ""
     phone: str = ""
     email: str = ""
     linkedin: str = ""
@@ -172,7 +173,7 @@ class ResumeParsingOutput(BaseModel):
     def _coerce_experience(cls, v: Any) -> list[ExperienceEntry]:
         return _coerce_experience_list(v)
 
-    @field_validator("phone", "email", "linkedin", "github", mode="before")
+    @field_validator("name", "phone", "email", "linkedin", "github", mode="before")
     @classmethod
     def _coerce_contact_fields(cls, v: Any) -> str:
         return _coerce_str(v)

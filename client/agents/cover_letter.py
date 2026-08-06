@@ -285,6 +285,8 @@ class CoverLetterAgent:
 
         result = _apply_company_name(result, jd_json, resume_json)
 
+        result = _apply_candidate_name(result, resume_json)
+
         _check_skills(result, resume_json, jd_json)
 
         if not _validate_length(result):
@@ -613,6 +615,48 @@ def _apply_company_name(
                 target,
             )
 
+    if letter == result.cover_letter:
+        return result
+    return CoverLetterOutput(cover_letter=letter)
+
+
+_NAME_PLACEHOLDER_TOKENS = (
+    "[Your Name]",
+    "[Candidate Name]",
+    "<Your Name>",
+)
+
+
+def _candidate_name_from_resume(resume_json: str) -> str:
+    """Return the candidate's name from a serialized resume, or empty."""
+    if not resume_json:
+        return ""
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return ""
+    name = resume_data.get("name", "")
+    if isinstance(name, str):
+        return name.strip()
+    return ""
+
+
+def _apply_candidate_name(
+    result: CoverLetterOutput, resume_json: str
+) -> CoverLetterOutput:
+    """Replace a ``[Your Name]`` placeholder with the candidate's real name.
+
+    Pure string post-processing (no LLM call).  Reads the candidate's name
+    from ``resume_json`` (never a placeholder).  When the name resolves empty
+    or no placeholder is present, the letter is returned unchanged.
+    """
+    name = _candidate_name_from_resume(resume_json)
+    if not name:
+        return result
+    letter = result.cover_letter
+    for token in _NAME_PLACEHOLDER_TOKENS:
+        if token in letter:
+            letter = letter.replace(token, name)
     if letter == result.cover_letter:
         return result
     return CoverLetterOutput(cover_letter=letter)

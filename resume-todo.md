@@ -207,29 +207,31 @@ The cover letter previously could use a **company name pulled from the candidate
 
 ### 9.3 Candidate Name must come from the candidate's resume
 
-**Context:** The cover letter's signature / opening sometimes contains `[Your Name]`. The candidate name is not currently carried through the pipeline — `ResumeParsingOutput` (in `client/models.py`) has **no `name` field**, even though `FormatDetector` already extracts `ParsedResume.name`. So the cover letter agent cannot know the candidate's real name. The fallback `_build_fallback_cover_letter()` already does `_read_str(resume_data, "name").strip() or "Candidate"`, which returns `"Candidate"` today because the field is absent.
+**Status:** ✅ DONE
+
+The cover letter's signature / opening previously contained `[Your Name]`. The candidate name was not carried through the pipeline — `ResumeParsingOutput` (in `client/models.py`) had **no `name` field**, even though `FormatDetector` already extracts `ParsedResume.name`. The `name` field now exists on `ResumeParsingOutput`, is threaded through the Resume Parsing agent (regex + LLM paths), and is post-processed into the Cover Letter agent output.
 
 **Sub-tasks:**
 
 - **9.3.1** Add `name: str = ""` to `ResumeParsingOutput` and thread it through.
-  - [ ] Add `name: str = ""` field to `ResumeParsingOutput` in `client/models.py`.
-  - [ ] In `ResumeParsingAgent._regex_fallback()`, set `name=parsed.name` from the `FormatDetector` result (already extracted).
-  - [ ] For the LLM path (`_try_llm`), add `name` to `_SYSTEM_PROMPT` field list.
-  - [ ] Add prompt rule: "Extract the candidate's full name exactly as it appears at the top of the resume; empty string if absent."
-  - [ ] Ensure no duplicate — add `name` to the schema's field list; confirm the `str` validator handles it.
+  - [x] Added `name: str = ""` field to `ResumeParsingOutput` in `client/models.py`.
+  - [x] In `ResumeParsingAgent._regex_fallback()`, set `name=_normalize_extracted_name(parsed.name)` from the `FormatDetector` result (already extracted).
+  - [x] For the LLM path (`_try_llm`), added `name` to `_SYSTEM_PROMPT` field list (`ResumeParsingOutput(**data)` now includes it).
+  - [x] Added prompt rule: "Extract the candidate's full name exactly as it appears at the top of the resume; empty string if absent."
+  - [x] No duplicate — added `name` to the schema field list and to the `str` `_coerce_contact_fields` validator (renamed usage; the shared `_coerce_str` handles dict/list coercion).
 - **9.3.2** `_apply_candidate_name(result, resume_json)` in `cover_letter.py` `_try_llm()`.
-  - [ ] Read the candidate name from `resume_json` (NOT a placeholder).
-  - [ ] Add `_apply_candidate_name(result: CoverLetterOutput, resume_json) -> CoverLetterOutput`.
-  - [ ] Replace `[Your Name]` / residue with the resolved resume name.
-  - [ ] If the name resolves empty, leave the letter untouched.
-  - [ ] No LLM call.
+  - [x] Reads the candidate name from `resume_json` (via `_candidate_name_from_resume` — never a placeholder).
+  - [x] Added `_apply_candidate_name(result: CoverLetterOutput, resume_json) -> CoverLetterOutput`.
+  - [x] Replaces `[Your Name]` / residue (`[Your Name]`, `[Candidate Name]`, `<Your Name>`) with the resolved resume name.
+  - [x] If the name resolves empty, leaves the letter untouched.
+  - [x] No LLM call.
 - **9.3.3** `_build_fallback_cover_letter()`.
-  - [ ] Verify the existing `_read_str(resume_data, "name").strip() or "Candidate"` resolves to the real name once 9.3.1 lands.
+  - [x] Verified the existing `_read_str(resume_data, "name").strip() or "Candidate"` now resolves to the real name once 9.3.1 lands (the name flows regex/LLM → `ResumeParsingOutput.name` → the fallback's `resume_data`).
 - **9.3.4** Add tests.
-  - [ ] Test: `name` flows regex → `ResumeParsingOutput.name`.
-  - [ ] Test: placeholder `[Your Name]` replaced.
-  - [ ] Test: empty name leaves the letter unchanged (or emits "Candidate"/nothing).
-  - [ ] Run `uv run pytest tests/test_cover_letter_validation.py` (name-replacement).
+  - [x] Test: `name` flows regex → `ResumeParsingOutput.name` (new `TestResumeParsingName`).
+  - [x] Test: placeholder `[Your Name]` replaced (new `TestApplyCandidateName`).
+  - [x] Test: empty name leaves the letter unchanged (or emits "Candidate"/nothing).
+  - [x] Run `uv run pytest tests/test_cover_letter_validation.py` (name-replacement; 102 passed).
 
 **Files changed:** `client/models.py`, `client/agents/resume_parsing.py`, `client/agents/cover_letter.py`, `tests/test_resume_rewrite_validation.py` (no), `tests/test_cover_letter_validation.py` (name-replacement)
 
@@ -509,7 +511,7 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 6 | 8.5.6: integrate into Cover Letter | ❌ TODO | 8.5.1 | 1 |
 | 7 | 9.1: chronological ordering (sort, don't reject) | ✅ DONE | 6.B.1 | 2 |
 | 8 | 9.2: company name from JD + placeholder fix | ✅ DONE | 9.1 | 1 |
-| 9 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
+| 9 | 9.3: candidate name via `ResumeParsingOutput.name` | ✅ DONE | 9.2 | 3 |
 | 10 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 7–9 | 2 |
 | 11 | 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1–10 (all features) | 1 |
 | 12 | 7.2.1: agent unit tests (`tests/test_agent_*.py` or `test_agents.py`) | ❌ TODO | Steps 1–10 | 7 to 8 |

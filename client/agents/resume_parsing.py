@@ -29,11 +29,13 @@ _SYSTEM_PROMPT = (
     "experience (list of roles with: title, company, dates, "
     "responsibilities, achievements, metrics), "
     "projects, certifications, education, "
-    "phone, email, linkedin, github. "
+    "name, phone, email, linkedin, github. "
     "Rules: "
     "Preserve all quantifiable metrics. "
     "Convert bullet points into structured lists. "
     "Do not infer missing information. "
+    "Extract the candidate's full name exactly as it appears at the top "
+    "of the resume; empty string if absent. "
     "Extract the candidate's phone number, email address, "
     "LinkedIn profile URL, and GitHub profile URL exactly as they "
     "appear in the resume; empty string if absent. "
@@ -195,11 +197,24 @@ class ResumeParsingAgent:
             projects=parsed.projects,
             certifications=parsed.certifications,
             education=parsed.education,
+            name=_normalize_extracted_name(parsed.name),
             phone=parsed.phone,
             email=parsed.email,
             linkedin=parsed.linkedin,
             github=parsed.github,
         )
+
+
+def _normalize_extracted_name(name: str) -> str:
+    """Normalize a FormatDetector-extracted name for the resume schema.
+
+    ``FormatDetector`` uses ``"Unknown"`` as its not-found sentinel; the
+    ``ResumeParsingOutput.name`` field uses an empty string for absence.
+    """
+    if not name:
+        return ""
+    stripped = name.strip()
+    return stripped if stripped != "Unknown" else ""
 
 
 def _extract_start_year(dates: str) -> int | None:

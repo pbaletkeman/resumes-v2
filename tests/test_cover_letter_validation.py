@@ -6,6 +6,7 @@ from typing import Any
 
 from client.agents.cover_letter import (
     CoverLetterAgent,
+    _apply_candidate_name,
     _apply_company_name,
     _apply_contact_info,
     _build_fallback_cover_letter,
@@ -23,6 +24,7 @@ from client.agents.cover_letter import (
     _validate_length,
     _validate_role,
 )
+from client.agents.resume_parsing import ResumeParsingAgent
 from client.errors import LLMConnectionError
 from client.models import (
     CoverLetterOutput,
@@ -213,6 +215,61 @@ class TestApplyCompanyName:
         letter_text = "I worked at Acme and loved it."
         result = _apply_company_name(_letter(letter_text), jd, resume)
         assert result.cover_letter == letter_text
+
+
+class TestApplyCandidateName:
+    @staticmethod
+    def _resume(name: str = "") -> str:
+        return json.dumps({"name": name, "skills": []})
+
+    def test_your_name_placeholder_replaced(self) -> None:
+        letter = _letter("Sincerely,\n[Your Name]")
+        result = _apply_candidate_name(letter, self._resume("Peter Letkeman"))
+        assert result.cover_letter == "Sincerely,\nPeter Letkeman"
+
+    def test_candidate_name_placeholder_replaced(self) -> None:
+        letter = _letter("Sincerely,\n[Candidate Name]")
+        result = _apply_candidate_name(letter, self._resume("Jane Doe"))
+        assert result.cover_letter == "Sincerely,\nJane Doe"
+
+    def test_angle_bracket_placeholder_replaced(self) -> None:
+        letter = _letter("Sincerely,\n<Your Name>")
+        result = _apply_candidate_name(letter, self._resume("Jane Doe"))
+        assert result.cover_letter == "Sincerely,\nJane Doe"
+
+    def test_empty_name_leaves_letter_unchanged(self) -> None:
+        letter = _letter("Sincerely,\n[Your Name]")
+        result = _apply_candidate_name(letter, self._resume())
+        assert result.cover_letter == "Sincerely,\n[Your Name]"
+
+    def test_no_placeholder_leaves_letter_unchanged(self) -> None:
+        letter = _letter("Sincerely,\nJane Doe")
+        result = _apply_candidate_name(letter, self._resume("Jane Doe"))
+        assert result.cover_letter == "Sincerely,\nJane Doe"
+
+    def test_invalid_resume_json_unchanged(self) -> None:
+        letter = _letter("Sincerely,\n[Your Name]")
+        result = _apply_candidate_name(letter, "not json")
+        assert result.cover_letter == "Sincerely,\n[Your Name]"
+
+    def test_whitespace_name_untouched(self) -> None:
+        letter = _letter("Sincerely,\n[Your Name]")
+        result = _apply_candidate_name(letter, self._resume("   "))
+        assert result.cover_letter == "Sincerely,\n[Your Name]"
+
+
+class TestResumeParsingName:
+    async def test_name_flows_regex_fallback_into_output(self) -> None:
+        resume_text = "# Peter Letkeman\n\n## Summary\nData engineer.\n"
+        result = await ResumeParsingAgent._regex_fallback(resume_text)
+        assert result.name == "Peter Letkeman"
+
+    async def test_unknown_name_becomes_empty(self) -> None:
+        result = await ResumeParsingAgent._regex_fallback("\n\n\n")
+        assert result.name == ""
+
+    async def test_resume_parsing_output_defaults_empty_name(self) -> None:
+        assert ResumeParsingOutput().name == ""
 
 
 class TestSkillMentioned:
