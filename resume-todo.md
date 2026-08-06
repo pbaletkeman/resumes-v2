@@ -18,6 +18,154 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 
 ---
 
+## Phase 8: Contact Information Extraction & Cover Letter Integration
+
+Extract phone number, email address, LinkedIn URL, and GitHub URL from the parsed resume and use them in cover letter generation. Update cover letter templates to include these contact details.
+
+### 8.1 Add contact fields to ResumeParsingOutput
+
+**Status:** ❌ NOT DONE
+
+Add optional contact fields to `ResumeParsingOutput` in `client/models.py` and populate them from `FormatDetector` extraction.
+
+**Sub-tasks:**
+
+- **8.1.1** Add `phone: str = ""`, `email: str = ""`, `linkedin: str = ""`, `github: str = ""` to `ResumeParsingOutput` in `client/models.py`.
+- **8.1.2** In `ResumeParsingAgent._regex_fallback()` (in `client/agents/resume_parsing.py`), extract these fields from `FormatDetector` parsed output and assign to the model.
+- **8.1.3** For the LLM path (`_try_llm`), add contact fields to the system prompt field list with rules: "Extract the candidate's phone number, email address, LinkedIn profile URL, and GitHub profile URL exactly as they appear in the resume; empty string if absent."
+- **8.1.4** Ensure validators/coercion handles dict→string if LLM returns structured contact object.
+
+**Files changed:** `client/models.py`, `client/agents/resume_parsing.py`
+
+---
+
+### 8.2 Update cover letter templates to include contact information
+
+**Status:** ❌ NOT DONE
+
+Modify the Jinja2 cover letter templates in `client/templates/` to render the candidate's contact details (phone, email, LinkedIn, GitHub) in the letter header/footer.
+
+**Sub-tasks:**
+
+- **8.2.1** Update `client/templates/cover_letter.j2` (and any variants: modern, classic, minimal) to include contact fields in the header area.
+- **8.2.2** Ensure templates gracefully handle missing/empty contact fields (don't render empty lines).
+- **8.2.3** Verify template rendering with `ResumeRenderer.render_cover_letter_markdown/plain/docx/pdf`.
+
+**Files changed:** `client/templates/cover_letter.j2` (and variants)
+
+---
+
+### 8.3 Pass contact info to cover letter agent and use in generation
+
+**Status:** ❌ NOT DONE
+
+Thread the contact fields through the pipeline to the Cover Letter agent and use them when building the cover letter.
+
+**Sub-tasks:**
+
+- **8.3.1** In `cover_letter.py` `_try_llm()`, read contact fields from `resume_json` and pass them in the prompt/context so the LLM can include them.
+- **8.3.2** In `_apply_candidate_name()` (from 9.3.2) or a new `_apply_contact_info()`, post-process the LLM output to inject contact details if the template didn't render them.
+- **8.3.3** In `_build_fallback_cover_letter()`, ensure contact fields from `resume_data` are used in the fallback template.
+- **8.3.4** Add tests in `tests/test_cover_letter_validation.py` — contact fields appear in output; missing fields don't break rendering.
+
+**Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
+
+---
+
+## Phase 8.5: Skill Normalization & Canonical Taxonomy
+
+Add a centralized skill normalization layer with a canonical skill taxonomy to map synonyms, abbreviations, and variations to standard skill names. This enables accurate JD↔resume skill matching, gap analysis, and keyword optimization across all agents.
+
+### 8.5.1 Create skill normalization module
+
+**Status:** ❌ NOT DONE
+
+**Sub-tasks:**
+
+- **8.5.1.1** Create `client/skills/` directory with `normalizer.py`, `taxonomy.json`, and `__init__.py`.
+- **8.5.1.2** Define a **canonical skill taxonomy** in `taxonomy.json` — a mapping of **canonical skill names** to their variants/synonyms/abbreviations (e.g., `"javascript": ["js", "javascript", "ecmascript", "es6", "es2015"]`, `"react": ["react.js", "reactjs", "react.js"]`, `"aws": ["amazon web services", "aws", "amazon cloud"]`).
+- **8.5.1.3** Implement `SkillNormalizer` class in `normalizer.py` with methods:
+  - `normalize(skill: str) -> str` — maps a skill to its **canonical form** using the taxonomy (returns canonical name if match found, otherwise returns normalized lowercase tokenized form)
+  - `canonicalize(skill: str) -> str` — alias for `normalize()`, explicit canonicalization
+  - `normalize_list(skills: list[str]) -> list[str]` — normalizes, **canonicalizes**, and deduplicates a skill list
+  - `get_variants(canonical: str) -> list[str]` — returns all known variants for a canonical skill
+  - `match_skills(jd_skills: list[str], resume_skills: list[str]) -> dict` — returns matched, missing, extra skills using canonical forms
+- **8.5.1.4** Include skill categories (programming_languages, frameworks, databases, cloud, tools, soft_skills) in taxonomy for future categorization features.
+- **8.5.1.5** Add unit tests in `tests/test_skill_normalizer.py` — normalization, canonicalization, deduplication, matching, variant lookup.
+
+**Files changed:** new `client/skills/normalizer.py`, `client/skills/taxonomy.json`, `client/skills/__init__.py`, `tests/test_skill_normalizer.py`
+
+---
+
+### 8.5.2 Integrate skill normalization into JD Parsing Agent
+
+**Status:** ❌ NOT DONE
+
+**Sub-tasks:**
+
+- **8.5.2.1** In `jd_parsing.py` `_regex_fallback()`, apply `SkillNormalizer.normalize_list()` to `parsed.requirements` and `parsed.nice_to_have` before assigning to `required_skills`/`preferred_skills`.
+- **8.5.2.2** In `_try_llm()` system prompt, add rule: "Normalize all skills to their canonical form (e.g., 'JS' → 'JavaScript', 'React.js' → 'React', 'AWS' → 'Amazon Web Services')."
+- **8.5.2.3** Post-process LLM output: apply `SkillNormalizer.normalize_list()` to `required_skills` and `preferred_skills` after Pydantic validation.
+
+**Files changed:** `client/agents/jd_parsing.py`
+
+---
+
+### 8.5.3 Integrate skill normalization into Resume Parsing Agent
+
+**Status:** ❌ NOT DONE
+
+**Sub-tasks:**
+
+- **8.5.3.1** In `resume_parsing.py` `_regex_fallback()`, apply `SkillNormalizer.normalize_list()` to `parsed.skills` before assigning.
+- **8.5.3.2** In `_try_llm()` system prompt, add same normalization rule as JD parsing.
+- **8.5.3.3** Post-process LLM output: apply `SkillNormalizer.normalize_list()` to `skills` after Pydantic validation.
+
+**Files changed:** `client/agents/resume_parsing.py`
+
+---
+
+### 8.5.4 Integrate skill normalization into Gap Analysis Agent
+
+**Status:** ❌ NOT DONE
+
+**Sub-tasks:**
+
+- **8.5.4.1** In `gap_analysis.py` `_try_llm()`, pass canonical skill lists (normalized JD required/preferred skills and resume skills) to the LLM prompt.
+- **8.5.4.2** Post-process LLM output: apply `SkillNormalizer.normalize_list()` to `missing_skills`, `weak_skills`, `strong_matches`, and `keyword_strategy` fields.
+- **8.5.4.3** Use `SkillNormalizer.match_skills()` as a deterministic cross-check alongside LLM analysis; log discrepancies.
+
+**Files changed:** `client/agents/gap_analysis.py`
+
+---
+
+### 8.5.5 Integrate skill normalization into Resume Rewrite Agent
+
+**Status:** ❌ NOT DONE
+
+**Sub-tasks:**
+
+- **8.5.5.1** Replace local `_normalize_skill`/`_skill_matches` in `resume_rewrite.py` with `SkillNormalizer` from the shared module.
+- **8.5.5.2** In `_sanitize_skills()`, use `SkillNormalizer.normalize()` and `match_skills()` for more accurate filtering.
+- **8.5.5.3** In keyword injection logic, use canonical forms to avoid duplicates.
+
+**Files changed:** `client/agents/resume_rewrite.py`
+
+---
+
+### 8.5.6 Integrate skill normalization into Cover Letter Agent
+
+**Status:** ❌ NOT DONE
+
+**Sub-tasks:**
+
+- **8.5.6.1** Replace local `_normalize_skill` in `cover_letter.py` with shared `SkillNormalizer`.
+- **8.5.6.2** Use normalized skills when selecting keywords to highlight in the cover letter.
+
+**Files changed:** `client/agents/cover_letter.py`
+
+---
+
 ## Phase 9: Cover Letter Creation Fixes (a/b/c)
 
 Fixes for three defects in cover letter creation that surface on live runs: experience entries coming back out of chronological order, the company name being taken from the candidate's resume (or left as `[Company Name]`), and the candidate name left as `[Your Name]`. All three are handled with **pure Python post-processing — no additional LLM calls**.
@@ -248,90 +396,17 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 5 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
 | 6 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
 | 7 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |
-| 8 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
-| 9 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
-| 10 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
-| 11 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 8–10 | 2 |
+| 8 | 8.1: contact fields in ResumeParsingOutput | ❌ TODO | 6.B.1 | 2 |
+| 9 | 8.2: cover letter templates with contact info | ❌ TODO | 8.1 | 1-3 |
+| 10 | 8.3: pass contact info to cover letter agent | ❌ TODO | 8.1, 8.2 | 2 |
+| 11 | 8.5.1: skill normalizer module + taxonomy | ❌ TODO | 6.B.1 | 4 |
+| 12 | 8.5.2: integrate into JD Parsing | ❌ TODO | 8.5.1 | 1 |
+| 13 | 8.5.3: integrate into Resume Parsing | ❌ TODO | 8.5.1 | 1 |
+| 14 | 8.5.4: integrate into Gap Analysis | ❌ TODO | 8.5.1 | 1 |
+| 15 | 8.5.5: integrate into Resume Rewrite | ❌ TODO | 8.5.1 | 1 |
+| 16 | 8.5.6: integrate into Cover Letter | ❌ TODO | 8.5.1 | 1 |
+| 17 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
+| 18 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
+| 19 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
+| 20 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 17–19 | 2 |
 
----
-
-**get:**
-
-- Phone Number
-- Email
-- linkedIn
-- Github
-for cover letter generation
-
----
-
-**falsehoods**
-Do not add skills not in the resume to the coverletter:
-
-- e.g. pytest, and flask are not in the incoming resume it should not be a skill or platform listed in the generated coverletter or resume
-- not all diagrams are the same UML != C4 != ArchiMate, etc
-
----
-
-**fallback:**
-
-If any one section is missing e.g. Output missing certifications from input, only replace that section with the fallback value if possible
-
----
-
-Normalization of skills
-
-
-Here is the exact instruction you should include in your JD–Resume matching prompt:
-
-“Normalize all skills by mapping synonyms, variations, and related phrases to a single canonical skill. Treat any phrasing differences as equivalent if they refer to the same underlying capability.
-Example: ‘REST API’, ‘RESTFul API’, ‘REST API Development’, and ‘REST API Endpoint Development’ must all be treated as the same skill: REST API.”
-
-Then add the general rule:
-
-“Apply this normalization rule to all skills, technologies, tools, and methodologies found in the job description and resume. If two phrases refer to the same capability, treat them as equivalent even if wording differs.”
-
-🛠️ A more complete version (recommended for production)
-You can embed this block into your JD–Resume matching pipeline:
-
-Skill Normalization Rule:
-
-Map all skill synonyms, abbreviations, plurals, and variations to a single canonical skill name.
-
-Treat different phrasings as equivalent if they refer to the same underlying capability.
-
-Examples:
-
-REST API = RESTFul API = REST API Development = REST API Endpoint Development
-
-CI/CD = Continuous Integration and Continuous Deployment
-
-Microservices = Microservice Architecture
-
-Node.js = Node = NodeJS
-
-Apply this rule consistently across both the job description and the resume.
-
-This tells the LLM to generalize beyond REST API.
-
-🔍 Why this works
-LLMs are excellent at semantic grouping when explicitly instructed.
-Without instructions, they treat phrases literally.
-With instructions, they cluster them conceptually.
-
-🧪 Optional: Add a canonicalization step
-If you want the model to output a clean list of normalized skills:
-
-“After extracting skills, convert all skills to their canonical form using the normalization rules.”
-
-This ensures:
-
-JD skills → canonical
-
-Resume skills → canonical
-
-Gap analysis → canonical
-
-Matching → canonical
-
-Everything aligns.
