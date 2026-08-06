@@ -6,6 +6,7 @@ from typing import Any
 
 from client.agents.cover_letter import (
     CoverLetterAgent,
+    _apply_contact_info,
     _build_fallback_cover_letter,
     _check_company,
     _check_skills,
@@ -470,6 +471,34 @@ class TestBuildFallbackCoverLetter:
         )
         assert all(ord(char) < 128 for char in letter)
 
+    def test_includes_contact_line_from_resume(self) -> None:
+        resume_dict = self._resume().model_dump()
+        resume_dict.update(
+            {
+                "phone": "555-1234",
+                "email": "peter@example.com",
+                "linkedin": "https://linkedin.com/in/peter",
+            }
+        )
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Engineer"), resume_dict, self._strategy()
+        )
+        assert "555-1234 | peter@example.com | https://linkedin.com/in/peter" in letter
+
+    def test_omits_contact_line_when_absent(self) -> None:
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Engineer"), self._resume(), self._strategy()
+        )
+        assert " | " not in letter
+
+    def test_signature_contact_line_after_name(self) -> None:
+        resume_dict = self._resume().model_dump()
+        resume_dict["email"] = "peter@example.com"
+        letter = _build_fallback_cover_letter(
+            self._jd(role_title="Engineer"), resume_dict, self._strategy()
+        )
+        assert "Sincerely,\nCandidate\npeter@example.com" in letter
+
 
 class _MockClient:
     """Stub ``ModelClient`` returning a canned response or raising an error."""
@@ -506,6 +535,41 @@ class TestFallbackLogging:
         assert "LLM cover letter succeeded" in caplog.text
         assert "words=210" in caplog.text
 
+    async def test_llm_success_injects_contact_info(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        letter = " ".join(["word"] * 210)
+        client = _MockClient(response=json.dumps({"cover_letter": letter}))
+        agent = CoverLetterAgent(client)
+        resume: dict[str, Any] = {
+            "skills": [],
+            "phone": "555-1234",
+            "email": "peter@example.com",
+        }
+        result = await agent.run(self._inputs(resume))
+        assert "555-1234 | peter@example.com" in result.cover_letter
+        assert "Injected contact info" in caplog.text
+
+    async def test_llm_success_without_contact_leaves_unchanged(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        letter = " ".join(["word"] * 210)
+        client = _MockClient(response=json.dumps({"cover_letter": letter}))
+        agent = CoverLetterAgent(client)
+        result = await agent.run(self._inputs())
+        assert len(result.cover_letter.split()) == 210
+        assert " | " not in result.cover_letter
+        assert "Injected contact info" not in caplog.text
+
+    async def test_fallback_includes_contact_line(self, caplog) -> None:
+        caplog.set_level(logging.INFO)
+        agent = CoverLetterAgent(_MockClient(error=LLMConnectionError("boom")))
+        resume: dict[str, Any] = {
+            "skills": ["Python"],
+            "email": "peter@example.com",
+        }
+        result = await agent.run(self._inputs(resume))
+        assert "peter@example.com" in result.cover_letter
+        assert "Sincerely,\nCandidate\npeter@example.com" in result.cover_letter
+
     async def test_llm_failure_logs_fallback_reason(self, caplog) -> None:
         caplog.set_level(logging.INFO)
         agent = CoverLetterAgent(_MockClient(error=LLMConnectionError("boom")))
@@ -520,3 +584,44 @@ class TestFallbackLogging:
         await agent.run({})
         assert "Fallback: template cover letter used" in caplog.text
         assert "empty input" in caplog.text
+
+
+class TestApplyContactInfo:
+    def _resume(self, **contacts: str) -> str:
+        data: dict[str, Any] = {"skills": []}
+        data.update(contacts)
+        return json.dumps(data)
+
+    def test_injects_contact_line_when_absent(self) -> None:
+        letter = _letter("Dear Hiring Manager,\n\nI am applying.\n\nSincerely,\nJane")
+        result = _apply_contact_info(
+            letter,
+            self._resume(phone="555-1234", email="jane@example.com"),
+        )
+        assert result.cover_letter.endswith("555-1234 | jane@example.com\n")
+        assert "555-1234 | jane@example.com" in result.cover_letter
+
+    def test_leaves_unchanged_when_contact_already_present(self) -> None:
+        letter = _letter(
+            "Dear Hiring Manager,\n\nYou can reach me at jane@example.com.\n"
+        )
+        result = _apply_contact_info(
+            letter, self._resume(email="jane@example.com")
+        )
+        assert result.cover_letter == letter.cover_letter
+
+    def test_leaves_unchanged_when_no_contact_fields(self) -> None:
+        letter = _letter("Dear Hiring Manager,\n\nI am applying.")
+        result = _apply_contact_info(letter, self._resume())
+        assert result.cover_letter == letter.cover_letter
+
+    def test_leaves_unchanged_on_invalid_json(self) -> None:
+        letter = _letter("Dear Hiring Manager,\n\nI am applying.")
+        result = _apply_contact_info(letter, "not json")
+        assert result.cover_letter == letter.cover_letter
+
+    def test_missing_contact_fields_do_not_break_output(self) -> None:
+        letter = _letter("Dear Hiring Manager,\n\nI am applying.")
+        result = _apply_contact_info(letter, self._resume(phone="555-1234"))
+        assert "555-1234" in result.cover_letter
+        assert " | " not in result.cover_letter.split("555-1234", 1)[0]

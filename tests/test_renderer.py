@@ -236,6 +236,66 @@ def test_cover_letter_plaintext_uses_date(
     assert date.today().strftime("%B %d, %Y") in rendered
 
 
+def test_cover_letter_plaintext_includes_contact_line(
+    cover_letter_output: CoverLetterOutput,
+) -> None:
+    """The plaintext letter header includes the provided contact details."""
+    rendered = ResumeRenderer().render_cover_letter_plaintext(
+        cover_letter_output,
+        name="Jane Doe",
+        phone="555-1234",
+        email="jane@example.com",
+        linkedin="https://linkedin.com/in/jane",
+        github="https://github.com/jane",
+    )
+    assert "555-1234 | jane@example.com" in rendered
+    assert "https://linkedin.com/in/jane" in rendered
+    assert "https://github.com/jane" in rendered
+
+
+def test_cover_letter_markdown_includes_contact_line(
+    cover_letter_output: CoverLetterOutput,
+) -> None:
+    """The Markdown letter header includes the provided contact details."""
+    rendered = ResumeRenderer().render_cover_letter_markdown(
+        cover_letter_output,
+        name="Jane Doe",
+        email="jane@example.com",
+        linkedin="https://linkedin.com/in/jane",
+    )
+    assert "*jane@example.com | https://linkedin.com/in/jane*" in rendered
+
+
+def test_cover_letter_omits_contact_line_when_empty(
+    cover_letter_output: CoverLetterOutput,
+) -> None:
+    """Empty contact fields do not render an empty contact line."""
+    rendered = ResumeRenderer().render_cover_letter_plaintext(
+        cover_letter_output, name="Jane Doe"
+    )
+    assert " | " not in rendered
+    rendered_md = ResumeRenderer().render_cover_letter_markdown(
+        cover_letter_output, name="Jane Doe"
+    )
+    assert " | " not in rendered_md
+
+
+def test_cover_letter_no_blank_line_between_name_and_date(
+    cover_letter_output: CoverLetterOutput,
+) -> None:
+    """The name and date are adjacent lines when no contact info is present."""
+    rendered = ResumeRenderer().render_cover_letter_plaintext(
+        cover_letter_output, name="Jane Doe"
+    )
+    assert "Jane Doe\n" in rendered
+    assert "Jane Doe\n\n" not in rendered
+    rendered_md = ResumeRenderer().render_cover_letter_markdown(
+        cover_letter_output, name="Jane Doe"
+    )
+    assert "Jane Doe\n" in rendered_md
+    assert "Jane Doe\n\n" not in rendered_md
+
+
 # ===================================================================
 # build_output_path
 # ===================================================================
@@ -517,6 +577,29 @@ def test_render_all_renders_with_empty_segments(
         "cover_letter_plaintext",
         "cover_letter_markdown",
     }
+
+
+def test_render_all_cover_letter_files_include_contact_info(
+    rewrite_output: RewriteOutput,
+    cover_letter_output: CoverLetterOutput,
+    tmp_path,
+) -> None:
+    """Contact info passes through render_all into the written letter files."""
+    paths = ResumeRenderer().render_all(
+        rewrite_output,
+        cover_letter_output,
+        candidate_name="Jane Doe",
+        company_name="Acme Corp",
+        output_dir=tmp_path,
+        phone="555-1234",
+        email="jane@example.com",
+        linkedin="https://linkedin.com/in/jane",
+        github="https://github.com/jane",
+    )
+    contact_line = "555-1234 | jane@example.com | https://linkedin.com/in/jane | https://github.com/jane"
+    for key in ("cover_letter_plaintext", "cover_letter_markdown"):
+        text = paths[key].read_text(encoding="utf-8")
+        assert contact_line in text
 
 
 # ===================================================================

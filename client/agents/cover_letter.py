@@ -169,7 +169,7 @@ class CoverLetterAgent:
             "You MUST use the company name and role title from the job description. "
             "You MUST match the candidate's skills to the required skills.\n\n"
             "CRITICAL RULES:\n"
-            "- ONLY mention skills that appear in the CANDIDATE RESUME below. "
+            "- ONLY mention skills whose credentials are in the CANDIDATE resume. "
             "- Use the company name from the job description.\n"
             "- Do NOT invent or add skills not present in the resume.\n"
             "- Do not use any Unicode characters outside the standard ASCII range.\n"
@@ -177,18 +177,25 @@ class CoverLetterAgent:
             "explicitly present in the resume.\n"
             "- Do not fabricate the company name, only use the exact company name from "
             "the job description.\n"
-            "- Use the exact role title from the job description.\n\n"
+            "- Use the exact role title from the job description.\n"
+            "- The candidate's contact details (if provided below) are the ONLY "
+            "phone number and email address you may mention; never invent contact "
+            "information.\n\n"
             "STRUCTURE:\n"
             "1. First paragraph: Mention [ROLE TITLE] at [COMPANY NAME]. "
             "Reference something specific about the company.\n"
             "2. Middle paragraphs: Map these required skills to the candidate's "
             "experience: [list the required_skills from the JD]. "
             "Include quantified achievements.\n"
-            "3. Final paragraph: Thank them and request an interview.\n\n"
+            "3. Final paragraph: Thank them and request an interview.\n"
+            "If any contact details were provided, you may close with a line giving "
+            "the candidate's phone number or email address for follow-up.\n\n"
             f"JOB DESCRIPTION (use the company name and role title from here):\n"
             f"{jd_json}\n\n"
             f"CANDIDATE RESUME (use ONLY skills and achievements from here):\n"
             f"{resume_json}\n\n"
+            f"CANDIDATE CONTACT INFORMATION (only these, if any are present):\n"
+            f"{_contact_from_resume(resume_json)}\n\n"
             f"TAILORING STRATEGY (use recommended emphasis and keywords):\n"
             f"{strategy_json}\n\n"
             'Return ONLY: {"cover_letter": "your tailored letter here"}'
@@ -272,7 +279,7 @@ class CoverLetterAgent:
             logger.warning("Cover letter length outside extreme bounds -- rejecting")
             return None
 
-        return result
+        return _apply_contact_info(result, resume_json)
 
 
 def _serialize(value: Any) -> str:
@@ -282,6 +289,80 @@ def _serialize(value: Any) -> str:
     if isinstance(value, dict):
         return json.dumps(value, indent=2, default=str)
     return str(value)
+
+
+def _contact_from_resume(resume_json: str) -> str:
+    """Build a contact-info block string from a serialized resume.
+
+    Reads ``phone``, ``email``, ``linkedin``, and ``github`` from the
+    resume JSON and returns them as labeled lines.  Returns the string
+    ``"(none)"`` when every field is empty or absent so the LLM knows
+    no contact details are available.
+    """
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except (json.JSONDecodeError, TypeError):
+        return "(none available)"
+    labels = (
+        ("Phone", "phone"),
+        ("Email", "email"),
+        ("LinkedIn", "linkedin"),
+        ("GitHub", "github"),
+    )
+    lines: list[str] = []
+    for label, field in labels:
+        value = resume_data.get(field, "")
+        if isinstance(value, str) and value.strip():
+            lines.append(f"{label}: {value.strip()}")
+    if not lines:
+        return "(none available)"
+    return "\n".join(lines)
+
+
+def _apply_contact_info(
+    result: CoverLetterOutput, resume_json: str
+) -> CoverLetterOutput:
+    """Ensure the letter carries the candidate's contact details.
+
+    Reads ``phone``, ``email``, ``linkedin``, and ``github`` from the
+    resume JSON.  When at least one contact value is present AND none of
+    the present values already appears in the letter, a contact line is
+    appended after the signature so the letter is self-contained even if
+    the renderer template omits the contact header.  When the values are
+    already present or no contact info exists, the letter is returned
+    unchanged.  Pure string post-processing -- no LLM call.
+    """
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except (json.JSONDecodeError, TypeError):
+        return result
+    contact_values = [
+        v.strip()
+        for v in (
+            resume_data.get("phone", ""),
+            resume_data.get("email", ""),
+            resume_data.get("linkedin", ""),
+            resume_data.get("github", ""),
+        )
+        if isinstance(v, str) and v.strip()
+    ]
+    if not contact_values:
+        return result
+
+    letter_lower = result.cover_letter.lower()
+    present = [v for v in contact_values if v.lower() in letter_lower]
+    missing = [v for v in contact_values if v not in present]
+    if not missing:
+        return result
+
+    contact_line = " | ".join(contact_values)
+    letter = result.cover_letter.rstrip() + "\n\n" + contact_line + "\n"
+    logger.info(
+        "Injected contact info into cover letter (added %d of %d values)",
+        len(missing),
+        len(contact_values),
+    )
+    return CoverLetterOutput(cover_letter=letter)
 
 
 def _parse_json(raw: str) -> dict[str, Any] | None:
@@ -422,13 +503,38 @@ def _build_fallback_cover_letter(jd: Any, resume: Any, strategy: Any) -> str:
 
     achievement = _most_recent_achievement(resume_data)
 
+    signature = f"Sincerely,\n{name}"
+    contact_line = _contact_signature_line(resume_data)
+    if contact_line:
+        signature += f"\n{contact_line}"
+
     return (
         "Dear Hiring Manager,\n\n"
         f"{_opening_paragraph(role_title, company)}\n\n"
         f"{_middle_paragraph(overlap, achievement)}\n\n"
         f"{_closing_paragraph(company)}\n\n"
-        f"Sincerely,\n{name}"
+        f"{signature}"
     )
+
+
+def _contact_signature_line(resume_data: dict[str, Any]) -> str:
+    """Join the resume's contact fields into a single signature line.
+
+    Reads ``phone``, ``email``, ``linkedin``, and ``github`` and returns
+    them joined on `` | ``.  Returns an empty string when none are present
+    so the signature renders unchanged.
+    """
+    values = [
+        v.strip()
+        for v in (
+            resume_data.get("phone", ""),
+            resume_data.get("email", ""),
+            resume_data.get("linkedin", ""),
+            resume_data.get("github", ""),
+        )
+        if isinstance(v, str) and v.strip()
+    ]
+    return " | ".join(values)
 
 
 def _opening_paragraph(role_title: str, company: str) -> str:

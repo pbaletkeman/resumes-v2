@@ -6,8 +6,8 @@ Cover letter template — professional format for all output styles.
 COVER_LETTER = {
     "plaintext": """\
 {{ candidate_name }}
-
-{{ date }}
+{% if contact_line %}{{ contact_line }}
+{% endif %}{{ date }}
 
 Dear {{ hiring_manager | default('Hiring Manager') }},
 
@@ -21,8 +21,9 @@ Sincerely,
 {{ candidate_name }}""",
     "markdown": """\
 # {{ candidate_name }}
+{% if contact_line %}*{{ contact_line }}*
 
-*{{ date }}*
+{% endif %}*{{ date }}*
 
 Dear {{ hiring_manager | default('Hiring Manager') }},
 

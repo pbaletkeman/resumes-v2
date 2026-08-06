@@ -41,15 +41,15 @@ Add optional contact fields to `ResumeParsingOutput` in `client/models.py` and p
 
 ### 8.2 Update cover letter templates to include contact information
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Modify the Jinja2 cover letter templates in `client/templates/` to render the candidate's contact details (phone, email, LinkedIn, GitHub) in the letter header/footer.
 
 **Sub-tasks:**
 
-- **8.2.1** Update `client/templates/cover_letter.j2` (and any variants: modern, classic, minimal) to include contact fields in the header area.
-- **8.2.2** Ensure templates gracefully handle missing/empty contact fields (don't render empty lines).
-- **8.2.3** Verify template rendering with `ResumeRenderer.render_cover_letter_markdown/plain/docx/pdf`.
+- **8.2.1** ~~Update `client/templates/cover_letter.j2` (and any variants: modern, classic, minimal) to include contact fields in the header area.~~ ✅ DONE
+- **8.2.2** ~~Ensure templates gracefully handle missing/empty contact fields (don't render empty lines).~~ ✅ DONE
+- **8.2.3** ~~Verify template rendering with `ResumeRenderer.render_cover_letter_markdown/plain/docx/pdf`.~~ ✅ DONE
 
 **Files changed:** `client/templates/cover_letter.j2` (and variants)
 
@@ -57,16 +57,16 @@ Modify the Jinja2 cover letter templates in `client/templates/` to render the ca
 
 ### 8.3 Pass contact info to cover letter agent and use in generation
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Thread the contact fields through the pipeline to the Cover Letter agent and use them when building the cover letter.
 
 **Sub-tasks:**
 
-- **8.3.1** In `cover_letter.py` `_try_llm()`, read contact fields from `resume_json` and pass them in the prompt/context so the LLM can include them.
-- **8.3.2** In `_apply_candidate_name()` (from 9.3.2) or a new `_apply_contact_info()`, post-process the LLM output to inject contact details if the template didn't render them.
-- **8.3.3** In `_build_fallback_cover_letter()`, ensure contact fields from `resume_data` are used in the fallback template.
-- **8.3.4** Add tests in `tests/test_cover_letter_validation.py` — contact fields appear in output; missing fields don't break rendering.
+- **8.3.1** ~~In `cover_letter.py` `_try_llm()`, read contact fields from `resume_json` and pass them in the prompt/context so the LLM can include them.~~ ✅ DONE
+- **8.3.2** ~~In `_apply_candidate_name()` (from 9.3.2) or a new `_apply_contact_info()`, post-process the LLM output to inject contact details if the template didn't render them.~~ ✅ DONE
+- **8.3.3** ~~In `_build_fallback_cover_letter()`, ensure contact fields from `resume_data` are used in the fallback template.~~ ✅ DONE
+- **8.3.4** ~~Add tests in `tests/test_cover_letter_validation.py` — contact fields appear in output; missing fields don't break rendering.~~ ✅ DONE
 
 **Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
 
@@ -389,9 +389,9 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | 8.1: contact fields in ResumeParsingOutput | ❌ TODO | 6.B.1 | 2 |
-| 2 | 8.2: cover letter templates with contact info | ❌ TODO | 8.1 | 1-3 |
-| 3 | 8.3: pass contact info to cover letter agent | ❌ TODO | 8.1, 8.2 | 2 |
+| 1 | 8.1: contact fields in ResumeParsingOutput | ✅ DONE | 6.B.1 | 2 |
+| 2 | 8.2: cover letter templates with contact info | ✅ DONE | 8.1 | 1-3 |
+| 3 | 8.3: pass contact info to cover letter agent | ✅ DONE | 8.1, 8.2 | 2 |
 | 4 | 8.5.1: skill normalizer module + taxonomy | ❌ TODO | 6.B.1 | 4 |
 | 5 | 8.5.2: integrate into JD Parsing | ❌ TODO | 8.5.1 | 1 |
 | 6 | 8.5.3: integrate into Resume Parsing | ❌ TODO | 8.5.1 | 1 |

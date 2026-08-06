@@ -137,6 +137,10 @@ class ResumeRenderer:
         *,
         name: str = "",
         company: str = "",
+        phone: str = "",
+        email: str = "",
+        linkedin: str = "",
+        github: str = "",
     ) -> str:
         """Render *cover_letter* as clean plaintext.
 
@@ -144,6 +148,10 @@ class ResumeRenderer:
             cover_letter: Structured letter data from the Cover Letter Agent.
             name: Candidate name for the signature and header.
             company: Target company name (reserved for context).
+            phone: Candidate phone number for the header.
+            email: Candidate email address for the header.
+            linkedin: Candidate LinkedIn profile URL for the header.
+            github: Candidate GitHub profile URL for the header.
 
         Returns:
             A rendered plaintext letter string.
@@ -155,7 +163,13 @@ class ResumeRenderer:
         tpl_source = COVER_LETTER["plaintext"]
 
         context = self._build_cover_letter_context(
-            cover_letter, name=name, company=company
+            cover_letter,
+            name=name,
+            company=company,
+            phone=phone,
+            email=email,
+            linkedin=linkedin,
+            github=github,
         )
         rendered = self._env.from_string(tpl_source).render(**context)
         return self._clean_output(rendered)
@@ -166,6 +180,10 @@ class ResumeRenderer:
         *,
         name: str = "",
         company: str = "",
+        phone: str = "",
+        email: str = "",
+        linkedin: str = "",
+        github: str = "",
     ) -> str:
         """Render *cover_letter* as Markdown.
 
@@ -173,6 +191,10 @@ class ResumeRenderer:
             cover_letter: Structured data from the Cover Letter Agent.
             name: Candidate name for the signature and header.
             company: Target company name (reserved for context).
+            phone: Candidate phone number for the header.
+            email: Candidate email address for the header.
+            linkedin: Candidate LinkedIn profile URL for the header.
+            github: Candidate GitHub profile URL for the header.
 
         Returns:
             A rendered Markdown letter string.
@@ -184,7 +206,13 @@ class ResumeRenderer:
         tpl_source = COVER_LETTER["markdown"]
 
         context = self._build_cover_letter_context(
-            cover_letter, name=name, company=company
+            cover_letter,
+            name=name,
+            company=company,
+            phone=phone,
+            email=email,
+            linkedin=linkedin,
+            github=github,
         )
         rendered = self._env.from_string(tpl_source).render(**context)
         return self._clean_output(rendered)
@@ -287,6 +315,10 @@ class ResumeRenderer:
         company_name: str,
         output_dir: str | Path,
         resume_template: str = "modern",
+        phone: str = "",
+        email: str = "",
+        linkedin: str = "",
+        github: str = "",
     ) -> dict[str, Path]:
         """Render *resume* and, when available, *cover_letter* into formats.
 
@@ -304,6 +336,10 @@ class ResumeRenderer:
             company_name: Target company name for filenames.
             output_dir: Directory the rendered files are written to.
             resume_template: Template key for the resume text formats.
+            phone: Candidate phone number for cover letter headers.
+            email: Candidate email address for cover letter headers.
+            linkedin: Candidate LinkedIn profile URL for cover letter headers.
+            github: Candidate GitHub profile URL for cover letter headers.
 
         Returns:
             Mapping of format name to the written ``Path``.
@@ -365,10 +401,22 @@ class ResumeRenderer:
 
         if cover_letter is not None and cover_letter.cover_letter.strip():
             letter_plain = self.render_cover_letter_plaintext(
-                cover_letter, name=candidate_name, company=company_name
+                cover_letter,
+                name=candidate_name,
+                company=company_name,
+                phone=phone,
+                email=email,
+                linkedin=linkedin,
+                github=github,
             )
             letter_md = self.render_cover_letter_markdown(
-                cover_letter, name=candidate_name, company=company_name
+                cover_letter,
+                name=candidate_name,
+                company=company_name,
+                phone=phone,
+                email=email,
+                linkedin=linkedin,
+                github=github,
             )
             paths["cover_letter_plaintext"] = self._write_text(
                 letter_plain,
@@ -504,21 +552,32 @@ class ResumeRenderer:
         *,
         name: str = "",
         company: str = "",
+        phone: str = "",
+        email: str = "",
+        linkedin: str = "",
+        github: str = "",
     ) -> dict[str, object]:
         """Convert a ``CoverLetterOutput`` into a Jinja2 context dict.
 
         The ``COVER_LETTER`` template expects ``candidate_name``, ``date``,
         ``opening_paragraph``, ``body_paragraph``, and ``closing_paragraph``.
         The letter body is split on blank lines into up to three logical
-        paragraphs (opening / middle / closing).
+        paragraphs (opening / middle / closing).  ``contact_line`` holds the
+        non-empty contact details joined on `` | `` for the header.
         """
         paragraphs = _split_paragraphs(cover_letter.cover_letter)
         opening = paragraphs[0] if paragraphs else ""
         closing = paragraphs[-1] if len(paragraphs) > 1 else ""
         body = "\n\n".join(paragraphs[1:-1]) if len(paragraphs) > 2 else ""
+        contact_parts = [p for p in (phone, email, linkedin, github) if p]
         return {
             "candidate_name": name,
             "company": company,
+            "phone": phone,
+            "email": email,
+            "linkedin": linkedin,
+            "github": github,
+            "contact_line": " | ".join(contact_parts),
             "date": date.today().strftime("%B %d, %Y"),
             "opening_paragraph": opening,
             "body_paragraph": body,
