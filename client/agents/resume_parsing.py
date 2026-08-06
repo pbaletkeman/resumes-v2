@@ -18,8 +18,11 @@ from client.format_detector import FormatDetector
 from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import ExperienceEntry, ResumeParsingOutput
+from client.skills import SkillNormalizer
 
 logger = logging.getLogger(__name__)
+
+_NORMALIZER = SkillNormalizer()
 
 _SYSTEM_PROMPT = (
     "You are the Resume Parsing Agent. "
@@ -34,6 +37,9 @@ _SYSTEM_PROMPT = (
     "Preserve all quantifiable metrics. "
     "Convert bullet points into structured lists. "
     "Do not infer missing information. "
+    "Normalize all skills to their canonical form "
+    "(e.g., 'JS' -> 'JavaScript', 'React.js' -> 'React', "
+    "'AWS' -> 'Amazon Web Services'). "
     "Extract the candidate's full name exactly as it appears at the top "
     "of the resume; empty string if absent. "
     "Extract the candidate's phone number, email address, "
@@ -147,6 +153,7 @@ class ResumeParsingAgent:
         try:
             parsed = ResumeParsingOutput(**data)
             parsed.experience = _sort_experience(parsed.experience)
+            parsed.skills = _NORMALIZER.normalize_list(parsed.skills)
             return parsed
         except ValidationError:
             logger.warning("LLM output failed Pydantic validation")
@@ -192,7 +199,7 @@ class ResumeParsingAgent:
 
         return ResumeParsingOutput(
             summary=parsed.summary,
-            skills=parsed.skills,
+            skills=_NORMALIZER.normalize_list(parsed.skills),
             experience=experience,
             projects=parsed.projects,
             certifications=parsed.certifications,

@@ -18,8 +18,11 @@ from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
 from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import GapAnalysisOutput
+from client.skills import SkillNormalizer
 
 logger = logging.getLogger(__name__)
+
+_NORMALIZER = SkillNormalizer()
 
 _SYSTEM_PROMPT = (
     "You are the Gap Analysis Agent. "
@@ -112,7 +115,7 @@ class GapAnalysisAgent:
             "Identify gaps and produce a tailoring strategy.\n\n"
             f"JOB DESCRIPTION:\n{jd_json}\n\n"
             f"RESUME:\n{resume_json}"
-        )
+        ) + _canonical_skills_context(jd_json, resume_json)
         rules = (
             _STRICT_RULES
             if strict
@@ -156,7 +159,7 @@ class GapAnalysisAgent:
             return None
 
         try:
-            return GapAnalysisOutput(**data)
+            return _post_process(GapAnalysisOutput(**data), jd_json, resume_json)
         except ValidationError as exc:
             data_keys = list(data.keys()) if hasattr(data, "keys") else str(type(data))
             data_preview = (
@@ -189,3 +192,71 @@ def _parse_json(raw: str) -> dict[str, Any] | None:
     Handles responses wrapped in markdown fences.
     """
     return parse_json_response(raw)
+
+
+def _load_str_list(data: dict[str, Any], field: str) -> list[str]:
+    """Return a list-of-strings field from a parsed JSON dict."""
+    value = data.get(field)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
+
+
+def _canonical_skills(jd_json: str, resume_json: str) -> dict[str, list[str]]:
+    """Extract and canonicalize JD + resume skill lists."""
+    try:
+        jd: dict[str, Any] = json.loads(jd_json)
+        resume: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError:
+        return {"jd": [], "resume": []}
+    jd_skills = _load_str_list(jd, "required_skills") + _load_str_list(
+        jd, "preferred_skills"
+    )
+    resume_skills = _load_str_list(resume, "skills")
+    return {
+        "jd": _NORMALIZER.normalize_list(jd_skills),
+        "resume": _NORMALIZER.normalize_list(resume_skills),
+    }
+
+
+def _canonical_skills_context(jd_json: str, resume_json: str) -> str:
+    """Build a normalized-skills context block for the LLM prompt."""
+    canonical = _canonical_skills(jd_json, resume_json)
+    cross = _NORMALIZER.match_skills(canonical["jd"], canonical["resume"])
+    return (
+        "\n\nNORMALIZED SKILLS (canonical forms):\n"
+        f"  JD: {canonical['jd']}\n"
+        f"  Resume: {canonical['resume']}\n"
+        f"  Deterministic cross-check -> missing: {cross['missing']}\n"
+        f"                                 matched: {cross['matched']}\n"
+        f"                                 extra: {cross['extra']}\n"
+        "Use these when reasoning about skill gaps."
+    )
+
+
+def _post_process(
+    result: GapAnalysisOutput, jd_json: str, resume_json: str
+) -> GapAnalysisOutput:
+    """Canonicalize skill fields and cross-check LLM vs deterministic matching."""
+    canonical = _canonical_skills(jd_json, resume_json)
+    missing = _NORMALIZER.normalize_list(result.missing_skills)
+    output = result.model_copy(
+        update={
+            "missing_skills": missing,
+            "weak_skills": _NORMALIZER.normalize_list(result.weak_skills),
+            "strong_matches": _NORMALIZER.normalize_list(result.strong_matches),
+            "keyword_strategy": _NORMALIZER.normalize_list(result.keyword_strategy),
+        }
+    )
+    deterministic = set(
+        _NORMALIZER.match_skills(canonical["jd"], canonical["resume"])["missing"]
+    )
+    llm_norm = set(missing)
+    if llm_norm != deterministic:
+        logger.warning(
+            "Gap analysis deterministic cross-check differs from LLM: "
+            "missing deterministic=%s llm=%s",
+            sorted(deterministic),
+            sorted(llm_norm),
+        )
+    return output

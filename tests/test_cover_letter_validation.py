@@ -17,7 +17,6 @@ from client.agents.cover_letter import (
     _join_skills,
     _load_str_list,
     _most_recent_achievement,
-    _normalize_skill,
     _overlapping_skills,
     _skill_in_list,
     _skill_mentioned,
@@ -366,17 +365,6 @@ class TestLoadStrList:
 
     def test_invalid_json_empty(self) -> None:
         assert _load_str_list("not json", "skills") == []
-
-
-class TestNormalizeSkill:
-    def test_lowercases_and_tokenizes(self) -> None:
-        assert _normalize_skill("Python (Django)") == "python django"
-
-    def test_removes_symbols(self) -> None:
-        assert _normalize_skill("C++") == "c"
-
-    def test_empty_string(self) -> None:
-        assert _normalize_skill("") == ""
 
 
 class TestValidateLength:

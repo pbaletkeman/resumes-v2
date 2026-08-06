@@ -18,8 +18,11 @@ from client.format_detector import FormatDetector
 from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import JDParsingOutput
+from client.skills import SkillNormalizer
 
 logger = logging.getLogger(__name__)
+
+_NORMALIZER = SkillNormalizer()
 
 _SYSTEM_PROMPT = (
     "You are the Job Description Parsing Agent. "
@@ -34,6 +37,9 @@ _SYSTEM_PROMPT = (
     "Extract the company name exactly as it appears in the job "
     "description; output empty string if not present. "
     "Normalize skills (e.g., 'communication skills' -> 'communication'). "
+    "Normalize all skills to their canonical form "
+    "(e.g., 'JS' -> 'JavaScript', 'React.js' -> 'React', "
+    "'AWS' -> 'Amazon Web Services'). "
     "Extract all relevant keywords. "
     "Output only valid JSON."
 )
@@ -209,7 +215,14 @@ class JDParsingAgent:
 
         # Keep company_name and company_signals in sync so the name
         # flows with the signals regardless of which the LLM populated.
-        return _sync_company_name(result)
+        result = _sync_company_name(result)
+        # Canonicalize skill lists per the shared taxonomy.
+        return result.model_copy(
+            update={
+                "required_skills": _NORMALIZER.normalize_list(result.required_skills),
+                "preferred_skills": _NORMALIZER.normalize_list(result.preferred_skills),
+            }
+        )
 
     @staticmethod
     def _parse_json(raw: str) -> dict[str, Any] | None:
@@ -250,8 +263,8 @@ class JDParsingAgent:
             role_title=parsed.title,
             company_name=company_name,
             seniority_level="",
-            required_skills=parsed.requirements,
-            preferred_skills=parsed.nice_to_have,
+            required_skills=_NORMALIZER.normalize_list(parsed.requirements),
+            preferred_skills=_NORMALIZER.normalize_list(parsed.nice_to_have),
             responsibilities=parsed.responsibilities,
             keywords=FormatDetector.extract_keywords(jd_text),
             industry_terms=[],

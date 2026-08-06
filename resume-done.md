@@ -27,7 +27,7 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo (JSON mode)
-- `tests/` — 322 tests across 8 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer)
+- `tests/` — 362 tests across 9 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer)
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
 - `docs/TESTING.md` — Testing guide
@@ -972,6 +972,158 @@ wip_testing/
   test_tone_polishing.py           # EXISTS ✅ (Agents 1-6 chain test)
   test_cover_letter.py             # EXISTS ✅ (Agents 1-7 chain test)
 ```
+
+---
+
+## Phase 8.5: Skill Normalization & Canonical Taxonomy
+
+**Status:** ✅ COMPLETE (8.5.1–8.5.6)
+
+A centralized skill normalization layer with a canonical skill taxonomy maps synonyms, abbreviations, and variations to standard skill names. This enables accurate JD↔resume skill matching, gap analysis, and keyword optimization across all agents.
+
+### 8.5.1 Create skill normalization module
+
+**Status:** ✅ DONE
+
+Created the `client/skills/` package. `SkillNormalizer` (in `normalizer.py`) maps raw skill names to canonical taxonomy names deterministically (no LLM). Taxonomy lives in `taxonomy.json` (`client/skills/taxonomy.json`), loaded via `importlib.resources`.
+
+- Created `client/skills/__init__.py` (exports `SkillNormalizer`), `client/skills/normalizer.py`, `client/skills/taxonomy.json`.
+- Taxonomy maps canonical skill names to variants/synonyms/abbreviations (e.g., `"JavaScript": ["js", "javascript", "ecmascript", "es6", "es2015"]`, `"React": ["react.js", "reactjs"]`, `"Amazon Web Services": ["aws", "amazon web services", "amazon cloud"]`).
+- `SkillNormalizer` API:
+  - `normalize(skill) -> str` — maps to canonical form via lower/squashed/tokenized key matching; returns the canonical name on a hit, else the normalized lowercase tokenized form.
+  - `canonicalize(skill) -> str` — alias for `normalize()`.
+  - `normalize_list(skills) -> list[str]` — normalizes, canonicalizes, de-duplicates (order-preserving).
+  - `get_variants(canonical) -> list[str]` — known variants for a canonical skill (empty when unknown).
+  - `match_skills(jd_skills, resume_skills) -> dict` — returns `missing` / `matched` / `extra` using canonical forms.
+- Categories `programming_languages`, `frameworks`, `databases`, `cloud`, `tools`, `soft_skills` present in `taxonomy.json`.
+- Tests in `tests/test_skill_normalizer.py` (15 tests): normalization, canonicalization, dedup, matching, variant lookup.
+
+**Files changed:** new `client/skills/normalizer.py`, `client/skills/taxonomy.json`, `client/skills/__init__.py`, `tests/test_skill_normalizer.py`
+
+### 8.5.2 Integrate skill normalization into JD Parsing Agent
+
+**Status:** ✅ DONE
+
+`JDParsingAgent` canonicalizes skill lists on both the LLM and regex paths via a shared `_NORMALIZER = SkillNormalizer()` instance.
+
+- `_regex_fallback()`: `required_skills=_NORMALIZER.normalize_list(parsed.requirements)`, `preferred_skills=_NORMALIZER.normalize_list(parsed.nice_to_have)`.
+- `_SYSTEM_PROMPT` rule added: "Normalize all skills to their canonical form (e.g., 'JS' → 'JavaScript', 'React.js' → 'React', 'AWS' → 'Amazon Web Services')."
+- Post-process LLM output: after `_sync_company_name(result)`, return `result.model_copy(update={"required_skills": ..., "preferred_skills": ...})` with both lists normalized.
+
+**Files changed:** `client/agents/jd_parsing.py`
+
+### 8.5.3 Integrate skill normalization into Resume Parsing Agent
+
+**Status:** ✅ DONE
+
+`ResumeParsingAgent` canonicalizes the resume skills list on both the LLM and regex paths via a shared `_NORMALIZER = SkillNormalizer()` instance.
+
+- `_regex_fallback()`: `skills=_NORMALIZER.normalize_list(parsed.skills)`.
+- `_SYSTEM_PROMPT` rule added: same canonical-form rule as JD parsing.
+- Post-process LLM output: `parsed.skills = _NORMALIZER.normalize_list(parsed.skills)` after `ResumeParsingOutput(**data)` validation.
+
+**Files changed:** `client/agents/resume_parsing.py`
+
+### 8.5.4 Integrate skill normalization into Gap Analysis Agent
+
+**Status:** ✅ DONE
+
+`GapAnalysisAgent` feeds canonical skill lists to the LLM prompt, canonicalizes the LLM's skill fields, and cross-checks the LLM against deterministic matching.
+
+- `_canonical_skills_context(jd_json, resume_json)` appends a `NORMALIZED SKILLS` block (canonical JD / resume lists + the deterministic cross-check result) to the LLM prompt.
+- `_post_process()` returns `result.model_copy(update={...})` with `missing_skills`, `weak_skills`, `strong_matches`, and `keyword_strategy` all normalized.
+- `SkillNormalizer.match_skills()` used as a deterministic cross-check; `logger.warning` emitted when the `missing` set differs from the LLM's normalized `missing_skills`.
+
+**Files changed:** `client/agents/gap_analysis.py`
+
+### 8.5.5 Integrate skill normalization into Resume Rewrite Agent
+
+**Status:** ✅ DONE
+
+`ResumeRewriteAgent` uses the shared `SkillNormalizer` for canonical skill matching in tailoring and sanitizing. The tolerant (substring/token) matcher is retained for fuzzy matches but is now canonical-aware.
+
+- `_tailor_skills` priority / "present" lists use `_NORMALIZER.normalize_list`; `_skill_matches` first checks `_NORMALIZER.normalize(skill)` before the fuzzy substring/token path (case-insensitive).
+- `_sanitize_skills()` uses `_NORMALIZER.normalize_list(input_skills)` and folds `_NORMALIZER.match_skills(result.skills, input_skills)["matched"]` into the keep/drop decision.
+- Keyword dedup in `_tailor_skills` compares `_NORMALIZER.normalize(keyword)` against canonical `present`/`additions_norm` before prepending.
+
+**Files changed:** `client/agents/resume_rewrite.py`
+
+### 8.5.6 Integrate skill normalization into Cover Letter Agent
+
+**Status:** ✅ DONE
+
+`CoverLetterAgent` uses the shared `SkillNormalizer` for skill matching and canonical keyword highlighting in the fallback builder.
+
+- Replaced the local `_normalize_skill` helper; `_skill_in_list` now tries `_NORMALIZER.normalize(skill)` against `_NORMALIZER.normalize_list(skills)` first, then the tolerant tokenized fuzzy matcher.
+- `_overlapping_skills()` returns `_NORMALIZER.normalize(skill)` (canonical form) for each overlapping skill, so the fallback letter highlights standard skill names.
+- Removed the redundant local `_normalize_skill` test class from `tests/test_cover_letter_validation.py`; coverage moved to `tests/test_skill_normalizer.py`.
+
+**Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
+
+**Verification (Phase 8.5):** `uv run pytest` → **362 passed**; `uv run ruff check .` clean; `uv run pyright` → **0 errors**.
+
+---
+
+## Phase 9: Cover Letter Creation Fixes (a/b/c)
+
+**Status:** ✅ DONE (9.1–9.4)
+
+Fixes for three defects in cover letter creation that surfaced on live runs: experience entries coming back out of chronological order, the company name being taken from the candidate's resume (or left as `[Company Name]`), and the candidate name left as `[Your Name]`. All three are handled with **pure Python post-processing — no additional LLM calls**.
+
+### 9.1 Chronological ordering of experience (in `resume_rewrite.py`)
+
+**Status:** ✅ DONE
+
+`_try_llm()` no longer **rejects** the whole rewrite when experiences are out of order (which dropped the entire LLM result and fell back to `_parsed_to_rewrite()`). It now **intercepts and sorts** the experience section so the rest of the LLM's work is preserved.
+
+- Added `_ensure_chronological(result: RewriteOutput) -> RewriteOutput` — pure Python, no LLM call.
+- Sorts `result.experience` by `_extract_start_year(entry.dates)` descending (most-recent-first), with `sorted()` on a stable key that falls back to the original index so the sort is lossless.
+- Entries whose start year is `None` (unparseable dates) are preserved at the end in their original relative order; never drops entries (input length == output length).
+- A fully-unsortable list (all `None` years) is returned unchanged.
+- `_validate_chronological` downgraded to an optional `DEBUG`-level signal only; `_ensure_chronological` is the source of truth.
+- Input resume experience is pre-sorted most-recent-first in `ResumeParsingAgent._regex_fallback()` (idempotency; the rewrite sort becomes a cheap no-op in the common case).
+
+**Files changed:** `client/agents/resume_rewrite.py`, `client/agents/resume_parsing.py`, `tests/test_resume_rewrite_validation.py`
+
+### 9.2 Company Name must come from the JD, not the candidate's resume
+
+**Status:** ✅ DONE
+
+The cover letter previously could use a company name pulled from the candidate's resume (a past employer) or the literal placeholder `[Company Name]`. The source of truth is `JDParsingOutput.company_name` (Phase 4.3.F), surfaced through the shared `_company_from()` helper. Both failure modes are fixed deterministically (no additional LLM calls).
+
+- `_company_directive()` in `_try_llm()` injects the exact target company into the prompt; a new rule forbids using a company from the candidate's resume as the target.
+- `_apply_company_name(result, jd_json, resume_json="")` resolves the target via `_company_from(jd_data)` (top-level `company_name`, else `company_signals["company_name"]`).
+- `_PLACEHOLDER_TOKENS` match ASCII tokens `[Company Name]`, `[Company]`, `<Company Name>`, `[Employer Name]` and replace with the resolved JD company name via `str.replace`.
+- `_resume_company_in_letter()` detects a resume-company present but the JD company absent; `_replace_first_casefold()` substitutes the **first** occurrence with the JD name. Guarded so a resume company that matches the target is ignored.
+- `_check_company` (already present) now only `logger.warning` on mismatch — it does not reject.
+- `_build_fallback_cover_letter()` confirmed to use `_company_from` and never emit `[Company Name]` (company omitted when absent).
+- Tests added in new `TestApplyCompanyName` class (`tests/test_cover_letter_validation.py`).
+
+**Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
+
+### 9.3 Candidate Name must come from the candidate's resume
+
+**Status:** ✅ DONE
+
+The cover letter's signature / opening previously contained `[Your Name]`, because `ResumeParsingOutput` had **no `name` field** even though `FormatDetector` already extracts `ParsedResume.name`. `name` now flows through the pipeline and is post-processed into the cover letter.
+
+- Added `name: str = ""` to `ResumeParsingOutput` in `client/models.py`.
+- `ResumeParsingAgent._regex_fallback()` sets `name=_normalize_extracted_name(parsed.name)`; the LLM path includes `name` in `_SYSTEM_PROMPT` / field list, with rule "Extract the candidate's full name exactly as it appears at the top of the resume; empty string if absent."
+- `_apply_candidate_name(result, resume_json)` reads the name via `_candidate_name_from_resume` and replaces `[Your Name]` / `[Candidate Name]` / `<Your Name>` residue with the resolved resume name (leaves the letter untouched when empty). No LLM call.
+- `_build_fallback_cover_letter()` `_read_str(resume_data, "name").strip() or "Candidate"` now resolves to the real name.
+- Tests added `TestResumeParsingName` and `TestApplyCandidateName`.
+
+**Files changed:** `client/models.py`, `client/agents/resume_parsing.py`, `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
+
+### 9.4 Cross-cutting notes
+
+**Status:** ✅ DONE
+
+- `_try_llm()` stays pure: all string replacement / sorting (`_ensure_chronological`, `_apply_company_name`, `_apply_candidate_name`) runs on the validated `RewriteOutput`/`CoverLetterOutput` **after** Pydantic validation; data returned via `model_copy` / new output object, never mutated in place.
+- ASCII-only convention: tokens used are `[Company Name]`, `[Your Name]`, `[Candidate Name]`, `<Your Name>`, `[Employer Name]` (no extended characters).
+- Verification: `uv run pytest` → **350 passed**; `uv run ruff check .` clean; `uv run pyright .` → **0 errors**; manual `wip_testing/test_cover_letter.py` (full 1–7 chain, LLM success, real candidate name `Peter Letkeman` in signature, contact line injected, company honored) and `wip_testing/test_resume_rewrite.py` (full 1–4 chain, chronologically ordered, certifications preserved).
+
+**Files changed:** (verification only — no code changes)
 
 ---
 

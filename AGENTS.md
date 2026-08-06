@@ -60,12 +60,13 @@ client/
 tests/
   test_format_detector.py          # FormatDetector regex parsing tests (46 tests)
   test_jd_parsing.py               # JD Parsing company_name extraction/sync tests (19 tests)
-  test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (56 tests)
-  test_cover_letter_validation.py  # Cover Letter post-validation tests (91 tests)
+  test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (63 tests)
+  test_cover_letter_validation.py  # Cover Letter post-validation tests (109 tests)
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + JSON Schema helper tests (15 tests)
   test_formatter.py                # format_* helpers (41 tests)
   test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (43 tests)
+  test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
 wip_testing/
   test_parsing.py            # Regex + LLM parsing demo (both modes)
   test_job_description.py  # JD Parsing Agent test
@@ -87,6 +88,7 @@ wip_testing/
 - **No extended characters** in LLM output: `"` not `""`, `->` not `→`. Enforced in agent prompts.
 - **FormatDetector** tries regex first, falls back to LLM only if regex returns sparse results and a client is available. Pass `client=None` for regex-only mode. LLM is now connected — `wip_testing/test_parsing.py` demonstrates both modes.
 - **LLM output coercion**: Pydantic validators in `client/models.py` handle LLMs returning dicts where strings/lists are expected (e.g., `tone_guidance` as a dict, `keyword_strategy` as a dict). See `_coerce_str_list`, `_coerce_tone_guidance`, `_coerce_final_resume`.
+- **Deterministic post-processors (Phase 9)**: after Pydantic validation, `_try_llm()` runs pure-Python post-processors that never call the LLM or mutate state — `_ensure_chronological()` in `resume_rewrite.py` (sort experience most-recent-first, don't reject), and `_apply_company_name()` + `_apply_candidate_name()` in `cover_letter.py` (JD company + `ResumeParsingOutput.name`, substituting ASCII placeholder tokens `[Company Name]`/`[Your Name]`). Results are returned via `model_copy`, never mutated in place.
 
 ## Logging
 
@@ -124,7 +126,7 @@ Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compli
 
 ## Testing
 
-pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 322 tests across 8 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer). Sample files in `sample/jobs/` and `sample/resume/`.
+pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 362 tests across 9 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer). Sample files in `sample/jobs/` and `sample/resume/`.
 
 Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_compliance.py` runs agents 1-5). Run with `uv run python wip_testing/test_<agent>.py`.
 

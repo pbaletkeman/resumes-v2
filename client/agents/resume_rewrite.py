@@ -18,8 +18,11 @@ from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
 from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import RewriteOutput
+from client.skills import SkillNormalizer
 
 logger = logging.getLogger(__name__)
+
+_NORMALIZER = SkillNormalizer()
 
 _SYSTEM_PROMPT = (
     "You are the Resume Rewrite Agent. "
@@ -327,7 +330,7 @@ def _tailor_skills(
         strategy_data, "keyword_strategy"
     )
 
-    priority_norm = [_normalize_skill(s) for s in priority]
+    priority_norm = _NORMALIZER.normalize_list(priority)
     matched: list[str] = []
     unmatched: list[str] = []
     for skill in skills:
@@ -337,7 +340,7 @@ def _tailor_skills(
             unmatched.append(skill)
     reordered = matched + unmatched
 
-    present = [_normalize_skill(s) for s in reordered]
+    present = _NORMALIZER.normalize_list(reordered)
     additions: list[str] = []
     additions_norm: list[str] = []
     for keyword in additions_source:
@@ -346,10 +349,16 @@ def _tailor_skills(
         keyword = keyword.strip()
         if not keyword or not _is_ascii(keyword):
             continue
-        if _skill_matches(keyword, present) or _skill_matches(keyword, additions_norm):
+        keyword_norm = _NORMALIZER.normalize(keyword)
+        if (
+            keyword_norm in present
+            or keyword_norm in additions_norm
+            or _skill_matches(keyword, present)
+            or _skill_matches(keyword, additions_norm)
+        ):
             continue
         additions.append(keyword)
-        additions_norm.append(_normalize_skill(keyword))
+        additions_norm.append(keyword_norm)
 
     return additions + reordered
 
@@ -537,11 +546,14 @@ def _sanitize_skills(result: RewriteOutput, resume_json: str) -> RewriteOutput |
     input_skills = _load_str_list(resume_json, "skills")
     if not input_skills or not result.skills:
         return result
-    input_normalized = [norm for s in input_skills if (norm := _normalize_skill(s))]
+    input_normalized = _NORMALIZER.normalize_list(input_skills)
+    canonical_matched = set(
+        _NORMALIZER.match_skills(result.skills, input_skills)["matched"]
+    )
     kept: list[str] = []
     dropped: list[str] = []
     for skill in result.skills:
-        if _skill_matches(skill, input_normalized):
+        if _skill_matches(skill, input_normalized) or skill in canonical_matched:
             kept.append(skill)
         else:
             dropped.append(skill)
@@ -567,15 +579,21 @@ def _skill_matches(skill: str, input_skills: list[str]) -> bool:
     """Fuzzy-match an output skill against normalized input skills.
 
     Accepts exact, substring (len >= 3), and shared-token matches to
-    tolerate LLM renaming (e.g., 'SQL' vs 'PostgreSQL').
+    tolerate LLM renaming (e.g., 'SQL' vs 'PostgreSQL').  First tries the
+    shared canonical taxonomy so that variants/abbreviations match their
+    canonical form.
     """
+    canonical = _NORMALIZER.normalize(skill)
+    if canonical in input_skills:
+        return True
     norm = _normalize_skill(skill)
     if not norm:
         return False
     if norm in input_skills:
         return True
     norm_tokens = {t for t in norm.split() if len(t) >= 2}
-    for inp in input_skills:
+    for raw_inp in input_skills:
+        inp = raw_inp.lower()
         if not inp:
             continue
         if len(norm) >= 3 and (norm in inp or inp in norm):

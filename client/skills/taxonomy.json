@@ -1,0 +1,66 @@
+{
+  "programming_languages": {
+    "JavaScript": ["js", "javascript", "ecmascript", "es6", "es2015"],
+    "TypeScript": ["ts", "typescript"],
+    "Python": ["python", "py", "python3"],
+    "Java": ["java", "core java", "jdk"],
+    "Go": ["go", "golang"],
+    "Rust": ["rust"],
+    "Ruby": ["ruby"],
+    "Swift": ["swift"],
+    "Kotlin": ["kotlin"],
+    "PHP": ["php", "php7", "php8"],
+    "SQL": ["sql", "structured query language"],
+    "HTML": ["html", "html5"],
+    "CSS": ["css", "css3"],
+    "C#": ["csharp", "c-sharp", "c#", "dotnet c#"],
+    "C++": ["cplusplus", "cpp", "c++"],
+    "Scala": ["scala"],
+    "Bash": ["bash", "shell", "sh", "shell scripting"],
+    "PowerShell": ["powershell", "ps", "pwsh"]
+  },
+  "frameworks": {
+    "React": ["react.js", "reactjs", "react", "react js"],
+    "Angular": ["angularjs", "angular 2", "angular 2+", "angular"],
+    "Vue": ["vue.js", "vuejs", "vue"],
+    "Node.js": ["node", "nodejs", "nodejs"],
+    ".NET": ["dotnet", "net", ".net core", "asp.net", "aspnet"],
+    "Django": ["django", "django framework"],
+    "Flask": ["flask"],
+    "Spring": ["spring", "spring boot", "springboot"],
+    "Flutter": ["flutter"],
+    "React Native": ["reactnative", "react native"],
+    "Spring Boot": ["springboot", "spring-boot"]
+  },
+  "databases": {
+    "PostgreSQL": ["postgres", "postgresql"],
+    "MySQL": ["mysql"],
+    "MongoDB": ["mongo", "mongodb"],
+    "Redis": ["redis"],
+    "SQL Server": ["mssql", "sqlserver"],
+    "Oracle": ["oracle", "oracle db"],
+    "DynamoDB": ["dynamodb"],
+    "SQLite": ["sqlite"]
+  },
+  "cloud": {
+    "Amazon Web Services": ["aws", "amazon web services", "amazon cloud"],
+    "Microsoft Azure": ["azure", "ms azure", "azure cloud"],
+    "Google Cloud Platform": ["gcp", "google cloud", "google cloud platform"],
+    "Kubernetes": ["kubernetes", "k8s"],
+    "Docker": ["docker", "docker containers"]
+  },
+  "tools": {
+    "Git": ["git", "github", "gitlab"],
+    "Jira": ["jira", "atlassian jira"],
+    "Jenkins": ["jenkins"],
+    "Terraform": ["terraform", "tf"],
+    "Ansible": ["ansible"],
+    "CI/CD": ["cicd", "ci/cd", "continuous integration", "continuous delivery"]
+  },
+  "soft_skills": {
+    "Leadership": ["leadership", "team leadership"],
+    "Communication": ["communication", "communication skills"],
+    "Agile": ["agile", "scrum", "agile methodologies"],
+    "Problem Solving": ["problem solving", "problem-solving", "analytical thinking"]
+  }
+}

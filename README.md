@@ -117,12 +117,13 @@ client/
 tests/
   test_format_detector.py          # FormatDetector regex parsing tests (46 tests)
   test_jd_parsing.py               # JD Parsing company_name extraction/sync tests (19 tests)
-  test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (56 tests)
-  test_cover_letter_validation.py  # Cover Letter post-validation tests (91 tests)
+  test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (63 tests)
+  test_cover_letter_validation.py  # Cover Letter post-validation tests (109 tests)
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + JSON Schema helper tests (15 tests)
   test_formatter.py                # format_* helpers (41 tests)
   test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (43 tests)
+  test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
 wip_testing/
   test_job_description.py  # JD Parsing Agent test
   test_resume_parsing.py   # Resume Parsing Agent test

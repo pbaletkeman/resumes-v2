@@ -19,8 +19,11 @@ from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
 from client.json_utils import model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import CoverLetterOutput
+from client.skills import SkillNormalizer
 
 logger = logging.getLogger(__name__)
+
+_NORMALIZER = SkillNormalizer()
 
 _SYSTEM_PROMPT = (
     "You are the Cover Letter Tailoring Agent. "
@@ -796,8 +799,16 @@ def _join_skills(skills: list[str]) -> str:
 
 
 def _overlapping_skills(candidates: list[str], known: list[str]) -> list[str]:
-    """Return candidates the resume already covers (fuzzy match)."""
-    return [skill for skill in candidates if _skill_in_list(skill, known)]
+    """Return candidates the resume already covers (fuzzy match).
+
+    Selected skills are canonicalized with the shared taxonomy so the
+    cover letter highlights standard skill names.
+    """
+    return [
+        _NORMALIZER.normalize(skill)
+        for skill in candidates
+        if _skill_in_list(skill, known)
+    ]
 
 
 def _most_recent_achievement(resume_data: dict[str, Any]) -> str:
@@ -900,12 +911,18 @@ def _skill_mentioned(letter_lower: str, skill: str) -> bool:
 
 
 def _skill_in_list(skill: str, skills: list[str]) -> bool:
-    """Fuzzy-match ``skill`` against a list of skills (case-insensitive)."""
-    norm = _normalize_skill(skill)
+    """Fuzzy-match ``skill`` against a list of skills (case-insensitive).
+
+    First tries the shared canonical taxonomy, then tolerates exact,
+    substring (len >= 3), and shared-token matches.
+    """
+    if _NORMALIZER.normalize(skill) in _NORMALIZER.normalize_list(skills):
+        return True
+    norm = " ".join(re.findall(r"[a-z0-9]+", skill.lower()))
     if not norm:
         return True
     for candidate in skills:
-        candidate_norm = _normalize_skill(candidate)
+        candidate_norm = " ".join(re.findall(r"[a-z0-9]+", candidate.lower()))
         if not candidate_norm:
             continue
         if norm == candidate_norm:
@@ -915,11 +932,6 @@ def _skill_in_list(skill: str, skills: list[str]) -> bool:
         if set(norm.split()) & set(candidate_norm.split()):
             return True
     return False
-
-
-def _normalize_skill(skill: str) -> str:
-    """Lowercase a skill and reduce it to whitespace-separated tokens."""
-    return " ".join(re.findall(r"[a-z0-9]+", skill.lower()))
 
 
 def _load_str_list(json_text: str, field: str) -> list[str]:
