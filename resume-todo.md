@@ -22,18 +22,18 @@ The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented.
 
 Extract phone number, email address, LinkedIn URL, and GitHub URL from the parsed resume and use them in cover letter generation. Update cover letter templates to include these contact details.
 
-### 8.1 Add contact fields to ResumeParsingOutput
+### '8.1 Add contact fields to ResumeParsingOutput'
 
-**Status:** ❌ NOT DONE
+**Status:** ✅ DONE
 
 Add optional contact fields to `ResumeParsingOutput` in `client/models.py` and populate them from `FormatDetector` extraction.
 
 **Sub-tasks:**
 
-- **8.1.1** Add `phone: str = ""`, `email: str = ""`, `linkedin: str = ""`, `github: str = ""` to `ResumeParsingOutput` in `client/models.py`.
-- **8.1.2** In `ResumeParsingAgent._regex_fallback()` (in `client/agents/resume_parsing.py`), extract these fields from `FormatDetector` parsed output and assign to the model.
-- **8.1.3** For the LLM path (`_try_llm`), add contact fields to the system prompt field list with rules: "Extract the candidate's phone number, email address, LinkedIn profile URL, and GitHub profile URL exactly as they appear in the resume; empty string if absent."
-- **8.1.4** Ensure validators/coercion handles dict→string if LLM returns structured contact object.
+- **8.1.1** ~~Add `phone: str = ""`, `email: str = ""`, `linkedin: str = ""`, `github: str = ""` to `ResumeParsingOutput` in `client/models.py`.~~ ✅ DONE
+- **8.1.2** ~~In `ResumeParsingAgent._regex_fallback()` (in `client/agents/resume_parsing.py`), extract these fields from `FormatDetector` parsed output and assign to the model.~~ ✅ DONE
+- **8.1.3** ~~For the LLM path (`_try_llm`), add contact fields to the system prompt field list with rules: "Extract the candidate's phone number, email address, LinkedIn profile URL, and GitHub profile URL exactly as they appear in the resume; empty string if absent."~~ ✅ DONE
+- **8.1.4** ~~Ensure validators/coercion handles dict→string if LLM returns structured contact object.~~ ✅ DONE
 
 **Files changed:** `client/models.py`, `client/agents/resume_parsing.py`
 
@@ -409,4 +409,3 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 | 18 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
 | 19 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
 | 20 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |
-

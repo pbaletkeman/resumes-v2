@@ -92,6 +92,10 @@ class FormatDetector:
             ),
             "keywords": FormatDetector.extract_keywords(content),
             "raw": content,
+            "phone": FormatDetector._extract_phone(content),
+            "email": FormatDetector._extract_email(content),
+            "linkedin": FormatDetector._extract_linkedin(content),
+            "github": FormatDetector._extract_github(content),
         }
 
         non_empty = sum(
@@ -511,6 +515,63 @@ class FormatDetector:
         counts = Counter(filtered)
         return [word for word, _ in counts.most_common(top_n)]
 
+    # ------------------------------------------------------------------
+    # Contact information extraction
+    # ------------------------------------------------------------------
+
+    _PHONE_PATTERN = re.compile(
+        r"""
+        (?:
+            (?:\+?1[\s.-]?)?        # optional country code
+            (?:\(?\d{3}\)?[\s.-]?)  # area code
+            \d{3}[\s.-]?\d{4}       # exchange + number
+        )
+        """,
+        re.VERBOSE,
+    )
+
+    _EMAIL_PATTERN = re.compile(
+        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+    )
+
+    _LINKEDIN_PATTERN = re.compile(
+        r"(?:linkedin\.com/in/|linkedin\.com/profile/|linkedin\.com/pub/)([a-zA-Z0-9\-_]+)",
+        re.IGNORECASE,
+    )
+
+    _GITHUB_PATTERN = re.compile(
+        r"(?:github\.com/)([a-zA-Z0-9\-_]+)",
+        re.IGNORECASE,
+    )
+
+    @staticmethod
+    def _extract_phone(content: str) -> str:
+        """Extract phone number from resume content."""
+        match = FormatDetector._PHONE_PATTERN.search(content)
+        return match.group(0).strip() if match else ""
+
+    @staticmethod
+    def _extract_email(content: str) -> str:
+        """Extract email address from resume content."""
+        match = FormatDetector._EMAIL_PATTERN.search(content)
+        return match.group(0).strip() if match else ""
+
+    @staticmethod
+    def _extract_linkedin(content: str) -> str:
+        """Extract LinkedIn profile URL from resume content."""
+        match = FormatDetector._LINKEDIN_PATTERN.search(content)
+        if match:
+            return f"https://linkedin.com/in/{match.group(1)}"
+        return ""
+
+    @staticmethod
+    def _extract_github(content: str) -> str:
+        """Extract GitHub profile URL from resume content."""
+        match = FormatDetector._GITHUB_PATTERN.search(content)
+        if match:
+            return f"https://github.com/{match.group(1)}"
+        return ""
+
     @staticmethod
     def _detect_format(content: str) -> str:
         """Detect whether content is Markdown or plain text.
@@ -568,10 +629,13 @@ class FormatDetector:
         prompt = (
             "Extract structured data from this resume. "
             "Return a JSON object with keys: name, title, summary, "
-            "skills, experience, projects, education, certifications, keywords. "
+            "skills, experience, projects, education, certifications, keywords, "
+            "phone, email, linkedin, github. "
             "Every value must be a string or a list of flat strings. "
             "For experience, each item must be a single descriptive string. "
             "For projects and education, each item must be a single string. "
+            "For phone, email, linkedin, github: extract exactly as they "
+            "appear in the resume; empty string if absent. "
             "Return only valid JSON."
         )
         if self.client is None:
@@ -595,6 +659,10 @@ class FormatDetector:
                     "education",
                     "certifications",
                     "keywords",
+                    "phone",
+                    "email",
+                    "linkedin",
+                    "github",
                 ],
                 rules=["Return only valid JSON", "Do not infer missing information"],
                 inputs=[content],

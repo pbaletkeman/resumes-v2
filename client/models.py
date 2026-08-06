@@ -27,6 +27,10 @@ class ParsedResume(BaseModel):
     certifications: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     raw: str = ""
+    phone: str = ""
+    email: str = ""
+    linkedin: str = ""
+    github: str = ""
 
 
 class ParsedJobDescription(BaseModel):
@@ -126,6 +130,24 @@ def _coerce_str_list(v: Any) -> list[str]:
     return result
 
 
+def _coerce_str(v: Any) -> str:
+    """Coerce a value into a string.
+
+    Handles the LLM returning a dict or list where a ``str`` field is
+    expected (e.g. a structured contact object for ``phone``/``email``).
+    Dicts are flattened to ``key: value`` pairs; lists are joined.
+    """
+    if isinstance(v, dict):
+        parts: list[str] = []
+        for k, val in v.items():  # type: ignore[reportUnknownVariableType, reportUnknownMemberType]
+            if val:
+                parts.append(f"{k}: {val}")
+        return ", ".join(parts) if parts else ""
+    if isinstance(v, list):
+        return ", ".join(str(item) for item in v)  # type: ignore[reportUnknownVariableType]
+    return str(v) if v else ""
+
+
 class ResumeParsingOutput(BaseModel):
     """Structured output from the Resume Parsing Agent."""
 
@@ -135,6 +157,10 @@ class ResumeParsingOutput(BaseModel):
     projects: list[str] = Field(default_factory=list)
     certifications: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
+    phone: str = ""
+    email: str = ""
+    linkedin: str = ""
+    github: str = ""
 
     @field_validator("skills", "projects", "certifications", "education", mode="before")
     @classmethod
@@ -145,6 +171,11 @@ class ResumeParsingOutput(BaseModel):
     @classmethod
     def _coerce_experience(cls, v: Any) -> list[ExperienceEntry]:
         return _coerce_experience_list(v)
+
+    @field_validator("phone", "email", "linkedin", "github", mode="before")
+    @classmethod
+    def _coerce_contact_fields(cls, v: Any) -> str:
+        return _coerce_str(v)
 
 
 class GapAnalysisOutput(BaseModel):

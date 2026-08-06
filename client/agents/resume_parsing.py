@@ -27,11 +27,15 @@ _SYSTEM_PROMPT = (
     "summary, skills (normalize terms), "
     "experience (list of roles with: title, company, dates, "
     "responsibilities, achievements, metrics), "
-    "projects, certifications, education. "
+    "projects, certifications, education, "
+    "phone, email, linkedin, github. "
     "Rules: "
     "Preserve all quantifiable metrics. "
     "Convert bullet points into structured lists. "
     "Do not infer missing information. "
+    "Extract the candidate's phone number, email address, "
+    "LinkedIn profile URL, and GitHub profile URL exactly as they "
+    "appear in the resume; empty string if absent. "
     "Output only valid JSON."
 )
 
@@ -187,6 +191,10 @@ class ResumeParsingAgent:
             projects=parsed.projects,
             certifications=parsed.certifications,
             education=parsed.education,
+            phone=parsed.phone,
+            email=parsed.email,
+            linkedin=parsed.linkedin,
+            github=parsed.github,
         )
 
 
