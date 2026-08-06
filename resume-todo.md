@@ -389,24 +389,24 @@ Already created (see `resume-done.md`): `client/formatter.py`, `client/templates
 
 | Step | Phase | Status | Depends On | Estimated Files Changed |
 | ------ | ------- | -------- | ------------ | ------------------------ |
-| 1 | 7.1: `test_real_files.py` integration test | ❌ TODO | Step 1 (6.B.8 wiring) | 1 |
-| 2 | 7.2.1: agent unit tests (`tests/test_agent_*.py` or `test_agents.py`) | ❌ TODO | 6.B.8 wiring | 7 to 8 |
-| 3 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ❌ TODO | Step 2 | 1 |
-| 4 | 7.3.1: `docs/architecture.md` | ❌ TODO | All | 1 |
-| 5 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
-| 6 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
-| 7 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |
-| 8 | 8.1: contact fields in ResumeParsingOutput | ❌ TODO | 6.B.1 | 2 |
-| 9 | 8.2: cover letter templates with contact info | ❌ TODO | 8.1 | 1-3 |
-| 10 | 8.3: pass contact info to cover letter agent | ❌ TODO | 8.1, 8.2 | 2 |
-| 11 | 8.5.1: skill normalizer module + taxonomy | ❌ TODO | 6.B.1 | 4 |
-| 12 | 8.5.2: integrate into JD Parsing | ❌ TODO | 8.5.1 | 1 |
-| 13 | 8.5.3: integrate into Resume Parsing | ❌ TODO | 8.5.1 | 1 |
-| 14 | 8.5.4: integrate into Gap Analysis | ❌ TODO | 8.5.1 | 1 |
-| 15 | 8.5.5: integrate into Resume Rewrite | ❌ TODO | 8.5.1 | 1 |
-| 16 | 8.5.6: integrate into Cover Letter | ❌ TODO | 8.5.1 | 1 |
-| 17 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
-| 18 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
-| 19 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
-| 20 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 17–19 | 2 |
+| 1 | 8.1: contact fields in ResumeParsingOutput | ❌ TODO | 6.B.1 | 2 |
+| 2 | 8.2: cover letter templates with contact info | ❌ TODO | 8.1 | 1-3 |
+| 3 | 8.3: pass contact info to cover letter agent | ❌ TODO | 8.1, 8.2 | 2 |
+| 4 | 8.5.1: skill normalizer module + taxonomy | ❌ TODO | 6.B.1 | 4 |
+| 5 | 8.5.2: integrate into JD Parsing | ❌ TODO | 8.5.1 | 1 |
+| 6 | 8.5.3: integrate into Resume Parsing | ❌ TODO | 8.5.1 | 1 |
+| 7 | 8.5.4: integrate into Gap Analysis | ❌ TODO | 8.5.1 | 1 |
+| 8 | 8.5.5: integrate into Resume Rewrite | ❌ TODO | 8.5.1 | 1 |
+| 9 | 8.5.6: integrate into Cover Letter | ❌ TODO | 8.5.1 | 1 |
+| 10 | 9.1: chronological ordering (sort, don't reject) | ❌ TODO | 6.B.1 | 2 |
+| 11 | 9.2: company name from JD + placeholder fix | ❌ TODO | 9.1 | 1 |
+| 12 | 9.3: candidate name via `ResumeParsingOutput.name` | ❌ TODO | 9.2 | 3 |
+| 13 | 9.4: tests + lint + typecheck for 9.1–9.3 | ❌ TODO | Steps 10–12 | 2 |
+| 14 | 7.1: `test_real_files.py` integration test | ❌ TODO | Steps 1–13 (all features) | 1 |
+| 15 | 7.2.1: agent unit tests (`tests/test_agent_*.py` or `test_agents.py`) | ❌ TODO | Steps 1–13 | 7 to 8 |
+| 16 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ❌ TODO | Step 15 | 1 |
+| 17 | 7.3.1: `docs/architecture.md` | ❌ TODO | All | 1 |
+| 18 | 7.3.2: `docs/agents.md` | ❌ TODO | 7.3.1 | 1 |
+| 19 | 7.3.3: `docs/usage.md` | ❌ TODO | All | 1 |
+| 20 | 7.3.4: `docs/api.md` | ❌ TODO | 7.3.1 | 1 |
 
