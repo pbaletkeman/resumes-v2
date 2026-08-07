@@ -1,6 +1,6 @@
 # resumes-v2
 
-Multi-agent resume optimization pipeline. 7 sequential agents transform a job description + resume into an ATS-optimized resume and tailored cover letter.
+Multi-agent resume optimization pipeline. 7 sequential agents transform a job description + resume into an ATS-optimized resume and tailored cover letter. The pipeline is also exposed as a FastAPI web API (`app/`) with sync/async runs plus file listing and management.
 
 ## Prerequisites
 
@@ -40,6 +40,7 @@ uv run python pipeline.py
 | Test | `uv run pytest` |
 | Test (verbose) | `uv run pytest -v` |
 | Test (single file) | `uv run pytest tests/test_format_detector.py` |
+| Run web API | `uv run uvicorn app.main:app --reload` |
 
 See `docs/TESTING.md` for detailed testing instructions (individual agents, OpenAI provider, model registry).
 
@@ -52,6 +53,22 @@ uv run uvicorn app.main:app --reload
 ```
 
 OpenAPI docs are at `http://localhost:8000/docs`.
+
+### Routes
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Liveness check |
+| `GET` | `/api/models` | List configured models per agent |
+| `POST` | `/api/pipeline` | Run the full 7-agent pipeline (sync) |
+| `POST` | `/api/pipeline/async` | Launch a background pipeline run |
+| `GET` | `/api/tasks/{task_id}` | Poll a background task's status/result |
+| `GET` | `/api/outputs/{filename}` | Download a rendered output file |
+| `GET` | `/api/files/generated` | List generated files (`output/`) — filter + paged |
+| `GET` | `/api/files/uploaded` | List uploaded files (`uploads/`) — filter + paged |
+| `DELETE` | `/api/files` | Delete selected files (from either listing) |
+
+Pipeline inputs are multipart fields: `job_description` / `resume` (pasted text) or `job_file` / `resume_file` (uploads), plus optional `candidate_name` / `company_name`. Exactly one of text-or-file is required per input; text wins when both are supplied. Uploaded files are persisted to `uploads/` and rendered outputs to `output/` (both git-ignored).
 
 ### Testing the API with REST Client
 
@@ -169,6 +186,12 @@ wip_testing/
   test_tone_polishing.py   # Tone Polishing Agent test
   test_cover_letter.py     # Cover Letter Agent test
   test_parsing.py          # Regex + LLM parsing demo
+app/                       # FastAPI web API layer
+  main.py                  # App + lifespan + all routes
+  schemas.py               # Pydantic request/response models
+  upload.py                # .txt/.docx/.pdf text extraction
+  tasks.py                 # In-memory background task registry
+  files.py                 # File listing/filter/paging + delete helpers
 ```
 
 ## Configuration
@@ -189,3 +212,4 @@ wip_testing/
 - `docs/logging-info.md` - Logging implementation plan and status
 - `resume-done.md` - Completed work archive
 - `resume-todo.md` - Remaining implementation work
+- `web-files-todo.md` - File-management endpoint work log

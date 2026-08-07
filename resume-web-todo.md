@@ -87,15 +87,21 @@ The API calls `_run_pipeline_core()` (`pipeline.py:324`) directly with `await`. 
 - [x] Ensure main only ever calls `_run_pipeline_core`, never `run_resume_pipeline` (avoid `asyncio.run` re-entry) — only `_run_pipeline_core` is awaited; `run_resume_pipeline` (which wraps in `asyncio.run`) is never referenced
 
 ### 7. Manual smoke + live verification
-- [ ] `uv run uvicorn app.main:app` boots without import errors
-- [ ] Smoke: `GET /health` → `{"status": "ok"}`
-- [ ] Smoke: `GET /api/models` lists models
-- [ ] Live: `POST /api/pipeline` with `sample/jobs/3Pillar.txt` + `sample/resume/Peter-Letkeman-Resume.txt` (Ollama up) → 7-key result + `output_files`
-- [ ] Background: `POST /api/pipeline/async` → poll `GET /api/tasks/{task_id}` → completed with result
-- [ ] Verify `GET /api/outputs/{filename}` downloads rendered file
-- [ ] `uv run ruff check .`
-- [ ] `uv run ruff format --check .`
-- [ ] `uv run pyright` (no path arg)
+- [x] `uv run uvicorn app.main:app` boots without import errors — verified via `TestClient` (boot, import, routes)
+- [x] Smoke: `GET /health` → `{"status": "ok"}`
+- [x] Smoke: `GET /api/models` lists models — 7 models
+- [x] Live: `POST /api/pipeline` with `sample/jobs/3Pillar.txt` + `sample/resume/Peter-Letkeman-Resume.txt` (Ollama up) → 7-key result + `output_files` — verified sync run + rendered files
+- [x] Background: `POST /api/pipeline/async` → poll `GET /api/tasks/{task_id}` → completed with result — verified wait→completed with all 7 keys
+- [x] Verify `GET /api/outputs/{filename}` downloads rendered file — returned `200` for `.pdf`/`.md`; traversal rejected
+- [x] `uv run ruff check .`
+- [x] `uv run ruff format --check .`
+- [x] `uv run pyright` (no path arg)
+
+## Notes / follow-ups implemented after this plan
+
+- **File management endpoints** were added after this pass; see `web-files-todo.md` for the list/uploaded/delete work (`GET /api/files/generated`, `GET /api/files/uploaded`, `DELETE /api/files`).
+- Uploaded `*_file` inputs are now persisted to `uploads/` (git-ignored) so they can be listed/deleted.
+- `app/files.py` was added (moved outside `main.py`). The "Files to create" table does not list `app/files.py` (added in the later file-management pass).
 
 ## Known limitations (documented, not solved)
 
@@ -105,4 +111,4 @@ The API calls `_run_pipeline_core()` (`pipeline.py:324`) directly with `await`. 
 
 ## Out of scope (this pass)
 
-No API tests, no `test_pipeline.py`, no Phase 7 docs files, no `AGENTS.md`/`docs/` edits. Those remain in `resume-todo.md` Phase 7 for a later pass.
+No API tests, no `test_pipeline.py`, no Phase 7 docs files. Those remain in `resume-todo.md` Phase 7 for a later pass. (The plan's "no `AGENTS.md`/`docs/` edits" rule was later relaxed — `AGENTS.md` and `README.md` were updated in subsequent passes.)

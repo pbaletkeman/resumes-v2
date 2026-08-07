@@ -61,13 +61,13 @@ Claims:
 - 1.1 `client/model_client.py` is a clean ABC with `@abstractmethod async def chat(...)`.
 - 1.2 `client/errors.py` defines `LLMError/LLMConnectionError/LLMResponseError/LLMTimeoutError`;
      Ollama and OpenAI clients wrap the documented error types.
-- 1.3 `requirements.txt` has 3 deps: `ollama`, `openai`, `pydantic`.
+- 1.3 core deps `ollama`, `openai`, `pydantic` are present in `pyproject.toml` `dependencies` (project uses uv, not `requirements.txt`).
 
 **Verify:**
 - `uv run python -c "from client.model_client import ModelClient; import inspect; print(inspect.isabstract(ModelClient), list(ModelClient.__abstractmethods__))"` -> abstractmethods includes `chat`.
 - `uv run python -c "from client import errors; print([e.__name__ for e in (errors.LLMError, errors.LLMConnectionError, errors.LLMResponseError, errors.LLMTimeoutError)])"`.
 - Grep `client/ollama_client.py` for `RequestError|ResponseError|TimeoutError`; `client/open_ai_client.py` for `AuthenticationError|RateLimitError|APIConnectionError|APIError|TimeoutError`.
-- Inspect `requirements.txt` -> expect at most 3 lines.
+- Inspect `pyproject.toml` `[project].dependencies` -> includes `ollama`, `openai`, `pydantic`.
 
 **Fix if not done:** these are architecture-level; do not rewrite wholesale. Record
 the delta in the results table and, if a documented error wrapper is missing, add it.

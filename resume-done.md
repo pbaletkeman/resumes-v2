@@ -34,6 +34,7 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `docs/models.md`, `docs/logging-info.md` — Additional docs
 - `sample/` — Sample JDs and resume for testing
 - `wip_testing/` — Manual agent test scripts (8 files, one per agent chain)
+- `app/` — FastAPI web API layer (`main.py`, `schemas.py`, `upload.py`, `tasks.py`, `files.py`): sync + background pipeline runs, task polling, rendered-output download, and file listing/management for `output/` and `uploads/`
 
 ---
 
@@ -1138,3 +1139,51 @@ The cover letter's signature / opening previously contained `[Your Name]`, becau
 - **Typecheck:** pyright (strict mode, Python 3.14)
 - **Test:** pytest with pytest-asyncio (`asyncio_mode = "auto"`)
 - **Config:** all in `pyproject.toml`
+
+---
+
+## Phase 10: FastAPI Web API Layer (`app/`)
+
+**Status:** ✅ DONE
+
+Exposes the 7-agent pipeline as a FastAPI application. API-layer only (no API tests by design, matching the web-plan rule). New deps: `fastapi`, `uvicorn`, `python-multipart`, `pypdf`.
+
+### 10.1 Why `_run_pipeline_core()` instead of `run_resume_pipeline()`
+
+**Status:** ✅ DONE
+
+`run_resume_pipeline()` (`pipeline.py:313`) wraps the chain in `asyncio.run()` — calling it from inside FastAPI's running event loop raises `RuntimeError: event loop already running`. The API awaits `_run_pipeline_core()` (`pipeline.py:324`) directly instead. A single shared `AgentRunner` is built once at startup via `create_runner_from_config()` on the app loop (`lifespan`) and reused by both sync and background paths, so no "Event loop is closed" failures.
+
+### 10.2 Files created
+
+- `app/__init__.py` — package marker
+- `app/schemas.py` — `PipelineRunRequest`, `PipelineRunResponse`, `TaskCreated`, `TaskStatus`; serialized via `model_dump(mode="json")`
+- `app/upload.py` — `extract_text(file, *, mime)` for `.txt` (encoding fallback) / `.docx` (python-docx) / `.pdf` (pypdf), else `400`
+- `app/tasks.py` — thread-safe in-memory `TaskRegistry` (`create`/`update`/`get`/`set_result`/`set_error`)
+- `app/main.py` — FastAPI app + lifespan + all routes; uses `Annotated[...]` defaults (avoids ruff B008)
+- `app/files.py` — `list_files()` (filter/sort/paginate), `safe_dir_path`/`safe_delete_path` (traversal guards)
+
+### 10.3 Routes
+
+- `GET /health` → `{"status": "ok"}`
+- `GET /api/models` → `get_model_summary()` from `config.agents`
+- `POST /api/pipeline` (sync) → full 7-key result + `output_files`; inputs via multipart `job_description`/`resume` text or `job_file`/`resume_file` uploads, optional `candidate_name`/`company_name`
+- `POST /api/pipeline/async` → `{task_id}`; runs via `asyncio.create_task(_run_pipeline_core(...))`, recorded in `TaskRegistry`
+- `GET /api/tasks/{task_id}` → `TaskStatus` (404 unknown)
+- `GET /api/outputs/{filename}` → `FileResponse` from `output/`
+- `GET /api/files/generated` → filtered + paged listing of `output/`
+- `GET /api/files/uploaded` → filtered + paged listing of `uploads/`
+- `DELETE /api/files` → bulk delete from `output/` or `uploads/`, returns `{deleted, missing}`
+
+### 10.4 Input handling
+
+- Copied-and-pasted text is a first-class input; text wins over file when both supplied; exactly one is required per input.
+- Uploaded `*_file` inputs are **persisted** to `uploads/` (deduped name, git-ignored) so they can be listed/deleted.
+- Invalid/unsupported uploads → `400`; empty-after-extraction → `400`; `503` if runner not initialized.
+
+### 10.5 File persistence & safety
+
+- `output/` (generated, git-ignored) and `uploads/` (git-ignored) are created at startup.
+- `resources`: downloads and deletes both resolve paths against allowlisted directories and reject traversal.
+
+**Files changed:** new `app/` package; `pyproject.toml` (deps + `known-first-party` + pyright `include` add `"app"`); `.gitignore` (`/uploads/`)

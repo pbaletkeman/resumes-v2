@@ -145,6 +145,9 @@ venv.bak/
 # Pipeline rendered output
 /output/
 
+# Uploaded resumes
+/uploads/
+
 # mypy
 .mypy_cache/
 .dmypy.json

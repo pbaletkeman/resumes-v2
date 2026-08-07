@@ -2,7 +2,7 @@
 
 ## What this repo is
 
-Python multi-agent resume optimization pipeline. 7 sequential agents transform a job description + resume into an ATS-optimized resume and tailored cover letter. Uses Ollama (local) or OpenAI as LLM providers.
+Python multi-agent resume optimization pipeline. 7 sequential agents transform a job description + resume into an ATS-optimized resume and tailored cover letter. Uses Ollama (local) or OpenAI as LLM providers. Includes a FastAPI web API (`app/`).
 
 ## Prerequisites
 
@@ -17,6 +17,7 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 | Install/sync deps | `uv sync` |
 | Basic agent test | `uv run python basic.py` |
 | Full 7-agent pipeline | `uv run python pipeline.py` |
+| Run web API | `uv run uvicorn app.main:app --reload` |
 | Regex parsing test (no LLM) | See `docs/TESTING.md` section 2 |
 | Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
 | Lint | `uv run ruff check .` |
@@ -80,6 +81,13 @@ wip_testing/
   test_ats_compliance.py   # ATS Compliance Agent test (chains agents 1-5)
   test_tone_polishing.py   # Tone Polishing Agent test (chains agents 1-6)
   test_cover_letter.py     # Cover Letter Agent test (chains agents 1-7)
+app/                       # FastAPI web API layer
+  __init__.py              # Package marker
+  main.py                  # App + lifespan + routes (health/models/pipeline/tasks/outputs/files)
+  schemas.py               # Pydantic request/response models (PipelineRun*, Task*, File*)
+  upload.py                # extract_text(): .txt/.docx/.pdf -> str, 400 on unmime
+  tasks.py                 # In-memory background task registry (TaskRegistry)
+  files.py                 # File listing/filter/paging + safe delete helpers
 ```
 
 ## Key conventions
@@ -123,10 +131,11 @@ Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compli
 
 ## Toolchain quirks
 
-- **pyright** runs in `strict` mode and **excludes `tests/`**. New code under `tests/` won't be type-checked. Use `uv run pyright` with **no path arg** — passing `.` makes pyright recurse into `.venv/` and spew thousands of third-party errors. `pyproject.toml` sets `include = ["client", "config", "pipeline.py", "basic.py"]`.
+- **pyright** runs in `strict` mode and **excludes `tests/`**. New code under `tests/` won't be type-checked. Use `uv run pyright` with **no path arg** — passing `.` makes pyright recurse into `.venv/` and spew thousands of third-party errors. `pyproject.toml` sets `include = ["app", "client", "config", "pipeline.py", "basic.py"]`.
 - **ruff** selects rules: `E`, `F`, `I`, `UP`, `B`, `SIM`. Line length 88.
 - **pytest** uses `asyncio_mode = "auto"` — async test functions run without decorators.
 - Python 3.14+ required (`pyproject.toml`).
+- **B008 avoided** in FastAPI routes via `Annotated[..., Form()/File()/Query()/Depends()]` defaults (ruff `B008` flags function calls in default args).
 
 ## Testing
 
@@ -136,4 +145,4 @@ Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_
 
 ## Status
 
-Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Every LLM call uses provider-native JSON mode (`response_format="json"`), with optional Strict Structured Outputs via `json_schema=model_to_json_schema(<OutputModel>)` (see `client/json_utils.py`). All 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()` (which defaults to `DEFAULT_AGENT_CLASSES`). Phase 4.3 (LLM fallback falsehoods: validation, fallback templates, logging, prompt strengthening, `company_name`), Phase 6 (output formatting: `client/formatter.py` + `ResumeRenderer` with `render_all()`), Phase 8 contact info (contact extraction via `FormatDetector` + contact header/signature line in cover letters), Phase 8.5 (skill normalization via `client/skills/SkillNormalizer`), and Phase 9 (cover letter fixes) are complete. `run_resume_pipeline()` takes optional `candidate_name`/`company_name` and writes rendered files to `Path("output")`, returned under the `"output_files"` result key. `run_resume_pipeline()` runs the whole 7-agent chain on a single event loop through `_run_pipeline_core()` (see `run_agent_async()` on `AgentRunner`) so the shared async `ModelClient` loop is not closed between agents. See `resume-done.md` for completed work and `resume-todo.md` for remaining work (Phase 7: live `test_real_files.py` + `tests/test_pipeline.py` coverage and docs).
+Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Every LLM call uses provider-native JSON mode (`response_format="json"`), with optional Strict Structured Outputs via `json_schema=model_to_json_schema(<OutputModel>)` (see `client/json_utils.py`). All 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()` (which defaults to `DEFAULT_AGENT_CLASSES`). Phase 4.3 (LLM fallback falsehoods: validation, fallback templates, logging, prompt strengthening, `company_name`), Phase 6 (output formatting: `client/formatter.py` + `ResumeRenderer` with `render_all()`), Phase 8 contact info (contact extraction via `FormatDetector` + contact header/signature line in cover letters), Phase 8.5 (skill normalization via `client/skills/SkillNormalizer`), and Phase 9 (cover letter fixes) are complete. `run_resume_pipeline()` takes optional `candidate_name`/`company_name` and writes rendered files to `Path("output")`, returned under the `"output_files"` result key. `run_resume_pipeline()` runs the whole 7-agent chain on a single event loop through `_run_pipeline_core()` (see `run_agent_async()` on `AgentRunner`) so the shared async `ModelClient` loop is not closed between agents. A FastAPI web layer (`app/`) exposes the pipeline synchronously and in the background, plus file listing/management for `output/` (generated) and `uploads/` (persisted uploads); endpoints must call `_run_pipeline_core()` directly (`pipeline.py:324`) and never `run_resume_pipeline()` (`pipeline.py:313`, wraps in `asyncio.run`) to avoid re-entering the event loop. See `resume-done.md` for completed work and `resume-todo.md` for remaining work (Phase 7: live `test_real_files.py` + `tests/test_pipeline.py` coverage and docs).

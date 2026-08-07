@@ -67,37 +67,37 @@ Returns the list of deleted `path`s and the `missing` ones so the client can rec
 
 ### 1. Schemas (`app/schemas.py`)
 
-- [ ] `FileMeta` — `name`, `size`, `modified`, `type`, `path`
-- [ ] `PagedFile` — `items`, `page`, `page_size`, `total`, `page_pages`
-- [ ] `DeleteFilesRequest` — `files: list[str]`
-- [ ] `DeleteFilesResponse` — `deleted`, `missing`
+- [x] `FileMeta` — `name`, `size`, `modified`, `type`, `path`
+- [x] `PagedFile` — `items`, `page`, `page_size`, `total`, `page_pages`
+- [x] `DeleteFilesRequest` — `files: list[str]`
+- [x] `DeleteFilesResponse` — `deleted`, `missing`
 
 ### 2. `app/files.py` helpers
 
-- [ ] `safe_dir_path(base: Path, name: str) -> Path` — resolve + allowlist guard (traversal-safe)
-- [ ] `build_file_meta(entry: Path, kind: str) -> FileMeta` — name/size/modified/type/path
-- [ ] `list_files(directory, *, file_type, q, page, page_size, sort) -> PagedFile` — filter, sort, paginate
-- [ ] Validate/clamp paging params → `400`
+- [x] `safe_dir_path(base: Path, name: str) -> Path` — resolve + allowlist guard (traversal-safe)
+- [x] `build_file_meta(entry: Path, kind: str) -> FileMeta` — name/size/modified/type/path
+- [x] `list_files(directory, *, file_type, q, page, page_size, sort) -> PagedFile` — filter, sort, paginate
+- [x] Validate/clamp paging params → `400`
 
 ### 3. `app/main.py` — persist uploads
 
-- [ ] `UPLOADS_DIR = Path("uploads")` constant
-- [ ] Persist `*_File` uploads into `UP_LOADS_DIR` (dedup name) inside the pipeline endpoints
-- [ ] Ensure `uploads/` and `output/` dirs exist at startup (lifespan `mkdir`)
+- [x] `UPLOADS_DIR = Path("uploads")` constant
+- [x] Persist `*_File` uploads into `UP_LOADS_DIR` (dedup name) inside the pipeline endpoints — via `_persist_upload()` called from `_read_text_input`
+- [x] Ensure `uploads/` and `output/` dirs exist at startup (lifespan `mkdir`)
 
 ### 4. `app/main.py` — routes
 
-- [ ] `GET /api/files/generated` → `list_files(OUTPUT_DIR, ...)`
-- [ ] `GET /api/files/uploaded` → `list_files(UPLOADS_DIR, ...)`
-- [ ] `DELETE /api/files` → bulk delete with allowlist + `deleted`/`missing` response
+- [x] `GET /api/files/generated` → `list_files(OUTPUT_DIR, ...)`
+- [x] `GET /api/files/uploaded` → `list_files(UPLOADS_DIR, ...)`
+- [x] `DELETE /api/files` → bulk delete with allowlist + `deleted`/`missing` response
 
 ### 5. Manual smoke + verification
 
-- [ ] `uv run uvicorn app.main:app` boots
-- [ ] `GET /api/files/generated` lists existing `output/` files; `page`/`page_size`/`file_type=pdf`/`q=` behave
-- [ ] `GET /api/files/uploaded` lists persisted uploads after a `*_file` pipeline call
-- [ ] `DELETE /api/files` removes a chosen file (and reports `missing` for unknowns; rejects traversal)
-- [ ] `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`
+- [x] `uv run uvicorn app.main:app` boots — verified via `import app.main` + `TestClient` (no import/boot errors)
+- [x] `GET /api/files/generated` lists existing `output/` files; `page`/`page_size`/`file_type=pdf`/`q=` behave — verified filter (pdf→2), page_size=3→total_pages=4, q=resume→8, page=0→400, bad sort→400
+- [x] `GET /api/files/uploaded` lists persisted uploads after a `*_file` pipeline call — uploads persisted + listed
+- [x] `DELETE /api/files` removes a chosen file (and reports `missing` for unknowns; rejects traversal) — verified upload/generated delete, `missing`, and `../` traversal rejection
+- [x] `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`
 
 ## Known limitations / notes
 

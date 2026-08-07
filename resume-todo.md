@@ -2,6 +2,8 @@
 
 Everything still left to implement. For the archive of what is complete, see [resume-done.md](resume-done.md).
 
+> Note: the FastAPI web API layer (`app/`) is a separate workstream from the core pipeline. Its work log lives in `resume-web-todo.md` (API routes) and `web-files-todo.md` (file-management endpoints), not here.
+
 ## Overview
 
 The 7-agent resume optimization pipeline (see `bots.md`) is largely implemented. The dedicated agent classes for all 7 agents are done, as are Phase 8 (structured JSON output), Phase 4.3 (post-validation for rewrite/cover letter, fallback templates, logging, prompt strengthening, `company_name` — see `resume-done.md`), Phase 5.2 (pipeline wiring — all 7 dedicated classes wired), Phase 6.A (output formatting helpers), Phase 6.B (template renderer: `render_all()`, DOCX/PDF — see `resume-done.md`), Phase 8-contact info, Phase 8.5 (skill normalization & canonical taxonomy), Phase 9 (cover letter creation fixes — see `resume-done.md`), and 362 unit tests. The items below are what remains.

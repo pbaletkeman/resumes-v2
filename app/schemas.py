@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -52,3 +53,36 @@ class TaskStatus(BaseModel):
     error: str | None = None
     created_at: float | None = None
     completed_at: float | None = None
+
+
+class FileMeta(BaseModel):
+    """Metadata for a single generated or uploaded file."""
+
+    name: str
+    size: int
+    modified: datetime
+    type: str
+    path: str
+
+
+class PagedFile(BaseModel):
+    """A filtered + paginated page of file metadata."""
+
+    items: list[FileMeta]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
+class DeleteFilesRequest(BaseModel):
+    """Body for batch-deleting files by their ``path`` keys."""
+
+    files: list[str]
+
+
+class DeleteFilesResponse(BaseModel):
+    """Outcome of a batch delete."""
+
+    deleted: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
