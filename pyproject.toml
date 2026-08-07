@@ -4,12 +4,16 @@ version = "0.1.0"
 description = "Multi-agent resume optimization pipeline"
 requires-python = ">=3.14"
 dependencies = [
+    "fastapi>=0.115",
     "jinja2>=3.1.0",
     "ollama>=0.4.0",
     "openai>=1.0.0",
     "pydantic>=2.0.0",
+    "pypdf>=4.0",
     "python-docx>=1.0.0",
+    "python-multipart>=0.0.9",
     "reportlab>=4.0",
+    "uvicorn>=0.30",
 ]
 
 [tool.ruff]
@@ -20,11 +24,11 @@ line-length = 88
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["client", "config"]
+known-first-party = ["app", "client", "config"]
 
 [tool.pyright]
 pythonVersion = "3.14"
-include = ["client", "config", "pipeline.py", "basic.py"]
+include = ["app", "client", "config", "pipeline.py", "basic.py"]
 exclude = ["tests"]
 typeCheckingMode = "strict"
 

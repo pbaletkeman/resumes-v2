@@ -46,45 +46,45 @@ The API calls `_run_pipeline_core()` (`pipeline.py:324`) directly with `await`. 
 ## Task breakdown
 
 ### 1. Dependencies & config (`pyproject.toml`)
-- [ ] `uv add fastapi>=0.115 uvicorn>=0.30 python-multipart>=0.0.9 pypdf>=4.0` (or edit deps list)
-- [ ] `[tool.ruff.lint.isort] known-first-party`: add `"app"`
-- [ ] `[tool.pyright] include`: add `"app"` so new code is typechecked in strict mode
-- [ ] `uv sync` to lock/install
+- [x] `uv add fastapi>=0.115 uvicorn>=0.30 python-multipart>=0.0.9 pypdf>=4.0` (or edit deps list) — added to `dependencies` in `pyproject.toml`
+- [x] `[tool.ruff.lint.isort] known-first-party`: add `"app"` — `["app", "client", "config"]`
+- [x] `[tool.pyright] include`: add `"app"` so new code is typechecked in strict mode — `["app", "client", "config", "pipeline.py", "basic.py"]`
+- [x] `uv sync` to lock/install — fastapi 0.141.1, uvicorn 0.52.1, python-multipart 0.0.32, pypdf 6.15.0
 
 ### 2. Package scaffold
-- [ ] Create `app/__init__.py` package marker
+- [x] Create `app/__init__.py` package marker
 
 ### 3. `app/schemas.py` — Pydantic models
-- [ ] `PipelineRunRequest` — validated request shape for pipeline inputs
-- [ ] `PipelineRunResponse` — 7-key result + `output_files` (string paths); serialize via `model_dump(mode="json")`
-- [ ] `TaskCreated` — `{task_id}` response
-- [ ] `TaskStatus` — `{status, result?, error?, created_at?, completed_at?}`
-- [ ] Confirm serialization helpers for nested result dicts
+- [x] `PipelineRunRequest` — validated request shape for pipeline inputs
+- [x] `PipelineRunResponse` — 7-key result + `output_files` (string paths); serialize via `model_dump(mode="json")`
+- [x] `TaskCreated` — `{task_id}` response
+- [x] `TaskStatus` — `{status, result?, error?, created_at?, completed_at?}`
+- [x] Confirm serialization helpers for nested result dicts — verified `model_dump(mode="json")` round-trips nested dicts/`Any` fields
 
 ### 4. `app/upload.py` — text extraction + 400 handling
-- [ ] `extract_text(file, *, mime) -> str` signature + dispatch
-- [ ] `.txt` decode branch (encoding fallback handling)
-- [ ] `.docx` branch via `python-docx`
-- [ ] `.pdf` branch via `pypdf`
-- [ ] else → `HTTPException(400)`
-- [ ] Empty-text guard (return 400 vs pass-through — decide)
-- [ ] Decide text-field-vs-file precedence (text wins, or 400 for both)
+- [x] `extract_text(file, *, mime) -> str` signature + dispatch — on `mime`, dispatches to `_decode_txt` / `_extract_docx` / `_extract_pdf`
+- [x] `.txt` decode branch — `_decode_txt`: tries `utf-8` → `utf-8-sig` → `latin-1`, falls back to `latin-1` with `replace`
+- [x] `.docx` branch via `python-docx` — `Document(BytesIO(data))`, joins paragraph text with `\n`
+- [x] `.pdf` branch via `pypdf` — `PdfReader(BytesIO(data))`, joins page text with `\n`
+- [x] else → `HTTPException(400)` — unsupported MIME raises `400` with a `.txt/.docx/.pdf` hint
+- [x] Empty-text guard (return 400 vs pass-through — decide) — `extract_text` returns the extracted text as-is (empty allowed); the empty-vs-400 decision is delegated to `main.py`
+- [x] Decide text-field-vs-file precedence (text wins, or 400 for both) — text field wins (see todo line 35); enforcement delegated to `main.py` which only calls `extract_text` when no text was supplied
 
 ### 5. `app/tasks.py` — in-memory task registry
-- [ ] `TaskRegistry` container (dataclass or dict-backed)
-- [ ] `create() -> task_id` (unique id generation + initial status/created_at)
-- [ ] `update()` and `get()`
-- [ ] `set_result()` / `set_error()` (complete + completed_at)
+- [x] `TaskRegistry` container (dataclass or dict-backed) — class backed by `dict[str, dict[str, Any]]` with a `threading.Lock`
+- [x] `create() -> task_id` (unique id generation + initial status/created_at) — `uuid.uuid4().hex`; initializes `status="pending"`, `result/error=None`, `created_at=monotonic()`, `completed_at=None`
+- [x] `update()` and `get()` — `update()` merges fields (no-op for unknown id); `get()` returns a copy or `None`
+- [x] `set_result()` / `set_error()` (complete + completed_at) — set `status="completed"/"failed"`, store `result`/`error`, stamp `completed_at`
 
 ### 6. `app/main.py` — FastAPI app + routes
-- [ ] `lifespan` builds one `AgentRunner` via `create_runner_from_config()`, stores on `app.state.runner`
-- [ ] `GET /health` → `{"status": "ok"}`
-- [ ] `GET /api/models` → `get_model_summary()` from `config.agents`
-- [ ] `POST /api/pipeline` (sync): multipart fields `job_description`, `resume`, optional `job_file`/`resume_file`, optional `candidate_name`/`company_name`; parse inputs via `upload.py`; call `_run_pipeline_core(runner, jd, resume, candidate_name=, company_name=)` with `await` (via `pipeline.py:324`); return 7-key result + `output_files`
-- [ ] `POST /api/pipeline/async`: same inputs → `asyncio.create_task(_run_pipeline_core(...))`, record in `TaskRegistry`, return `TaskCreated`
-- [ ] `GET /api/tasks/{task_id}` → `TaskStatus` (404 if unknown)
-- [ ] `GET /api/outputs/{filename}` → `FileResponse` from `output/` dir
-- [ ] Ensure main only ever calls `_run_pipeline_core`, never `run_resume_pipeline` (avoid `asyncio.run` re-entry)
+- [x] `lifespan` builds one `AgentRunner` via `create_runner_from_config()`, stores on `app.state.runner` — `@asynccontextmanager lifespan` builds once, sets `app.state.runner`; routes access it via `Depends(_require_runner)`
+- [x] `GET /health` → `{"status": "ok"}`
+- [x] `GET /api/models` → `get_model_summary()` from `config.agents`
+- [x] `POST /api/pipeline` (sync): multipart fields `job_description`, `resume`, optional `job_file`/`resume_file`, optional `candidate_name`/`company_name`; parse inputs via `upload.py`; call `_run_pipeline_core(runner, jd, resume, candidate_name=, company_name=)` with `await` (via `pipeline.py:324`); return 7-key result + `output_files`
+- [x] `POST /api/pipeline/async`: same inputs → `asyncio.create_task(_run_pipeline_core(...))`, record in `TaskRegistry`, return `TaskCreated`
+- [x] `GET /api/tasks/{task_id}` → `TaskStatus` (404 if unknown)
+- [x] `GET /api/outputs/{filename}` → `FileResponse` from `output/` dir
+- [x] Ensure main only ever calls `_run_pipeline_core`, never `run_resume_pipeline` (avoid `asyncio.run` re-entry) — only `_run_pipeline_core` is awaited; `run_resume_pipeline` (which wraps in `asyncio.run`) is never referenced
 
 ### 7. Manual smoke + live verification
 - [ ] `uv run uvicorn app.main:app` boots without import errors
