@@ -476,7 +476,7 @@ Both agents log the outcome at `INFO` so an LLM success vs a deterministic fallb
 
 `wip_testing/test_resume_rewrite.py` and `wip_testing/test_cover_letter.py` now call `configure_logging()` (they previously relied on Python's default WARNING-only config, which silently dropped INFO messages even with `LOG_LEVEL=DEBUG` set).
 
-**Tests added:** `TestCountWords` (2) + `TestFallbackLogging` (2) in `tests/test_resume_rewrite_validation.py`; `TestFallbackLogging` (3) in `tests/test_cover_letter_validation.py` — each drives `run()` through a stub `ModelClient` (`_MockClient`) with `caplog.set_level(logging.INFO)` to assert the exact success/fallback messages. 227 tests total.
+**Tests added:** `TestCountWords` (2) + `TestFallbackLogging` (2) in `tests/test_resume_rewrite_validation.py`; `TestFallbackLogging` (3) in `tests/test_cover_letter_validation.py` — each drives `run()` through a stub `ModelClient` (`_MockClient`) with `caplog.set_level(logging.INFO)` to assert the exact success/fallback messages. 362 tests total.
 
 **Files changed:** `client/agents/resume_rewrite.py`, `client/agents/cover_letter.py`, `wip_testing/test_resume_rewrite.py`, `wip_testing/test_cover_letter.py`
 
@@ -499,7 +499,7 @@ Root-cause mitigation so the LLM is less likely to fabricate in the first place 
 - `uv run python wip_testing/test_resume_rewrite.py` with `LOG_LEVEL=DEBUG` → `LLM rewrite succeeded (skills=25, words=438)`.
 - `uv run python wip_testing/test_cover_letter.py` with `LOG_LEVEL=DEBUG` → `LLM cover letter succeeded (words=280)`.
 - Groundedness cross-check: extracted every number from the input resume text and every number from the rewritten metrics/achievements — **0 ungrounded numbers** (verified on both the LLM-success and deterministic-fallback paths).
-- `uv run pytest` → 227 passed; ruff check/format + scoped pyright all clean.
+- `uv run pytest` → 362 passed; ruff check/format + scoped pyright all clean.
 
 **Files changed:** `client/agents/resume_rewrite.py`, `client/agents/cover_letter.py`
 
@@ -523,8 +523,8 @@ Root-cause mitigation so the LLM is less likely to fabricate in the first place 
 **Tests added for the completed §4.3 items:**
 
 - `tests/test_jd_parsing.py` — covers `_extract_company_name` + `_sync_company_name` (19 tests)
-- `tests/test_resume_rewrite_validation.py` — covers the A checks + §C `_tailor_skills`/`_parsed_to_rewrite` + §D fallback logging (56 tests)
-- `tests/test_cover_letter_validation.py` — covers the B checks + §C fallback builder helpers + §D fallback logging + Phase 8 contact-info post-processing (91 tests)
+- `tests/test_resume_rewrite_validation.py` — covers the A checks + §C `_tailor_skills`/`_parsed_to_rewrite` + §D fallback logging (63 tests)
+- `tests/test_cover_letter_validation.py` — covers the B checks + §C fallback builder helpers + §D fallback logging + Phase 8 contact-info post-processing (109 tests)
 
 ---
 
@@ -896,7 +896,7 @@ Verification — **COMPLETE (Ollama)**, model-version dependent:
 
 **Files changed:** `client/agents/cover_letter.py`, `tests/test_cover_letter_validation.py`
 
-**Verification:** `uv run pytest tests/ -q` 322 passed (up from 306; +11 cover letter validation = 91, +5 renderer = 43); `uv run ruff check .` clean; `uv run pyright` (strict) 0 errors. The LSP "private member used outside class" warnings inside tests are pre-existing pyright-strict noise under the `tests/` exclusion (see AGENTS.md Toolchain quirks).
+**Verification:** `uv run pytest tests/ -q` 362 passed (up from 306; +11 cover letter validation = 109, +5 renderer = 43); `uv run ruff check .` clean; `uv run pyright` (strict) 0 errors. The LSP "private member used outside class" warnings inside tests are pre-existing pyright-strict noise under the `tests/` exclusion (see AGENTS.md Toolchain quirks).
 
 ---
 
@@ -930,6 +930,10 @@ client/
     ats_compliance.py              # EXISTS ✅ - Agent 5 (ATSComplianceAgent)
     tone_polishing.py              # EXISTS ✅ - Agent 6 (TonePolishingAgent)
     cover_letter.py                # EXISTS ✅ - Agent 7 (CoverLetterAgent)
+  skills/                          # EXISTS ✅ (Phase 8.5 — shared SkillNormalizer)
+    __init__.py                    # EXISTS (empty)
+    normalizer.py                  # EXISTS ✅ (canonical skill taxonomy normalization)
+    taxonomy.json                   # EXISTS ✅ (skill taxonomy data)
 config/
   __init__.py                      # EXISTS (empty)
   agents.py                        # EXISTS ✅
@@ -938,12 +942,13 @@ tests/
   conftest.py                      # EXISTS ✅ (shared fixtures)
   test_format_detector.py          # EXISTS ✅ (46 tests)
   test_jd_parsing.py               # EXISTS ✅ (19 tests)
-  test_resume_rewrite_validation.py # EXISTS ✅ (56 tests)
-  test_cover_letter_validation.py  # EXISTS ✅ (91 tests)
+  test_resume_rewrite_validation.py # EXISTS ✅ (63 tests)
+  test_cover_letter_validation.py  # EXISTS ✅ (109 tests)
   test_formatter.py                # EXISTS ✅ (41 tests — Phase 6.2)
   test_renderer.py                 # EXISTS ✅ (43 tests — Phase 6.3)
   test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
   test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
+  test_skill_normalizer.py         # EXISTS ✅ (15 tests — Phase 8.5)
 docs/
   TESTING.md                       # EXISTS ✅
   models.md                        # EXISTS ✅
@@ -1121,7 +1126,7 @@ The cover letter's signature / opening previously contained `[Your Name]`, becau
 
 - `_try_llm()` stays pure: all string replacement / sorting (`_ensure_chronological`, `_apply_company_name`, `_apply_candidate_name`) runs on the validated `RewriteOutput`/`CoverLetterOutput` **after** Pydantic validation; data returned via `model_copy` / new output object, never mutated in place.
 - ASCII-only convention: tokens used are `[Company Name]`, `[Your Name]`, `[Candidate Name]`, `<Your Name>`, `[Employer Name]` (no extended characters).
-- Verification: `uv run pytest` → **350 passed**; `uv run ruff check .` clean; `uv run pyright .` → **0 errors**; manual `wip_testing/test_cover_letter.py` (full 1–7 chain, LLM success, real candidate name `Peter Letkeman` in signature, contact line injected, company honored) and `wip_testing/test_resume_rewrite.py` (full 1–4 chain, chronologically ordered, certifications preserved).
+- Verification: `uv run pytest` → **362 passed**; `uv run ruff check .` clean; `uv run pyright .` → **0 errors**; manual `wip_testing/test_cover_letter.py` (full 1–7 chain, LLM success, real candidate name `Peter Letkeman` in signature, contact line injected, company honored) and `wip_testing/test_resume_rewrite.py` (full 1–4 chain, chronologically ordered, certifications preserved).
 
 **Files changed:** (verification only — no code changes)
 

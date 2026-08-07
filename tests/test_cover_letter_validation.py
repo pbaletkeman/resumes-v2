@@ -734,9 +734,7 @@ class TestApplyContactInfo:
         letter = _letter(
             "Dear Hiring Manager,\n\nYou can reach me at jane@example.com.\n"
         )
-        result = _apply_contact_info(
-            letter, self._resume(email="jane@example.com")
-        )
+        result = _apply_contact_info(letter, self._resume(email="jane@example.com"))
         assert result.cover_letter == letter.cover_letter
 
     def test_leaves_unchanged_when_no_contact_fields(self) -> None:

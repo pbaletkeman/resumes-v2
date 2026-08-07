@@ -19,7 +19,7 @@ uv run python pipeline.py
 ## Usage
 
 | What | Command |
-|---|---|
+| --- | --- |
 | Install/sync deps | `uv sync` |
 | Full 7-agent pipeline | `uv run python pipeline.py` |
 | Single-agent demo | `uv run python basic.py` |
@@ -112,6 +112,9 @@ client/
     ats_compliance.py    # ATS Compliance Agent (Agent 5) - dedicated class
     tone_polishing.py    # Tone Polishing Agent (Agent 6) - dedicated class
     cover_letter.py      # Cover Letter Agent (Agent 7) - dedicated class
+  skills/                # Shared SkillNormalizer (canonical skill taxonomy)
+    normalizer.py        # SkillNormalizer: canonical normalization/localization
+    taxonomy.json        # Canonical skill taxonomy data
   templates/             # Jinja2 templates (modern/classic/minimal/cover_letter)
     renderer.py          # ResumeRenderer: plaintext/markdown/cover-letter/docx/pdf + render_all()
 tests/
@@ -146,6 +149,7 @@ wip_testing/
 
 - `sample/jobs/` - Sample job descriptions for testing
 - `sample/resume/` - Sample resume for testing
+- `client/skills/` - Shared `SkillNormalizer` + canonical skill taxonomy
 - `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter) + `renderer.py` (`ResumeRenderer`)
 - `docs/models.md` - Quick reference for all Pydantic models
 - `docs/TESTING.md` - Detailed testing guide

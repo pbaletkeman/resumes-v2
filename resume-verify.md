@@ -280,33 +280,33 @@ or **failed -> fixed** and link any new bug/Phase entry.
 
 | # | Claim | Status | Notes / Fix |
 |---|-------|--------|-------------|
-| 0a | doc-count hygiene | [ ] | 227->362, 56->63, 91->109, 350->362; add client/skills + test_skill_normalizer |
-| 1.1 | ModelClient ABC + abstract chat | [ ] | |
-| 1.2 | errors + client wrappers | [ ] | |
-| 1.3 | requirements.txt = 3 deps | [ ] | |
-| 2.1 | FormatDetector methods | [ ] | 16 methods confirmed present |
-| 2.2 | agent infra contract | [ ] | run/_try_llm/_parse_json/json+json_schema |
-| 2.3 | JD Parsing agent | [ ] | test_jd_parsing = 19 |
-| 2.4 | Resume Parsing agent | [ ] | |
-| 3.1-3.2 | Gap + Rewrite agents | [ ] | |
-| 3.3 | ATS agent | [ ] | ats_score clamp |
-| 4.1-4.2 | Tone + Cover agents | [ ] | length/company/skill checks |
-| 4.3A | rewrite post-validation | [ ] | |
-| 4.3B | cover post-validation | [ ] | |
-| 4.3C | fallback templates | [ ] | |
-| 4.3D | fallback logging | [ ] | |
-| 4.3E | ASCII prompts / no fabrication | [ ] | |
-| 4.3F | company_name + sync | [ ] | |
-| 5.1 | AgentRunner | [ ] | |
-| 5.2 | 7-agent wiring + output_files | [ ] | |
-| 6.1 | models | [ ] | 10/10 present |
-| 6.2/6.3 | formatter + renderer | [ ] | 41 + 43 tests |
-| 6.10 | deps + caveats | [ ] | docx/reportlab/jinja2 |
-| 8CI | contact fields (phone/email/github/linkedin) | [ ] | |
-| 8.5 | skill normalizer, 6 integrations | [ ] | 15 tests |
-| 9 | Phase 9 fixes present | [ ] | tests pass; live Ollama run separate |
-| live | end-to-end Ollama, wip_testing | [ ] | requires Ollama |
-| cross | cross-doc count consistency | [ ] | expected: only resume-done.md lags |
+| 0a | doc-count hygiene | verified | 227->362, 56->63, 91->109, 350->362; added client/skills + test_skill_normalizer to File Structure |
+| 1.1 | ModelClient ABC + abstract chat | verified | `inspect.isabstract=True`, abstractmethods=`['chat']` |
+| 1.2 | errors + client wrappers | verified | 4 classes present; ollama wraps Request/Response/Timeout; openai wraps Auth/RateLimit/APIConnection/APIError/Timeout |
+| 1.3 | deps present | verified | no `requirements.txt` (project uses uv/pyproject.toml); ollama/openai/pydantic present in pyproject deps |
+| 2.1 | FormatDetector methods | verified | 13 methods + contact extractors present |
+| 2.2 | agent infra contract | verified | all 7 agents: run/_try_llm/_parse_json/json+json_schema |
+| 2.3 | JD Parsing agent | verified | test_jd_parsing = 19 |
+| 2.4 | Resume Parsing agent | verified | no standalone test file; covered via format_detector (46) |
+| 3.1-3.2 | Gap + Rewrite agents | verified | output models checked; no regex fallback in gap; rewrite fields present |
+| 3.3 | ATS agent | verified | ats_score clamped 0-100 (line 190) |
+| 4.1-4.2 | Tone + Cover agents | verified | `_validate_length/_validate_role/_check_company/_check_skills` present |
+| 4.3A | rewrite post-validation | verified | _sanitize_skills/_validate_companies/_validate_chronological import OK |
+| 4.3B | cover post-validation | verified | helpers import OK |
+| 4.3C | fallback templates | verified | _build_fallback_cover_letter import OK |
+| 4.3D | fallback logging | verified | INFO success/fallback logs; tests pass |
+| 4.3E | ASCII prompts / no fabrication | verified | all 7 `_SYSTEM_PROMPT`s ASCII-only; `引可` absent (False False) |
+| 4.3F | company_name + sync | verified | `company_name` in JDParsingOutput; `_sync_company_name`/`_extract_company_name` present |
+| 5.1 | AgentRunner | verified | class present; now has async `run_agent_async` + sync `run_agent` |
+| 5.2 | 7-agent wiring + output_files | failed -> fixed | fixed pipeline event-loop bug + `_extract_field` model handling; full run 7/7 with 6 rendered files |
+| 6.1 | models | verified | 10/10 present; output model fields confirmed |
+| 6.2/6.3 | formatter + renderer | verified | 41 + 43 = 84 tests pass; 8 renderer methods |
+| 6.10 | deps + caveats | verified | docx/reportlab/jinja2 import OK; no `markdown` dep |
+| 8CI | contact fields (phone/email/github/linkedin) | verified | 4/4 on ResumeParsingOutput model + ParsedResume; contact funcs + renderer contact_line |
+| 8.5 | skill normalizer, 6 integrations | verified | 15 tests; 5 consumers `_NORMALIZER`; local fuzzy-match helpers delegate to shared normalizer |
+| 9 | Phase 9 fixes present | verified | tests pass; live Ollama run separate |
+| live | end-to-end Ollama, wip_testing | verified | Ollama up; jd/rewrite/cover succeeded; full pipeline 7/7 with real name/company/contacts |
+| cross | cross-doc count consistency | verified | 362 everywhere (AGENTS/README/todo/done); fixed docs |
 
 ---
 
@@ -317,3 +317,58 @@ or **failed -> fixed** and link any new bug/Phase entry.
 - One full `pytest + ruff + pyright` green run at the end.
 - A short `## Verification Results (YYYY-MM-DD)` section appended to this file
   recording the final results and any new bug/Phase entries moved to resume-todo.md.
+
+---
+
+## Verification Results (2026-08-06)
+
+**Toolchain:** `uv run pytest` → **362 passed**; `uv run ruff check .` clean;
+`uv run ruff format --check .` clean; `uv run pyright` → 0 errors / 0 warnings.
+
+**Summary:** Every tracker row resolved. All static claims in Sections 1-8
+verified (symbol presence, contracts, tests, ASCII prompts, models, renderer,
+skill normalizer, contact info, cross-doc counts now 362 everywhere).
+Section 0a doc-count hygiene applied to `resume-done.md`.
+
+### Two live bugs fixed in `pipeline.py` (found during Section 9 / 5.2)
+
+1. **Event-loop lifecycle (failed → fixed).** `AgentRunner.run_agent()` wrapped
+   each of the 7 agents in its own `asyncio.run()`, opening+closing a fresh
+   event loop per agent. The dedicated agents share a single `ollama.AsyncClient`
+   bound to the first loop, so after `jd_parsing_agent` succeeded, later agents
+   crashed with `RuntimeError: Event loop is closed`. Fixed by extracting the
+   agent dispatch into an async coroutine `run_agent_async()` (sync `run_agent`
+   now delegates via one `asyncio.run()`) and running the whole 7-agent chain
+   under a single loop via a new `_run_pipeline_core()` coroutine wrapped once
+   in `asyncio.run()`.
+
+2. **`_extract_field` model handling (failed → fixed).** `_extract_field()`
+   returned the entire Pydantic model when a dedicated agent returned one,
+   instead of its named field. With ATS, the pipeline passed an
+   `ATSComplianceOutput` object into `tone_polishing_agent`, which threw
+   `TypeError: object of type 'ATSComplianceOutput' has no len()`. Added a
+   `getattr` branch for non-dict model results so `final_resume` (and
+   `cover_letter`, etc.) extract correctly.
+
+**Reported:** both logged to `resume-todo.md` (see new "Verification bugs" entry
+below). No seed/text test counts changed — still 362.
+
+### Live end-to-end (Ollama on :11434, model qwen2.5:7b-instruct)
+
+- `wip_testing/test_job_description.py` → succeeded.
+- `wip_testing/test_resume_rewrite.py` → `LLM rewrite succeeded` (no fallback).
+- `wip_testing/test_cover_letter.py` → `LLM cover letter succeeded` (no fallback).
+- `pipeline.py` full 7/7 agents succeeded in 131.6s; rendered 6 non-empty
+  `output/*` files (plaintext/markdown/docx/pdf resume + plaintext/markdown
+  cover letter) with real candidate name `Peter Letkeman`, honored company,
+  contact line and signature. `output/` added to `.gitignore`.
+
+OpenAI gpt-4o remains unverifiable (no `OPENAI_API_KEY`), noted in resume-todo.md.
+
+### Files changed (source/docs only)
+- `resume-done.md` — stale doc counts (Section 0a).
+- `resume-verify.md` — tracker + this results section.
+- `pipeline.py` — event-loop fix + `_extract_field` model handling.
+- `client/format_detector.py`, `tests/test_cover_letter_validation.py` —
+  format-only (ruff format; no logic change).
+- `.gitignore` — ignore `output/`.

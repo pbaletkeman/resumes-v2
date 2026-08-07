@@ -530,9 +530,7 @@ class FormatDetector:
         re.VERBOSE,
     )
 
-    _EMAIL_PATTERN = re.compile(
-        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-    )
+    _EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
     _LINKEDIN_PATTERN = re.compile(
         r"(?:linkedin\.com/in/|linkedin\.com/profile/|linkedin\.com/pub/)([a-zA-Z0-9\-_]+)",

@@ -167,7 +167,29 @@ class AgentRunner:
 
         Raises:
             KeyError: If the agent name is not registered.
-            NotImplementedError: Always (placeholder for real integration).
+        """
+        return asyncio.run(self.run_agent_async(name, inputs))
+
+    async def run_agent_async(self, name: str, inputs: dict[str, Any]) -> Any:
+        """Execute a named agent within the current event loop.
+
+        This is the coroutine form of :meth:`run_agent`.  It avoids creating
+        a fresh event loop per agent so that all agents share the same loop;
+        the dedicated agent classes reuse a single ``ModelClient`` whose
+        ``AsyncClient`` is bound to an event loop.  Wrapping every
+        ``run_agent`` call in its own ``asyncio.run()`` closed that loop after
+        the first agent, so subsequent agents failed with "Event loop is
+        closed" when using Ollama/OpenAI async clients.
+
+        Args:
+            name: The agent name (must exist in ``self.agents``).
+            inputs: Dictionary of input data for the agent.
+
+        Returns:
+            The agent's output (type depends on the agent).
+
+        Raises:
+            KeyError: If the agent name is not registered.
         """
         if name not in self.agents:
             raise KeyError(f"Agent '{name}' not found")
@@ -185,7 +207,7 @@ class AgentRunner:
             self.agents[name] = agent  # Cache the instance
 
         try:
-            result: Any = asyncio.run(agent.run(inputs))
+            result: Any = await agent.run(inputs)
             elapsed = time.monotonic() - start
             logger.info("Agent %s completed in %.1fs", name, elapsed)
             return result
@@ -208,25 +230,31 @@ class AgentRunner:
 
 
 def _extract_field(result: Any, *fields: str) -> Any:
-    """Return the first present dict field from ``result``, else ``result``.
+    """Return the first present dict/attribute field from ``result``, else ``result``.
 
     Dedicated agents return validated Pydantic models (e.g.
     ``GapAnalysisOutput``) that are themselves the stage output, while
     generic ``PipelineAgent`` wrappers return a raw dict with named result
     keys.  This helper normalises both shapes so ``run_resume_pipeline``
-    accepts a runner built from either kind of agent.
+    accepts a runner built from either kind of agent: it looks up the
+    requested fields either on a dict or (via ``getattr``) on a model,
+    falling back to returning ``result`` unchanged when none is found.
 
     Args:
         result: The agent's return value (dict or model).
-        fields: Candidate field names to look up on a dict result.
+        fields: Candidate field names to look up on the result.
 
     Returns:
-        The first field present in a dict result, otherwise ``result``.
+        The first present field, otherwise ``result``.
     """
     if isinstance(result, dict):
         for field in fields:
             if field in result:
                 return cast(Any, result[field])
+    elif result is not None:
+        for field in fields:
+            if hasattr(result, field):
+                return getattr(result, field)
     return cast(Any, result)
 
 
@@ -279,6 +307,30 @@ def run_resume_pipeline(
     """
     configure_logging()
 
+    # Run the whole 7-agent chain on a single event loop so all agents share
+    # one loop (and the shared async ModelClient's bound event loop).  This
+    # avoids each agent opening+closing its own loop (see run_agent_async).
+    return asyncio.run(
+        _run_pipeline_core(
+            runner,
+            job_description,
+            resume,
+            candidate_name=candidate_name,
+            company_name=company_name,
+        )
+    )
+
+
+async def _run_pipeline_core(
+    runner: AgentRunner,
+    job_description: str,
+    resume: str,
+    *,
+    candidate_name: str = "",
+    company_name: str = "",
+) -> dict[str, Any]:
+    """Async core of :func:`run_resume_pipeline` executed on one event loop."""
+
     total_agents = 7
     pipeline_start = time.monotonic()
 
@@ -287,7 +339,7 @@ def run_resume_pipeline(
     logger.info("Agents configured: %s", ", ".join(agent_names))
 
     # 1. JD Parsing Agent
-    jd_result = runner.run_agent(
+    jd_result = await runner.run_agent_async(
         "jd_parsing_agent",
         {
             "job_description": job_description,
@@ -296,7 +348,7 @@ def run_resume_pipeline(
     parsed_job_description: Any = _extract_field(jd_result, "parsed_job_description")
 
     # 2. Resume Parsing Agent
-    resume_result = runner.run_agent(
+    resume_result = await runner.run_agent_async(
         "resume_parsing_agent",
         {
             "resume": resume,
@@ -305,7 +357,7 @@ def run_resume_pipeline(
     parsed_resume: Any = resume_result
 
     # 3. Gap Analysis Agent
-    gap_result = runner.run_agent(
+    gap_result = await runner.run_agent_async(
         "gap_analysis_agent",
         {
             "prompt": (
@@ -320,7 +372,7 @@ def run_resume_pipeline(
     tailoring_strategy: Any = _extract_field(gap_result, "tailoring_strategy")
 
     # 4. Resume Rewrite Agent
-    rewrite_result = runner.run_agent(
+    rewrite_result = await runner.run_agent_async(
         "resume_rewrite_agent",
         {
             "prompt": (
@@ -335,7 +387,7 @@ def run_resume_pipeline(
     rewritten_resume: Any = _extract_field(rewrite_result, "rewritten_resume")
 
     # 5. ATS Compliance Agent
-    ats_result = runner.run_agent(
+    ats_result = await runner.run_agent_async(
         "ats_compliance_agent",
         {
             "prompt": "Check and optimize this resume for ATS systems.",
@@ -349,7 +401,7 @@ def run_resume_pipeline(
     )
 
     # 6. Tone Polishing Agent
-    tone_result = runner.run_agent(
+    tone_result = await runner.run_agent_async(
         "tone_polishing_agent",
         {
             "prompt": "Polish the tone and clarity of this resume.",
@@ -361,7 +413,7 @@ def run_resume_pipeline(
     polished_resume: Any = _extract_field(tone_result, "polished_resume")
 
     # 7. Cover Letter Agent
-    cover_result = runner.run_agent(
+    cover_result = await runner.run_agent_async(
         "cover_letter_agent",
         {
             "prompt": "Generate a tailored cover letter for this job application.",
