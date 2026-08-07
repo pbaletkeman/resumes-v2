@@ -106,9 +106,9 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 
 ### 7.2 Add unit tests (`tests/`) — remaining
 
-**Status:** ⚠️ PARTIAL — existing deterministic tests are done; pipeline tests remain
+**Status:** ⚠️ PARTIAL — Steps 1–3 (7.1, 7.2.1, 7.2.2) done; web tests + docs remain
 
-**What exists now:** 417 tests across 16 files:
+**What exists now:** 434 tests across 17 files:
 
 - `tests/test_format_detector.py` — 46 tests covering all `FormatDetector` static extraction methods + regex-only parse flows
 - `tests/test_jd_parsing.py` — 19 tests (`_extract_company_name` + `_sync_company_name`)
@@ -119,6 +119,7 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 - `tests/test_agent_ats_compliance.py` — 8 tests (Phase 7.2.1.5, mocked ModelClient)
 - `tests/test_agent_tone_polishing.py` — 6 tests (Phase 7.2.1.6, mocked ModelClient)
 - `tests/test_agent_cover_letter.py` — 8 tests (Phase 7.2.1.7, mocked ModelClient)
+- `tests/test_pipeline.py` — 17 tests (Phase 7.2.2.1–7.2.2.5, stub agents)
 - `tests/test_resume_rewrite_validation.py` — 63 tests (§4.3.A checks + §C skill tailoring + §D fallback logging + Phase 9 `_ensure_chronological` ordering)
 - `tests/test_cover_letter_validation.py` — 109 tests (§4.3.B checks + §C fallback builder + §D fallback logging + Phase 8 contact-info post-processing + Phase 9 `_apply_company_name`/`_apply_candidate_name`)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
@@ -129,7 +130,7 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 
 **Still needed:**
 
-- `tests/test_pipeline.py` — end-to-end with mocked agents
+- `tests/test_web_*.py` (7.4) — FastAPI route tests (health, pipeline, tasks, outputs, files, upload)
 
 #### 7.2.1 Agent unit tests — per-agent behaviour with a mocked `ModelClient`
 
@@ -177,28 +178,28 @@ Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()
 
 #### 7.2.2 `tests/test_pipeline.py` — pipeline wiring with mocked agents
 
-**Status:** ⚠️ NOT done
+**Status:** ✅ DONE (2026-08-07)
 
 **What it covers:** `AgentRunner` and `run_resume_pipeline()` orchestration (not the real LLM). Because the real agents are instantiated by the runner via `DEFAULT_AGENT_CLASSES`, the cleanest seam is to either (a) patch the agent classes in the module, or (b) swap `DEFAULT_AGENT_CLASSES` with a list of minimal fakes. This validates ordering, input/output threading, and the `output_files` dict without touching Ollama.
 
 - **7.2.2.1 — async end-to-end.**
-  - [ ] `async` test that runs `run_resume_pipeline(jd, resume, candidate_name=..., company_name=...)` with stub agents returning fixed `ParsedJDOutput`/`ParsedResumeOutput`/etc.
-  - [ ] Assert the 7 keys + `output_files` (6 keys) are present.
+  - [x] `async` test that runs `run_resume_pipeline(jd, resume, candidate_name=..., company_name=...)` with stub agents returning fixed `ParsedJDOutput`/`ParsedResumeOutput`/etc.
+  - [x] Assert the 7 keys + `output_files` (6 keys) are present.
 - **7.2.2.2 — dependency threading.**
-  - [ ] Test that each agent in the chain receives the preceding agent's output.
-  - [ ] Assert via stub `run()` that records its `inputs` argument.
+  - [x] Test that each agent in the chain receives the preceding agent's output.
+  - [x] Assert via stub `run()` that records its `inputs` argument.
 - **7.2.2.3 — error propagation.**
-  - [ ] Stub an agent that raises `LLMConnectionError`.
-  - [ ] Assert `run_resume_pipeline()` surfaces/logs the failure and does not hallucinate a missing output key.
+  - [x] Stub an agent that raises `LLMConnectionError`.
+  - [x] Assert `run_resume_pipeline()` surfaces/logs the failure and does not hallucinate a missing output key.
 - **7.2.2.4 — `company`/`candidate` passthrough.**
-  - [ ] Verify the `name`/`company` args reach the renderer call and `render_all()`.
-  - [ ] Assert an empty `candidate_name` skips rendering (no `output_files`).
+  - [x] Verify the `name`/`company` args reach the renderer call and `render_all()`.
+  - [x] Assert an empty `candidate_name` skips rendering (no `output_files`).
 - **7.2.2.5 — `AgentRunner` unit.**
-  - [ ] `AgentRunner.run(..)` calls the right agent.
-  - [ ] It carries `purpose`/`inputs`/`output`/`response_format`/`json_schema`.
-  - [ ] It maps LLM failures to the documented error-type handling.
+  - [x] `AgentRunner.run(..)` calls the right agent.
+  - [x] It carries `purpose`/`inputs`/`output`/`response_format`/`json_schema`.
+  - [x] It maps LLM failures to the documented error-type handling.
 
-**Files changed:** new file `tests/test_pipeline.py` (plus `tests/conftest.py` — `FakeClient` fixture already added in 7.2.1).
+**Files changed:** new file `tests/test_pipeline.py` (17 tests: `StubAgent`/`RaisingAgent` fakes, `_RecordingRenderAll` spy, `PipelineAgent` chat contract via `FakeClient`; `run_resume_pipeline` async core tested via `_run_pipeline_core` directly since the wrapper wraps in `asyncio.run`).
 
 ---
 
@@ -217,6 +218,7 @@ with an `AsyncMock` (and stub `app.state.runner` on the `TestClient` app via the
 `lifespan` context) so requests exercise routes/validation without any LLM.
 
 **Pre-requisites.**
+
 - [ ] Confirm `httpx2`/`TestClient` import works (`from fastapi.testclient import TestClient`) with no `StarletteDeprecationWarning` (see pyproject dev group — `httpx2` is installed).
 - [ ] Use a module-level `TestClient` fixture that enters the app `lifespan` (sets `app.state.runner`) — either via `with TestClient(app) as client:` which runs startup/shutdown, or by manually overriding the runner dependency.
 
@@ -376,7 +378,7 @@ All other files referenced across Phases 1–9 (agents, clients, templates, form
 | ------ | ------- | -------- | ------------ | ------------------------ |
 | 1 | 7.1: `test_real_files.py` integration test | ✅ DONE | all phases done | 1 |
 | 2 | 7.2.1: agent tests (`tests/test_agent_*.py`) | ✅ DONE (55 tests, FakeClient in conftest) | all phases done | 7 to 8 |
-| 3 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ❌ TODO | Step 2 | 1 |
+| 3 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ✅ DONE (17 tests) | Step 2 | 1 |
 | 4 | 7.4.1–7.4.2: web health + pipeline route tests | ❌ TODO | web layer done | 2 to 3 |
 | 5 | 7.4.3–7.4.5: web tasks, outputs, files tests | ❌ TODO | web layer done | 3 to 4 |
 | 6 | 7.4.6: web upload/extract tests | ❌ TODO | web layer done | 1 |
