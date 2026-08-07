@@ -2,12 +2,81 @@
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from client.errors import LLMConnectionError
 from client.models import CoverLetterOutput, ExperienceEntry, RewriteOutput
 
 SAMPLE_DIR = Path(__file__).resolve().parent.parent / "sample"
+
+
+class FakeClient:
+    """Stub ``ModelClient`` that records calls and serves canned responses.
+
+    Supports three behaviours (used across the Phase 7.2.1 agent tests):
+
+    - ``response``: a single payload returned on every ``chat()`` call.
+    - ``responses_by_purpose``: a payload map keyed by the ``purpose`` arg.
+    - ``error``: an exception raised on every call.
+    - ``fail_calls``: raise ``error`` (default ``LLMConnectionError``) on the
+      first *N* calls, then serve responses — used to exercise the one-strict-retry
+      path (attempt 0 fails, attempt 1 = ``strict=True`` succeeds).
+
+    Every call is appended to ``calls`` so tests can assert the documented
+    ``chat`` contract (``purpose``/``prompt``/``output``/``rules``/``inputs``/
+    ``response_format``/``json_schema``).
+    """
+
+    def __init__(
+        self,
+        response: str = "",
+        responses_by_purpose: dict[str, str] | None = None,
+        error: Exception | None = None,
+        fail_calls: int = 0,
+    ) -> None:
+        self.response = response
+        self.responses_by_purpose = responses_by_purpose or {}
+        self.error = error
+        self.fail_calls = fail_calls
+        self.calls: list[dict[str, Any]] = []
+
+    async def chat(
+        self,
+        purpose: str,
+        prompt: str,
+        output: list[str],
+        rules: list[str],
+        inputs: list[str],
+        response_format: str,
+        json_schema: dict[str, Any] | None = None,
+    ) -> str:
+        self.calls.append(
+            {
+                "purpose": purpose,
+                "prompt": prompt,
+                "output": output,
+                "rules": rules,
+                "inputs": inputs,
+                "response_format": response_format,
+                "json_schema": json_schema,
+            }
+        )
+        if self.fail_calls > 0:
+            self.fail_calls -= 1
+            raise (self.error or LLMConnectionError("fake connection error"))
+        if self.error is not None:
+            raise self.error
+        if purpose in self.responses_by_purpose:
+            return self.responses_by_purpose[purpose]
+        return self.response
+
+
+@pytest.fixture
+def fake_client() -> type[FakeClient]:
+    """Provide the ``FakeClient`` class so tests configure per-case instances."""
+    return FakeClient
 
 
 @pytest.fixture(autouse=True)
