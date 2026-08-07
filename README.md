@@ -43,6 +43,39 @@ uv run python pipeline.py
 
 See `docs/TESTING.md` for detailed testing instructions (individual agents, OpenAI provider, model registry).
 
+## Web API
+
+The pipeline is also exposed as a FastAPI application (`app/main.py`). Start it with:
+
+```bash
+uv run uvicorn app.main:app --reload
+```
+
+OpenAPI docs are at `http://localhost:8000/docs`.
+
+### Testing the API with REST Client
+
+To call the API from VS Code, install the **REST Client** extension:
+[rest-client-free](https://marketplace.visualstudio.com/items?itemName=SergeyEgorov.rest-client-free)
+
+1. Install the extension from the Marketplace link above.
+2. Create a request file and open it in VS Code. Note: this extension stores requests in a **`.fetch-client`** directory/file (not the `.http` extension).
+3. Each block is a request; press the **Send Request** link above each one to run it.
+
+Example request (start the server first, then send this):
+
+```http
+@base = http://localhost:8000
+
+### Health check
+GET {{base}}/health
+
+### List configured models
+GET {{base}}/api/models
+```
+
+Request files are plain text and git-friendly, so keep them in the repo and modify them freely.
+
 ## Pipeline flow
 
 ```mermaid
