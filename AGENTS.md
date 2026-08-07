@@ -61,7 +61,7 @@ client/
   skills/            # Shared SkillNormalizer (canonical skill taxonomy)
     __init__.py
     normalizer.py    # SkillNormalizer: canonical normalization/localization
-    taxonomy.json    # Canonical skill taxonomy data
+    taxonomy.json    # Canonical skill taxonomy data — see docs/skill-taxonomy.md
 tests/
   test_format_detector.py          # FormatDetector regex parsing tests (46 tests)
   test_jd_parsing.py               # JD Parsing company_name extraction/sync tests (19 tests)
@@ -114,7 +114,7 @@ app/                       # FastAPI web API layer
 
 ## Pipeline flow
 
-```
+```plaintext
 JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
                             ↓
                     [3. Gap Analysis]

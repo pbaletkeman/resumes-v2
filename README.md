@@ -210,6 +210,7 @@ app/                       # FastAPI web API layer
 - `docs/models.md` - Quick reference for all Pydantic models
 - `docs/TESTING.md` - Detailed testing guide
 - `docs/logging-info.md` - Logging implementation plan and status
+- `docs/skill-taxonomy.md` - Skill taxonomy (`taxonomy.json`) reference and usage
 - `resume-done.md` - Completed work archive
 - `resume-todo.md` - Remaining implementation work
 - `web-files-todo.md` - File-management endpoint work log
