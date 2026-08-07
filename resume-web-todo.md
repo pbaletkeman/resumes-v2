@@ -43,12 +43,59 @@ The API calls `_run_pipeline_core()` (`pipeline.py:324`) directly with `await`. 
 - `[tool.ruff.lint.isort] known-first-party`: add `"app"`
 - `[tool.pyright] include`: add `"app"` (so new code is typechecked in strict mode)
 
-## Verification
+## Task breakdown
 
-- `uv sync`; `uv run uvicorn app.main:app`
-- Smoke: `/health`, `/api/models`
-- Live: `POST /api/pipeline` with `sample/jobs/3Pillar.txt` + `sample/resume/Peter-Letkeman-Resume.txt` (Ollama must be up), then background + poll + output download
-- `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`
+### 1. Dependencies & config (`pyproject.toml`)
+- [ ] `uv add fastapi>=0.115 uvicorn>=0.30 python-multipart>=0.0.9 pypdf>=4.0` (or edit deps list)
+- [ ] `[tool.ruff.lint.isort] known-first-party`: add `"app"`
+- [ ] `[tool.pyright] include`: add `"app"` so new code is typechecked in strict mode
+- [ ] `uv sync` to lock/install
+
+### 2. Package scaffold
+- [ ] Create `app/__init__.py` package marker
+
+### 3. `app/schemas.py` — Pydantic models
+- [ ] `PipelineRunRequest` — validated request shape for pipeline inputs
+- [ ] `PipelineRunResponse` — 7-key result + `output_files` (string paths); serialize via `model_dump(mode="json")`
+- [ ] `TaskCreated` — `{task_id}` response
+- [ ] `TaskStatus` — `{status, result?, error?, created_at?, completed_at?}`
+- [ ] Confirm serialization helpers for nested result dicts
+
+### 4. `app/upload.py` — text extraction + 400 handling
+- [ ] `extract_text(file, *, mime) -> str` signature + dispatch
+- [ ] `.txt` decode branch (encoding fallback handling)
+- [ ] `.docx` branch via `python-docx`
+- [ ] `.pdf` branch via `pypdf`
+- [ ] else → `HTTPException(400)`
+- [ ] Empty-text guard (return 400 vs pass-through — decide)
+- [ ] Decide text-field-vs-file precedence (text wins, or 400 for both)
+
+### 5. `app/tasks.py` — in-memory task registry
+- [ ] `TaskRegistry` container (dataclass or dict-backed)
+- [ ] `create() -> task_id` (unique id generation + initial status/created_at)
+- [ ] `update()` and `get()`
+- [ ] `set_result()` / `set_error()` (complete + completed_at)
+
+### 6. `app/main.py` — FastAPI app + routes
+- [ ] `lifespan` builds one `AgentRunner` via `create_runner_from_config()`, stores on `app.state.runner`
+- [ ] `GET /health` → `{"status": "ok"}`
+- [ ] `GET /api/models` → `get_model_summary()` from `config.agents`
+- [ ] `POST /api/pipeline` (sync): multipart fields `job_description`, `resume`, optional `job_file`/`resume_file`, optional `candidate_name`/`company_name`; parse inputs via `upload.py`; call `_run_pipeline_core(runner, jd, resume, candidate_name=, company_name=)` with `await` (via `pipeline.py:324`); return 7-key result + `output_files`
+- [ ] `POST /api/pipeline/async`: same inputs → `asyncio.create_task(_run_pipeline_core(...))`, record in `TaskRegistry`, return `TaskCreated`
+- [ ] `GET /api/tasks/{task_id}` → `TaskStatus` (404 if unknown)
+- [ ] `GET /api/outputs/{filename}` → `FileResponse` from `output/` dir
+- [ ] Ensure main only ever calls `_run_pipeline_core`, never `run_resume_pipeline` (avoid `asyncio.run` re-entry)
+
+### 7. Manual smoke + live verification
+- [ ] `uv run uvicorn app.main:app` boots without import errors
+- [ ] Smoke: `GET /health` → `{"status": "ok"}`
+- [ ] Smoke: `GET /api/models` lists models
+- [ ] Live: `POST /api/pipeline` with `sample/jobs/3Pillar.txt` + `sample/resume/Peter-Letkeman-Resume.txt` (Ollama up) → 7-key result + `output_files`
+- [ ] Background: `POST /api/pipeline/async` → poll `GET /api/tasks/{task_id}` → completed with result
+- [ ] Verify `GET /api/outputs/{filename}` downloads rendered file
+- [ ] `uv run ruff check .`
+- [ ] `uv run ruff format --check .`
+- [ ] `uv run pyright` (no path arg)
 
 ## Known limitations (documented, not solved)
 
