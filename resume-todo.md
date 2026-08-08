@@ -108,7 +108,7 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 
 **Status:** ⚠️ PARTIAL — Steps 1–3 (7.1, 7.2.1, 7.2.2) done; web tests + docs remain
 
-**What exists now:** 434 tests across 17 files:
+**What exists now:** 445 tests across 19 files:
 
 - `tests/test_format_detector.py` — 46 tests covering all `FormatDetector` static extraction methods + regex-only parse flows
 - `tests/test_jd_parsing.py` — 19 tests (`_extract_company_name` + `_sync_company_name`)
@@ -127,10 +127,12 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 - `tests/test_formatter.py` — 41 tests (Phase 6.A formatting helpers)
 - `tests/test_renderer.py` — 43 tests (Phase 6.B renderer + Phase 8 contact-line rendering — archived in `resume-done.md` §6.3 and §8)
 - `tests/test_skill_normalizer.py` — 15 tests (Phase 8.5 SkillNormalizer canonical taxonomy — archived in `resume-done.md` §8.5)
+- `tests/test_web_health.py` — 2 tests (Phase 7.4.1, health + models routes)
+- `tests/test_web_pipeline.py` — 9 tests (Phase 7.4.2, sync + async pipeline routes)
 
 **Still needed:**
 
-- `tests/test_web_*.py` (7.4) — FastAPI route tests (health, pipeline, tasks, outputs, files, upload)
+- `tests/test_web_tasks.py`/`test_web_outputs.py`/`test_web_files.py`/`test_web_upload.py` (7.4.3–7.4.6) — task registry, output serving, file listing/deletion, upload/extract
 
 #### 7.2.1 Agent unit tests — per-agent behaviour with a mocked `ModelClient`
 
@@ -205,9 +207,9 @@ Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()
 
 ### 7.4 Add web API tests (`tests/test_web_*.py`) — FastAPI layer
 
-**Status:** ❌ NOT done
+**Status:** ⚠️ PARTIAL — 7.4.1 (health/models) and 7.4.2 (pipeline routes) done; tasks, outputs, files, upload remain
 
-The FastAPI web layer (`app/`) currently has **no automated tests** — it was exercised
+The FastAPI web layer (`app/`) previously had **no automated tests** — it was exercised
 only via manual `TestClient`/`uvicorn` smoke checks during `resume-web-todo.md` and
 `web-files-todo.md`. The goal here is deterministic client tests (no live Ollama) that
 cover the routes, the task registry, file listing/deletion, and upload/parse logic.
@@ -219,28 +221,32 @@ with an `AsyncMock` (and stub `app.state.runner` on the `TestClient` app via the
 
 **Pre-requisites.**
 
-- [ ] Confirm `httpx2`/`TestClient` import works (`from fastapi.testclient import TestClient`) with no `StarletteDeprecationWarning` (see pyproject dev group — `httpx2` is installed).
-- [ ] Use a module-level `TestClient` fixture that enters the app `lifespan` (sets `app.state.runner`) — either via `with TestClient(app) as client:` which runs startup/shutdown, or by manually overriding the runner dependency.
+- [x] Confirm `httpx`/`TestClient` import works (`from fastapi.testclient import TestClient`) with no `StarletteDeprecationWarning` (see pyproject dev group — `httpx` is installed).
+- [x] Use a module-level `TestClient` fixture that enters the app `lifespan` (sets `app.state.runner`) — either via `with TestClient(app) as client:` which runs startup/shutdown, or by manually overriding the runner dependency. **Chose `with TestClient(app) as client:` at module scope (matches `tests/test_web_health.py`).**
 
 #### 7.4.1 `tests/test_web_health.py` — health & models
 
-- **7.4.1.1** `GET /health` returns `200` with `{"status": "ok"}`.
-- **7.4.1.2** `GET /api/models` returns `200` with a JSON list of `{agent, provider, model}` dicts.
+- [x] `GET /health` returns `200` with `{"status": "ok"}`.
+- [x] `GET /api/models` returns `200` with a JSON list of `{agent, provider, model}` dicts.
 
 #### 7.4.2 `tests/test_web_pipeline.py` — sync & async pipeline routes
 
+**Status:** ✅ DONE (2026-08-08, 9 tests)
+
 - **7.4.2.1** `POST /api/pipeline` (form fields `job_description` + `resume`) → `200`, response model shape with all 7 keys + `output_files`.
-  - [ ] Patch `_run_pipeline_core` to return a canned result dict; assert fields serialize.
-  - [ ] Assert `response.json()` has exactly the 7 expected keys.
+  - [x] Patch `_run_pipeline_core` to return a canned result dict; assert fields serialize.
+  - [x] Assert `response.json()` has exactly the 7 expected keys.
 - **7.4.2.2** `POST /api/pipeline` with **non-empty text wins over file**.
-  - [ ] Send both `job_description` text AND `job_file`; assert the text branch is used (patch core, assert it got the text).
+  - [x] Send both `job_description` text AND `job_file`; assert the text branch is used (patch core, assert it got the text).
 - **7.4.2.3** `POST /api/pipeline` missing both inputs → `400` with message `Provide job description as pasted text or an uploaded file.`.
 - **7.4.2.4** `POST /api/pipeline` empty text + no file → `400`.
 - **7.4.2.5** `POST /api/pipeline` unsupported file type → `400` `Unsupported file type`.
-- **7.4.2.6** `POST /api/pipeline` oversized file → `400` too large (use a client-injected `file.size`).
+- **7.4.2.6** `POST /api/pipeline` oversized file → `400` too large (use a client-injected `file.size`). **Note:** a real multipart upload sets `UploadFile.size` from the byte length, so monkeypatching `app_module.MAX_UPLOAD_BYTES` low (e.g. `4`) + a larger file exercises the route rejection cleanly. `UPLOADS_DIR` is monkeypatched to `tmp_path` so nothing writes to the real `uploads/`.
 - **7.4.2.7** `POST /api/pipeline/async` returns `TaskCreated` with a `task_id`.
 - **7.4.2.8** Async task lifecycle: after launch, poll `GET /api/tasks/{id}` until `status == "completed"`, assert `result` populated.
 - **7.4.2.9** Async task failure: patch `_execute` (or `_run_pipeline_core`) to raise → poll until `status == "failed"` with an `error`; then `GET /api/tasks/{id}` returns `failed`.
+
+**Implementation notes:** `_run_pipeline_core` is patched with an `AsyncMock`; `client` fixture enters the lifespan at module scope. Background tasks are polled via `_wait_for_task()` (status must reach `completed`/`failed` within a deadline). One empty-string form-field gotcha: FastAPI maps `""` form values to `None`, so the "empty text" 400 test sends whitespace-only text (`"   "`) to hit the `must not be empty` branch.
 
 #### 7.4.3 `tests/test_web_tasks.py` — `TaskRegistry` unit
 
@@ -276,7 +282,7 @@ with an `AsyncMock` (and stub `app.state.runner` on the `TestClient` app via the
 - [ ] Unsupported MIME raises `HTTPException` `400`.
 - [ ] Malformed/invalid `.docx`/`.pdf` bytes raise `400` (`Could not parse .docx file.` / `Could not parse .pdf file.`).
 
-**Files changed:** new `tests/test_web_health.py`, `tests/test_web_pipeline.py`, `tests/test_web_tasks.py`, `tests/test_web_outputs.py`, `tests/test_web_files.py`, `tests/test_web_upload.py` (optionally consolidated into `tests/test_web_api.py`).
+**Files changed (7.4):** new `tests/test_web_health.py` (2 tests, DONE 7.4.1), `tests/test_web_pipeline.py` (9 tests, DONE 7.4.2); remaining `tests/test_web_tasks.py`, `tests/test_web_outputs.py`, `tests/test_web_files.py`, `tests/test_web_upload.py` (optionally consolidated into `tests/test_web_api.py`).
 
 > **Note:** pyright `exclude = ["tests"]` and `pytest asyncio_mode = "auto"` apply; these are *async-route* client tests via `TestClient`, which is synchronous — no extra `asyncio` decorator needed.
 
@@ -354,8 +360,8 @@ with an `AsyncMock` (and stub `app.state.runner` on the `TestClient` app via the
 tests/
   test_agents.py                  # NEW (Phase 7.2)
   test_pipeline.py               # NEW (Phase 7.2)
-  test_web_health.py             # NEW (Phase 7.4)
-  test_web_pipeline.py           # NEW (Phase 7.4)
+  test_web_health.py             # EXISTS (Phase 7.4, root)
+  test_web_pipeline.py           # EXISTS (Phase 7.4, root)
   test_web_tasks.py              # NEW (Phase 7.4)
   test_web_outputs.py            # NEW (Phase 7.4)
   test_web_files.py              # NEW (Phase 7.4)
@@ -379,7 +385,7 @@ All other files referenced across Phases 1–9 (agents, clients, templates, form
 | 1 | 7.1: `test_real_files.py` integration test | ✅ DONE | all phases done | 1 |
 | 2 | 7.2.1: agent tests (`tests/test_agent_*.py`) | ✅ DONE (55 tests, FakeClient in conftest) | all phases done | 7 to 8 |
 | 3 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ✅ DONE (17 tests) | Step 2 | 1 |
-| 4 | 7.4.1–7.4.2: web health + pipeline route tests | ❌ TODO | web layer done | 2 to 3 |
+| 4 | 7.4.1–7.4.2: web health + pipeline route tests | ✅ DONE (2 + 9 tests) | web layer done | 2 |
 | 5 | 7.4.3–7.4.5: web tasks, outputs, files tests | ❌ TODO | web layer done | 3 to 4 |
 | 6 | 7.4.6: web upload/extract tests | ❌ TODO | web layer done | 1 |
 | 7 | 7.3.1: `docs/architecture.md` | ❌ TODO | all | 1 |
