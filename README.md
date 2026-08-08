@@ -181,10 +181,10 @@ tests/
   test_agent_jd_parsing.py         # Agent 1 contract tests (7 tests)
   test_agent_resume_parsing.py     # Agent 2 contract tests (9 tests)
   test_agent_gap_analysis.py       # Agent 3 contract tests (7 tests)
-  test_agent_resume_rewrite.py     # Agent 4 contract tests (10 tests)
+  test_agent_resume_rewrite.py     # Agent 4 contract tests (8 tests)
   test_agent_ats_compliance.py     # Agent 5 contract tests (8 tests)
   test_agent_tone_polishing.py     # Agent 6 contract tests (6 tests)
-  test_agent_cover_letter.py       # Agent 7 contract tests (8 tests)
+  test_agent_cover_letter.py       # Agent 7 contract tests (10 tests)
   test_pipeline.py                 # AgentRunner / run_resume_pipeline orchestration (17 tests)
   test_web_health.py               # Web health + models routes (2 tests)
   test_web_pipeline.py             # Web sync + async pipeline routes (9 tests)
@@ -233,5 +233,6 @@ app/                       # FastAPI web API layer
 - `docs/usage.md` - Quickstart, model configuration, adding custom agents
 - `docs/api.md` - API reference (`ModelClient`, agents, `ResumeRenderer`, formatters)
 - `resume-done.md` - Completed work archive (all phases 1-10 complete)
-- `resume-todo.md` - Remaining work (currently empty - project complete)
+- `resume-todo.md` - Remaining work (project complete - pointer to `resume-done.md`)
+- `resume-web-todo.md` - Web API (FastAPI) work log
 - `web-files-todo.md` - File-management endpoint work log

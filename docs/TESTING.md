@@ -199,16 +199,31 @@ Single file:
 uv run pytest tests/test_format_detector.py
 ```
 
-Currently 322 tests across 8 files:
+Currently **477 tests across 23 files** (deterministic, no live LLM required):
 
 - `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
 - `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
-- `tests/test_resume_rewrite_validation.py` — 56 tests (rewrite post-validation + §C skill tailoring + §D fallback logging)
-- `tests/test_cover_letter_validation.py` — 91 tests (cover letter post-validation + §C fallback builder + §D fallback logging + Phase 8 contact-info post-processing)
+- `tests/test_resume_rewrite_validation.py` — 63 tests (rewrite post-validation + skill tailoring + fallback logging)
+- `tests/test_cover_letter_validation.py` — 109 tests (cover letter post-validation + fallback builder + fallback logging + contact-info post-processing)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 15 tests (shared parser + JSON Schema helpers)
 - `tests/test_formatter.py` — 41 tests (format_* helpers)
 - `tests/test_renderer.py` — 43 tests (ResumeRenderer plaintext/markdown/docx/pdf/render_all + contact-line rendering)
+- `tests/test_skill_normalizer.py` — 15 tests (SkillNormalizer canonical taxonomy)
+- `tests/test_agent_jd_parsing.py` — 7 tests (Agent 1 contract, mocked ModelClient)
+- `tests/test_agent_resume_parsing.py` — 9 tests (Agent 2 contract, mocked ModelClient)
+- `tests/test_agent_gap_analysis.py` — 7 tests (Agent 3 contract, mocked ModelClient)
+- `tests/test_agent_resume_rewrite.py` — 8 tests (Agent 4 contract, mocked ModelClient)
+- `tests/test_agent_ats_compliance.py` — 8 tests (Agent 5 contract, mocked ModelClient)
+- `tests/test_agent_tone_polishing.py` — 6 tests (Agent 6 contract, mocked ModelClient)
+- `tests/test_agent_cover_letter.py` — 10 tests (Agent 7 contract, mocked ModelClient)
+- `tests/test_pipeline.py` — 17 tests (AgentRunner / run_resume_pipeline orchestration, stub agents)
+- `tests/test_web_health.py` — 2 tests (web health + models routes)
+- `tests/test_web_pipeline.py` — 9 tests (web sync + async pipeline routes)
+- `tests/test_web_tasks.py` — 9 tests (TaskRegistry + tasks routes)
+- `tests/test_web_outputs.py` — 3 tests (output file serving)
+- `tests/test_web_files.py` — 11 tests (file listing + deletion)
+- `tests/test_web_upload.py` — 9 tests (text extraction unit)
 
 ---
 
