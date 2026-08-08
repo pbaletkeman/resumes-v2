@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Annotated, Any, cast
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.files import list_files, safe_delete_path
 from app.schemas import (
@@ -34,7 +35,41 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path("output")
 UPLOADS_DIR = Path("uploads")
+UI_DIST = Path("ui") / "dist"
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+
+def mount_spa(app_instance: FastAPI, ui_dist: Path) -> None:
+    """Serve a built Vite SPA from ``ui_dist`` with a client-side fallback.
+
+    Registers a ``StaticFiles`` mount for the ``/assets`` directory and a
+    catch-all ``GET /{full_path:path}`` route that serves ``index.html``.
+    The catch-all only fires for non-``/api``, non-``/health``, non-dotfile
+    paths, so deep links such as ``/files`` return the SPA on refresh while
+    API and health routes keep precedence.
+
+    Args:
+        app_instance: The FastAPI app to attach the static routes to.
+        ui_dist: Directory containing the built SPA (``index.html`` + ``assets/``).
+    """
+    assets_dir = ui_dist / "assets"
+    if assets_dir.is_dir():
+        app_instance.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    async def spa_fallback(full_path: str) -> HTMLResponse:
+        if full_path.startswith(("api/", "health/")) or full_path in {"api", "health"}:
+            raise HTTPException(status_code=404, detail="Not found")
+        last_segment = full_path.rsplit("/", 1)[-1]
+        if last_segment.startswith(".") or "." in last_segment:
+            raise HTTPException(status_code=404, detail="Not found")
+        index_html = ui_dist / "index.html"
+        if not index_html.is_file():
+            raise HTTPException(status_code=404, detail="Not found")
+        return HTMLResponse(content=index_html.read_text(encoding="utf-8"))
+
+    app_instance.add_api_route(
+        "/{full_path:path}", spa_fallback, methods=["GET"], include_in_schema=False
+    )
 
 
 @asynccontextmanager
@@ -284,3 +319,9 @@ async def delete_files(body: DeleteFilesRequest) -> DeleteFilesResponse:
         resolved.unlink()
         deleted.append(key)
     return DeleteFilesResponse(deleted=deleted, missing=missing)
+
+
+# Serve the built SPA when present. Registered last so the explicit API,
+# health, and docs routes keep precedence over the catch-all fallback.
+if (UI_DIST / "index.html").is_file():
+    mount_spa(app, UI_DIST)
