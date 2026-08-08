@@ -31,6 +31,7 @@ uv run python pipeline.py
 | Test Tone Polishing Agent | `uv run python wip_testing/test_tone_polishing.py` |
 | Test Cover Letter Agent | `uv run python wip_testing/test_cover_letter.py` |
 | Regex parsing test (no LLM) | `uv run python wip_testing/test_parsing.py` |
+| Live E2E pipeline test | `uv run python test_real_files.py` (requires Ollama) |
 | Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
 | Lint | `uv run ruff check .` |
 | Lint (auto-fix) | `uv run ruff check --fix .` |
@@ -177,6 +178,21 @@ tests/
   test_formatter.py                # format_* helpers (41 tests)
   test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (43 tests)
   test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
+  test_agent_jd_parsing.py         # Agent 1 contract tests (7 tests)
+  test_agent_resume_parsing.py     # Agent 2 contract tests (9 tests)
+  test_agent_gap_analysis.py       # Agent 3 contract tests (7 tests)
+  test_agent_resume_rewrite.py     # Agent 4 contract tests (10 tests)
+  test_agent_ats_compliance.py     # Agent 5 contract tests (8 tests)
+  test_agent_tone_polishing.py     # Agent 6 contract tests (6 tests)
+  test_agent_cover_letter.py       # Agent 7 contract tests (8 tests)
+  test_pipeline.py                 # AgentRunner / run_resume_pipeline orchestration (17 tests)
+  test_web_health.py               # Web health + models routes (2 tests)
+  test_web_pipeline.py             # Web sync + async pipeline routes (9 tests)
+  test_web_tasks.py                # TaskRegistry + tasks routes (9 tests)
+  test_web_outputs.py              # Output file serving (3 tests)
+  test_web_files.py                # File listing + deletion (11 tests)
+  test_web_upload.py               # Text extraction unit (9 tests)
+test_real_files.py                 # Live 7-agent E2E test (requires Ollama)
 wip_testing/
   test_job_description.py  # JD Parsing Agent test
   test_resume_parsing.py   # Resume Parsing Agent test
@@ -205,12 +221,17 @@ app/                       # FastAPI web API layer
 
 - `sample/jobs/` - Sample job descriptions for testing
 - `sample/resume/` - Sample resume for testing
+- `test_real_files.py` - Live 7-agent end-to-end test (requires Ollama; `RUN_LIVE_PIPELINE` guard)
 - `client/skills/` - Shared `SkillNormalizer` + canonical skill taxonomy
 - `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter) + `renderer.py` (`ResumeRenderer`)
 - `docs/models.md` - Quick reference for all Pydantic models
 - `docs/TESTING.md` - Detailed testing guide
 - `docs/logging-info.md` - Logging implementation plan and status
 - `docs/skill-taxonomy.md` - Skill taxonomy (`taxonomy.json`) reference and usage
-- `resume-done.md` - Completed work archive
-- `resume-todo.md` - Remaining implementation work
+- `docs/architecture.md` - System overview + Mermaid data-flow diagram
+- `docs/agents.md` - Agent-by-agent reference (prompts, input/output schemas, fallbacks)
+- `docs/usage.md` - Quickstart, model configuration, adding custom agents
+- `docs/api.md` - API reference (`ModelClient`, agents, `ResumeRenderer`, formatters)
+- `resume-done.md` - Completed work archive (all phases 1-10 complete)
+- `resume-todo.md` - Remaining work (currently empty - project complete)
 - `web-files-todo.md` - File-management endpoint work log

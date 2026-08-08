@@ -27,11 +27,13 @@ The pipeline uses dedicated agent classes orchestrated by `AgentRunner`. Per-age
 - `config/agents.py` — Environment-based agent-to-model configuration
 - `pipeline.py` — `AgentRunner`, `PipelineAgent`, and `run_resume_pipeline()`
 - `basic.py` — Single-agent demo (JSON mode)
-- `tests/` — 362 tests across 9 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer)
+- `tests/` — 477 tests across 23 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer, per-agent contract tests, pipeline orchestration, web API tests)
+- `test_real_files.py` — live end-to-end integration test (Phase 7.1, requires Ollama)
 - `pyproject.toml` — Project config (ruff, pyright, pytest)
 - `AGENTS.md` — Agent instruction file
 - `docs/TESTING.md` — Testing guide
-- `docs/models.md`, `docs/logging-info.md` — Additional docs
+- `docs/models.md`, `docs/logging-info.md`, `docs/skill-taxonomy.md` — Additional docs
+- `docs/architecture.md`, `docs/agents.md`, `docs/usage.md`, `docs/api.md` — Phase 7.3 docs (system overview, agent reference, usage guide, API reference)
 - `sample/` — Sample JDs and resume for testing
 - `wip_testing/` — Manual agent test scripts (8 files, one per agent chain)
 - `app/` — FastAPI web API layer (`main.py`, `schemas.py`, `upload.py`, `tasks.py`, `files.py`): sync + background pipeline runs, task polling, rendered-output download, and file listing/management for `output/` and `uploads/`
@@ -940,23 +942,43 @@ config/
   agents.py                        # EXISTS ✅
 tests/
   __init__.py                      # EXISTS ✅
-  conftest.py                      # EXISTS ✅ (shared fixtures)
+  conftest.py                      # EXISTS ✅ (shared fixtures + FakeClient/fake_client — Phase 7.2.1)
   test_format_detector.py          # EXISTS ✅ (46 tests)
   test_jd_parsing.py               # EXISTS ✅ (19 tests)
   test_resume_rewrite_validation.py # EXISTS ✅ (63 tests)
   test_cover_letter_validation.py  # EXISTS ✅ (109 tests)
   test_formatter.py                # EXISTS ✅ (41 tests — Phase 6.2)
-  test_renderer.py                 # EXISTS ✅ (43 tests — Phase 6.3)
+  test_renderer.py                 # EXISTS ✅ (43 tests — Phase 6.3 + Phase 8 contact-line)
   test_model_clients.py            # EXISTS ✅ (11 tests — response_format + Structured Outputs plumbing)
   test_json_utils.py               # EXISTS ✅ (15 tests — shared parser + JSON Schema helpers)
   test_skill_normalizer.py         # EXISTS ✅ (15 tests — Phase 8.5)
+  test_agent_jd_parsing.py         # EXISTS ✅ (7 tests — Phase 7.2.1.1, mocked ModelClient)
+  test_agent_resume_parsing.py     # EXISTS ✅ (9 tests — Phase 7.2.1.2, mocked ModelClient)
+  test_agent_gap_analysis.py       # EXISTS ✅ (7 tests — Phase 7.2.1.3, mocked ModelClient)
+  test_agent_resume_rewrite.py     # EXISTS ✅ (10 tests — Phase 7.2.1.4, mocked ModelClient)
+  test_agent_ats_compliance.py     # EXISTS ✅ (8 tests — Phase 7.2.1.5, mocked ModelClient)
+  test_agent_tone_polishing.py     # EXISTS ✅ (6 tests — Phase 7.2.1.6, mocked ModelClient)
+  test_agent_cover_letter.py       # EXISTS ✅ (8 tests — Phase 7.2.1.7, mocked ModelClient)
+  test_pipeline.py                 # EXISTS ✅ (17 tests — Phase 7.2.2, stub agents)
+  test_web_health.py               # EXISTS ✅ (2 tests — Phase 7.4.1, health + models routes)
+  test_web_pipeline.py             # EXISTS ✅ (9 tests — Phase 7.4.2, sync + async pipeline routes)
+  test_web_tasks.py                # EXISTS ✅ (9 tests — Phase 7.4.3, TaskRegistry + routes)
+  test_web_outputs.py              # EXISTS ✅ (3 tests — Phase 7.4.4, output file serving)
+  test_web_files.py                # EXISTS ✅ (11 tests — Phase 7.4.5, file listing + deletion)
+  test_web_upload.py               # EXISTS ✅ (9 tests — Phase 7.4.6, text extraction)
 docs/
   TESTING.md                       # EXISTS ✅
   models.md                        # EXISTS ✅
   logging-info.md                  # EXISTS ✅
+  skill-taxonomy.md                # EXISTS ✅
+  architecture.md                  # EXISTS ✅ (Phase 7.3.1)
+  agents.md                        # EXISTS ✅ (Phase 7.3.2)
+  usage.md                         # EXISTS ✅ (Phase 7.3.3)
+  api.md                           # EXISTS ✅ (Phase 7.3.4)
 pipeline.py                        # EXISTS ✅
 basic.py                           # EXISTS ✅
 logging_config.py                  # EXISTS ✅ (centralized logging, LOG_LEVEL env var)
+test_real_files.py                 # EXISTS ✅ (Phase 7.1 live E2E test, requires Ollama)
 pyproject.toml                     # EXISTS ✅ (ruff, pyright, pytest config)
 AGENTS.md                          # EXISTS ✅
 resume-done.md                     # THIS FILE
@@ -1187,3 +1209,64 @@ Exposes the 7-agent pipeline as a FastAPI application. API-layer only (no API te
 - `resources`: downloads and deletes both resolve paths against allowlisted directories and reject traversal.
 
 **Files changed:** new `app/` package; `pyproject.toml` (deps + `known-first-party` + pyright `include` add `"app"`); `.gitignore` (`/uploads/`)
+
+---
+
+## Phase 7: Testing & Docs — ALL COMPLETE (2026-08-08)
+
+**Status:** ✅ DONE — Phase 7 finished. This was the final phase in `resume-todo.md`; all remaining work (live E2E test, unit test coverage, web API tests, and the four new docs guides) is complete.
+
+### 7.1 Live end-to-end integration test — `test_real_files.py` — ✅ DONE (2026-08-07)
+
+A single end-to-end integration test (7.1.1–7.1.16) that runs the full 7-agent pipeline against the real sample files. It is deliberately **not** in `tests/` (which runs under pyright's excluded directory and the deterministic suite) — it depends on a live Ollama, so it is run manually via `uv run python test_real_files.py` (or `uv run pytest test_real_files.py`) and exercises the true agent chain rather than mocks. If Ollama is down, the test raises a clear `LLMConnectionError`-driven skip/failure message rather than silently pass.
+
+Covers: JD/resume parsing structure assertions, gap analysis `missing_skills`, rewrite/ATS/polish non-empty output, cover letter word count (450–600), chronological ordering, no-added-experience, certification preservation, `output_files` (6 keys, written + non-empty), naming-pattern regex `^\d{8}_\d{4}_.+$`, summary print, and a deterministic guard (`RUN_LIVE_PIPELINE` env/module flag → skipped, not failed, under plain `pytest` when Ollama is down).
+
+**Files changed:** new file `test_real_files.py`
+**Depends on:** 6.B.8 (`pipeline.py` wired with `candidate_name`/`company_name` + `render_all()`), 7.2 `test_pipeline.py`.
+
+### 7.2 Add unit tests (`tests/`) — per-agent + pipeline coverage — ✅ DONE (2026-08-07)
+
+The test suite grew from 362 tests / 9 files to **477 tests / 23 files**.
+
+#### 7.2.1 Agent contract tests (55 tests, `FakeClient` in `conftest.py`)
+
+Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()` → validation → fallback contract against a fake client that injects canned responses, with **no real LLM**. Because the built-in structured outputs enforce provider JSON, these are the only place the parse/validation layer is exercised off-network.
+
+- `tests/test_agent_jd_parsing.py` — 7 tests: valid JSON → `JDParsingOutput`; malformed JSON → fallback; `LLMConnectionError` → fallback; `strict=True` retry.
+- `tests/test_agent_resume_parsing.py` — 9 tests: valid parse; malformed JSON → fallback; missing `experience` key → fallback; dict→list coercion (`_coerce_str_list`).
+- `tests/test_agent_gap_analysis.py` — 7 tests: happy path; `None` → deterministic missing-skills fallback; prompt receives `missing_skills`.
+- `tests/test_agent_resume_rewrite.py` — 10 tests: post-validation §4.3.A applies; strict-mode retry toggles; invalid-date / empty-tone coercion.
+- `tests/test_agent_ats_compliance.py` — 8 tests: compliance checks return fix suggestions; fallback when frame absent.
+- `tests/test_agent_tone_polishing.py` — 6 tests: `tone_guidance` dict→string coercion (`_coerce_tone_guidance`); fallback.
+- `tests/test_agent_cover_letter.py` — 8 tests: `_sync_company_name`-style verification; word-count / fallback-builder; `CoverLetterOutput` fill.
+
+**Files changed (7.2.1):** new files `tests/test_agent_jd_parsing.py`, `tests/test_agent_resume_parsing.py`, `tests/test_agent_gap_analysis.py`, `tests/test_agent_resume_rewrite.py`, `tests/test_agent_ats_compliance.py`, `tests/test_agent_tone_polishing.py`, `tests/test_agent_cover_letter.py`; `tests/conftest.py` gained `FakeClient` + `fake_client` fixture. (The 7-file split was chosen over the alternate single `tests/test_agents.py` layout.)
+
+#### 7.2.2 `tests/test_pipeline.py` — pipeline wiring with mocked agents — ✅ DONE (2026-08-07; 17 tests)
+
+Covers `AgentRunner` and `run_resume_pipeline()` orchestration (not the real LLM) by swapping `DEFAULT_AGENT_CLASSES` with minimal stubs: ordering, input/output threading, error propagation (`LLMConnectionError` surfaces without hallucinating a key), `candidate`/`company` passthrough to the renderer, and the empty-`candidate_name` skip. Uses `StubAgent`/`RaisingAgent` fakes, a `_RecordingRenderAll` spy, `PipelineAgent` chat contract via `FakeClient`; the async core is tested via `_run_pipeline_core` directly since the public wrapper wraps in `asyncio.run`.
+
+### 7.3 Populate `docs/` — ✅ DONE (2026-08-08)
+
+`docs/` previously had `TESTING.md`, `models.md`, `logging-info.md`, `skill-taxonomy.md`. Four new guides were added, each ending with a `## References` section:
+
+- **7.3.1 `docs/architecture.md`** — system overview (7-agent chain, Ollama/OpenAI providers, renderer/formatter layers), Mermaid data-flow diagram (input files → agent order → intermediate Pydantic models → `output_files`), per-transition input/output contracts, `ResumeRenderer` hook-in, References.
+- **7.3.2 `docs/agents.md`** — per-agent purpose, verbatim prompts, input/output schema tables referencing `client/models.py`, fallback paths with trigger conditions, cross-links to `client/agents/*.py`, References.
+- **7.3.3 `docs/usage.md`** — quickstart (prereqs `ollama pull`/`uv sync`, run commands `uv run python basic.py`/`pipeline.py`/`test_real_files.py`, expected outputs), model configuration (env-var overrides + how `config/agents.py` picks them), adding a custom agent (`DEFAULT_AGENT_CLASSES`/registry harness), References.
+- **7.3.4 `docs/api.md`** — `ModelClient` ABC (`chat()`/`response_format`/`json_schema`), `OllamaClient`/`OpenAIClient` implementations; `Agent`/`PipelineAgent`/`AgentRunner` (`run()`/`run_agent_async()`, the purpose/inputs/output/rules contract); `ResumeRenderer` public API + `formatter` helpers; References.
+
+**Files changed:** new files `docs/architecture.md` (7.3.1), `docs/agents.md` (7.3.2), `docs/usage.md` (7.3.3), `docs/api.md` (7.3.4).
+
+### 7.4 Web API tests (`tests/test_web_*.py`) — ✅ DONE (2026-08-08; 43 tests)
+
+The FastAPI web layer (`app/`) previously had no automated tests. Deterministic `TestClient` tests (no live Ollama) cover the routes, task registry, file listing/deletion, and upload/parse logic. Key seam: `app.main._run_pipeline_core` is patched with an `AsyncMock`; a module-level `with TestClient(app) as client:` enters the lifespan.
+
+- **7.4.1 `tests/test_web_health.py`** — 2 tests: `GET /health` → `{"status": "ok"}`; `GET /api/models` → JSON list.
+- **7.4.2 `tests/test_web_pipeline.py`** — 9 tests: sync `POST /api/pipeline` 400/200 handling (text-vs-file priority, missing/empty inputs, unsupported type, oversized file), async `POST /api/pipeline/async` → task lifecycle (completed + failed → polled via status).
+- **7.4.3 `tests/test_web_tasks.py`** — 9 tests: `TaskRegistry` unit (unique ids, round-trip, no-op update, unknown id → `None`) + route `GET /api/tasks/{unknown}` → 404.
+- **7.4.4 `tests/test_web_outputs.py`** — 3 tests: `GET /api/outputs/{filename}` existing file → 200 streaming + `application/pdf`; missing → 404; path traversal `../secret.txt` → 404.
+- **7.4.5 `tests/test_web_files.py`** — 11 tests: `GET /api/files/generated` + `uploaded` (filter/sort/paging), `DELETE /api/files` (existing/missing split, dir-qualified keys, traversal dropped).
+- **7.4.6 `tests/test_web_upload.py`** — 9 tests: `.txt` decode (utf-8/utf-8-sig/latin-1), `.docx` via python-docx, `.pdf` via pypdf, unsupported MIME → 400, malformed `.docx`/`.pdf` → 400.
+
+**Verification:** `uv run pytest` → **477 passed**; `uv run ruff check .` clean; `uv run ruff format` clean; `uv run pyright` (strict) → **0 errors**.

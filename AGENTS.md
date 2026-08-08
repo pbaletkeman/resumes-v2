@@ -72,6 +72,30 @@ tests/
   test_formatter.py                # format_* helpers (41 tests)
   test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (43 tests)
   test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
+  test_agent_jd_parsing.py         # Agent 1 contract tests (7 tests, mocked ModelClient)
+  test_agent_resume_parsing.py     # Agent 2 contract tests (9 tests, mocked ModelClient)
+  test_agent_gap_analysis.py       # Agent 3 contract tests (7 tests, mocked ModelClient)
+  test_agent_resume_rewrite.py     # Agent 4 contract tests (10 tests, mocked ModelClient)
+  test_agent_ats_compliance.py     # Agent 5 contract tests (8 tests, mocked ModelClient)
+  test_agent_tone_polishing.py     # Agent 6 contract tests (6 tests, mocked ModelClient)
+  test_agent_cover_letter.py       # Agent 7 contract tests (8 tests, mocked ModelClient)
+  test_pipeline.py                 # AgentRunner / run_resume_pipeline orchestration (17 tests, stub agents)
+  test_web_health.py               # Web health + models routes (2 tests)
+  test_web_pipeline.py             # Web sync + async pipeline routes (9 tests)
+  test_web_tasks.py                # TaskRegistry + tasks routes (9 tests)
+  test_web_outputs.py              # Output file serving (3 tests)
+  test_web_files.py                # File listing + deletion (11 tests)
+  test_web_upload.py               # Text extraction unit (9 tests)
+test_real_files.py                  # Live 7-agent E2E test (requires Ollama; RUN_LIVE_PIPELINE guard)
+docs/
+  TESTING.md                       # Manual testing guide
+  models.md                        # Pydantic model reference
+  logging-info.md                  # Logging implementation notes
+  skill-taxonomy.md                # Skill taxonomy reference
+  architecture.md                  # System overview + Mermaid data-flow (Phase 7.3)
+  agents.md                        # Agent-by-agent reference (prompts, schemas, fallbacks)
+  usage.md                         # Quickstart, model config, custom agents
+  api.md                           # API reference (ModelClient, agents, renderer, formatter)
 wip_testing/
   test_parsing.py            # Regex + LLM parsing demo (both modes)
   test_job_description.py  # JD Parsing Agent test
@@ -139,10 +163,12 @@ Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compli
 
 ## Testing
 
-pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 362 tests across 9 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer). Sample files in `sample/jobs/` and `sample/resume/`.
+pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 477 tests across 23 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer, per-agent contract tests, pipeline orchestration, web API tests). Sample files in `sample/jobs/` and `sample/resume/`.
 
 Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_compliance.py` runs agents 1-5). Run with `uv run python wip_testing/test_<agent>.py`.
 
+Live end-to-end test `test_real_files.py` (repo root, not in `tests/`) runs the full 7-agent chain against the real sample files with Ollama. Run with `uv run python test_real_files.py` or `uv run pytest test_real_files.py`; guarded by the `RUN_LIVE_PIPELINE` env/module flag so a plain `pytest` run skips it when Ollama is down.
+
 ## Status
 
-Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Every LLM call uses provider-native JSON mode (`response_format="json"`), with optional Strict Structured Outputs via `json_schema=model_to_json_schema(<OutputModel>)` (see `client/json_utils.py`). All 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()` (which defaults to `DEFAULT_AGENT_CLASSES`). Phase 4.3 (LLM fallback falsehoods: validation, fallback templates, logging, prompt strengthening, `company_name`), Phase 6 (output formatting: `client/formatter.py` + `ResumeRenderer` with `render_all()`), Phase 8 contact info (contact extraction via `FormatDetector` + contact header/signature line in cover letters), Phase 8.5 (skill normalization via `client/skills/SkillNormalizer`), and Phase 9 (cover letter fixes) are complete. `run_resume_pipeline()` takes optional `candidate_name`/`company_name` and writes rendered files to `Path("output")`, returned under the `"output_files"` result key. `run_resume_pipeline()` runs the whole 7-agent chain on a single event loop through `_run_pipeline_core()` (see `run_agent_async()` on `AgentRunner`) so the shared async `ModelClient` loop is not closed between agents. A FastAPI web layer (`app/`) exposes the pipeline synchronously and in the background, plus file listing/management for `output/` (generated) and `uploads/` (persisted uploads); endpoints must call `_run_pipeline_core()` directly (`pipeline.py:324`) and never `run_resume_pipeline()` (`pipeline.py:313`, wraps in `asyncio.run`) to avoid re-entering the event loop. See `resume-done.md` for completed work and `resume-todo.md` for remaining work (Phase 7: live `test_real_files.py` + `tests/test_pipeline.py` coverage and docs).
+Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes. Agent output Pydantic schemas (`client/models.py`) are complete — all 7 agent output models exist. Every LLM call uses provider-native JSON mode (`response_format="json"`), with optional Strict Structured Outputs via `json_schema=model_to_json_schema(<OutputModel>)` (see `client/json_utils.py`). All 7 agents are wired as dedicated classes in `sample_run()` and `create_runner_from_config()` (which defaults to `DEFAULT_AGENT_CLASSES`). Phase 4.3 (LLM fallback falsehoods: validation, fallback templates, logging, prompt strengthening, `company_name`), Phase 6 (output formatting: `client/formatter.py` + `ResumeRenderer` with `render_all()`), Phase 8 contact info (contact extraction via `FormatDetector` + contact header/signature line in cover letters), Phase 8.5 (skill normalization via `client/skills/SkillNormalizer`), and Phase 9 (cover letter fixes) are complete. `run_resume_pipeline()` takes optional `candidate_name`/`company_name` and writes rendered files to `Path("output")`, returned under the `"output_files"` result key. `run_resume_pipeline()` runs the whole 7-agent chain on a single event loop through `_run_pipeline_core()` (see `run_agent_async()` on `AgentRunner`) so the shared async `ModelClient` loop is not closed between agents. A FastAPI web layer (`app/`) exposes the pipeline synchronously and in the background, plus file listing/management for `output/` (generated) and `uploads/` (persisted uploads); endpoints must call `_run_pipeline_core()` directly (`pipeline.py:324`) and never `run_resume_pipeline()` (`pipeline.py:313`, wraps in `asyncio.run`) to avoid re-entering the event loop. Phase 7 (Testing & Docs) is also complete: `test_real_files.py` live E2E test, per-agent + pipeline + web API tests (477 total), and four docs guides (`architecture.md`, `agents.md`, `usage.md`, `api.md`). See `resume-done.md` for the completed-work archive; `resume-todo.md` records that no remaining work exists.
