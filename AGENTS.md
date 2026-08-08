@@ -17,6 +17,7 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 | Install/sync deps | `uv sync` |
 | Basic agent test | `uv run python basic.py` |
 | Full 7-agent pipeline | `uv run python pipeline.py` |
+| Run pipeline with your files | `uv run python pipeline.py --resume <resume-file> --job-description <jd-file>` |
 | Run web API | `uv run uvicorn app.main:app --reload` |
 | Regex parsing test (no LLM) | See `docs/TESTING.md` section 2 |
 | Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |

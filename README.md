@@ -16,12 +16,36 @@ uv sync
 uv run python pipeline.py
 ```
 
+### Run with your own files from the command line
+
+`pipeline.py` accepts the resume and job-description file paths as arguments
+(no need to edit placeholder text in the code):
+
+```bash
+uv run python pipeline.py \
+  --resume sample/resume/Peter-Letkeman-Resume.txt \
+  --job-description sample/jobs/3Pillar.txt
+```
+
+Optional arguments:
+
+- `--candidate-name "Peter Letkeman"` — enables rendering output files
+  (output as `output/`); also used in rendered headers.
+- `--company-name "3Pillar"` — used in rendered output filenames.
+- `--jd` — shorthand for `--job-description`; `-h`/`--help` prints usage.
+
+The pipeline prints the polished resume and cover letter to stdout. When
+`--candidate-name` is supplied it also renders files into `output/` and lists
+them. File-mode requires both `--resume` and `--job-description`; the
+no-argument form still runs the placeholder `sample_run()` demo.
+
 ## Usage
 
 | What | Command |
 | --- | --- |
 | Install/sync deps | `uv sync` |
 | Full 7-agent pipeline | `uv run python pipeline.py` |
+| Pipeline with your files | `uv run python pipeline.py --resume <file> --job-description <file>` |
 | Single-agent demo | `uv run python basic.py` |
 | Test JD Parsing Agent | `uv run python wip_testing/test_job_description.py` |
 | Test Resume Parsing Agent | `uv run python wip_testing/test_resume_parsing.py` |

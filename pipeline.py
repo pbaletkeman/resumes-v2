@@ -14,6 +14,7 @@ for compatibility.  Per-agent model assignment is provided via
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
 import time
@@ -524,5 +525,99 @@ def sample_run() -> None:
     print(results["cover_letter"])
 
 
+def main(argv: list[str] | None = None) -> int:
+    """Run the full 7-agent pipeline from the command line.
+
+    Two modes:
+
+    - ``python pipeline.py`` -> runs ``sample_run()`` with placeholder text.
+    - ``python pipeline.py --resume <file> --job-description <file>`` -> runs
+      the real pipeline against those files and prints the polished resume,
+      cover letter, and any rendered output files.
+
+    Args:
+        argv: Optional argument list (defaults to ``sys.argv[1:]``).
+
+    Returns:
+        Process exit code (0 on success, 2 on a usage / file error).
+    """
+    parser = argparse.ArgumentParser(
+        prog="pipeline",
+        description="Run the 7-agent resume optimization pipeline.",
+    )
+    parser.add_argument(
+        "--resume",
+        metavar="PATH",
+        help="Path to the resume text file (.txt or otherwise plain text).",
+    )
+    parser.add_argument(
+        "--job-description",
+        "--jd",
+        dest="job_description",
+        metavar="PATH",
+        help="Path to the job description text file.",
+    )
+    parser.add_argument(
+        "--candidate-name",
+        default="",
+        metavar="NAME",
+        help="Candidate name for rendered output headers; enables file rendering.",
+    )
+    parser.add_argument(
+        "--company-name",
+        default="",
+        metavar="NAME",
+        help="Target company name used in rendered output filenames.",
+    )
+    args = parser.parse_args(argv)
+
+    # No file arguments -> backward-compatible demo run with placeholders.
+    if not args.resume and not args.job_description:
+        sample_run()
+        return 0
+
+    # File mode requires both inputs.
+    missing: list[str] = []
+    if not args.resume:
+        missing.append("--resume")
+    if not args.job_description:
+        missing.append("--job-description")
+    if missing:
+        parser.error(f"missing required argument(s): {', '.join(missing)}")
+
+    resume_path = Path(args.resume)
+    jd_path = Path(args.job_description)
+
+    if not resume_path.is_file():
+        parser.error(f"resume file not found: {resume_path}")
+    if not jd_path.is_file():
+        parser.error(f"job description file not found: {jd_path}")
+
+    resume_text = resume_path.read_text(encoding="utf-8")
+    jd_text = jd_path.read_text(encoding="utf-8")
+
+    runner_instance = create_runner_from_config()
+    results = run_resume_pipeline(
+        runner_instance,
+        jd_text,
+        resume_text,
+        candidate_name=args.candidate_name,
+        company_name=args.company_name,
+    )
+
+    print("=== Polished Resume ===")
+    print(results["polished_resume"])
+    print("\n=== Cover Letter ===")
+    print(results["cover_letter"])
+
+    output_files: dict[str, Path] = results.get("output_files") or {}
+    if output_files:
+        print("\n=== Rendered Files ===")
+        for format_name, path in sorted(output_files.items()):
+            print(f"{format_name}: {path}")
+
+    return 0
+
+
 if __name__ == "__main__":
-    sample_run()
+    raise SystemExit(main())
