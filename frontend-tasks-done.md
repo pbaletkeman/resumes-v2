@@ -4,7 +4,7 @@ Archive of tasks from `frontend-tasks.md` as they are completed. See [frontend-t
 
 ## Overview
 
-The React + PrimeReact UI will live in `ui/`. During development it talks to the backend through a Vite proxy; in production FastAPI serves the built SPA from `ui/dist`. Task 1.1 added the backend helper that serves the SPA; task 1.2 wires it in, guarded by build presence; task 1.3 (backed tests) is still pending.
+The React + PrimeReact UI will live in `ui/`. During development it talks to the backend through a Vite proxy; in production FastAPI serves the built SPA from `ui/dist`. Tasks 1.1 (SPA-serving helper), 1.2 (guarded wiring), and 1.3 (backend SPA fallback tests) are complete.
 
 ## Completed
 
@@ -44,3 +44,25 @@ Added `mount_spa(app_instance, ui_dist)` in `app/main.py`.
 - `uv run ruff check .` — All checks passed.
 - `uv run pyright` (strict, no path arg) — 0 errors, 0 warnings, 0 informations.
 - `uv run pytest` — 477 passed.
+
+### 1.3 Add a backend test for the SPA fallback — DONE
+
+New file `tests/test_web_spa.py` (8 tests).
+
+- **`TestMountSpa`** (6 tests) — exercises `mount_spa()` directly against a purpose-built app whose fake `dist/` lives under `tmp_path`:
+  - deep links (`/`, `/files`, `/models`, `/some/deep/link`) return `index.html`;
+  - `/api/models` and `/health` are not shadowed (still JSON 200);
+  - `/assets/app.js` is served from the `StaticFiles` mount;
+  - dotfile/dotted paths (`/file.txt`, `/resume.pdf`, `/.hidden`) are 404;
+  - unknown API paths (`/api/nope`) are 404.
+- **`TestModuleGuard`** (2 tests) — exercises the real import-time wiring in `app/main.py` by staging/removing `ui/dist/index.html` and reloading the module with `importlib.reload`, always restoring the no-build state afterward:
+  - build present → `/files` serves SPA html while API/static routes stay intact;
+  - build absent → unknown non-API GET is a plain 404, API still works.
+
+#### Verification
+
+- `uv run ruff check .` — All checks passed.
+- `uv run pyright` (strict, no path arg) — 0 errors, 0 warnings, 0 informations.
+- `uv run pytest tests/test_web_spa.py -v` — 8 passed.
+- `uv run pytest` — **485 passed** (477 + 8 new).
+- Confirmed no `ui/dist` artifacts are leaked by the module-reload tests.

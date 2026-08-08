@@ -10,34 +10,6 @@ Conventions:
 
 ---
 
-## 1. Backend prep — serve built SPA from `app/main.py`
-
-### 1.1 Add a static-mount helper in `app/main.py`
-
-- Add a function (module-level) that, given the `ui/dist` directory, mounts the SPA:
-  - `StaticFiles` mount for `/assets` (or wherever Vite emits hashed assets).
-  - A catch-all `GET /{full_path:path}` returning `index.html` for non-`/api`/`/health`/dotfile paths (SPA fallback so `/files` deep links work on refresh).
-- **Accept:** exists; pure function of paths; no imports of frontend code.
-- **Verify:** `uv run ruff check .`; `uv run pyright`.
-
-### 1.2 Wire the mount in `lifespan`/app setup, guarded by build presence
-
-- Only register the static routes when `ui/dist/index.html` exists (config constant, e.g. `UI_DIST = Path("ui") / "dist"`).
-- When absent, app behavior is identical to today (API-only).
-- **Accept:** running with no build still serves `/health` and `/api/*`; tests pass.
-- **Verify:** `uv run pytest` (web tests must stay green).
-
-### 1.3 Add a backend test for the SPA fallback
-
-- In `tests/` (e.g. `test_web_spa.py`), test that:
-  - with a fake `dist/index.html` present, `/files` returns the HTML;
-  - `/api/models` still returns JSON (routing not shadowed);
-  - a 404 is returned for missing files.
-- Use `tmp_path` + monkeypatch of `UI_DIST`.
-- **Verify:** `uv run pytest tests/test_web_spa.py -v`.
-
----
-
 ## 2. Scaffold `ui/` (Vite + React + TS)
 
 ### 2.1 Create the Vite project
