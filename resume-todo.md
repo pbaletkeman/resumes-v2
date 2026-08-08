@@ -106,9 +106,9 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 
 ### 7.2 Add unit tests (`tests/`) — remaining
 
-**Status:** ⚠️ PARTIAL — Steps 1–3 (7.1, 7.2.1, 7.2.2) done; web tests + docs remain
+**Status:** ⚠️ PARTIAL — Steps 1–4 (7.1, 7.2.1, 7.2.2, 7.4) done; docs (7.3) remain
 
-**What exists now:** 445 tests across 19 files:
+**What exists now:** 477 tests across 23 files:
 
 - `tests/test_format_detector.py` — 46 tests covering all `FormatDetector` static extraction methods + regex-only parse flows
 - `tests/test_jd_parsing.py` — 19 tests (`_extract_company_name` + `_sync_company_name`)
@@ -129,10 +129,12 @@ A single end-to-end integration test that runs the full 7-agent pipeline against
 - `tests/test_skill_normalizer.py` — 15 tests (Phase 8.5 SkillNormalizer canonical taxonomy — archived in `resume-done.md` §8.5)
 - `tests/test_web_health.py` — 2 tests (Phase 7.4.1, health + models routes)
 - `tests/test_web_pipeline.py` — 9 tests (Phase 7.4.2, sync + async pipeline routes)
+- `tests/test_web_tasks.py` — 9 tests (Phase 7.4.3, `TaskRegistry` unit + routes)
+- `tests/test_web_outputs.py` — 3 tests (Phase 7.4.4, output file serving)
+- `tests/test_web_files.py` — 11 tests (Phase 7.4.5, file listing + deletion)
+- `tests/test_web_upload.py` — 9 tests (Phase 7.4.6, text extraction)
 
-**Still needed:**
-
-- `tests/test_web_tasks.py`/`test_web_outputs.py`/`test_web_files.py`/`test_web_upload.py` (7.4.3–7.4.6) — task registry, output serving, file listing/deletion, upload/extract
+**Still needed:** none in 7.4 — the FastAPI web layer is now fully covered (43 web tests).
 
 #### 7.2.1 Agent unit tests — per-agent behaviour with a mocked `ModelClient`
 
@@ -207,7 +209,7 @@ Verify each dedicated agent runs its `run()` → `_try_llm()` → `_parse_json()
 
 ### 7.4 Add web API tests (`tests/test_web_*.py`) — FastAPI layer
 
-**Status:** ⚠️ PARTIAL — 7.4.1 (health/models) and 7.4.2 (pipeline routes) done; tasks, outputs, files, upload remain
+**Status:** ✅ DONE (2026-08-08) — all of 7.4.1–7.4.6 complete (43 tests)
 
 The FastAPI web layer (`app/`) previously had **no automated tests** — it was exercised
 only via manual `TestClient`/`uvicorn` smoke checks during `resume-web-todo.md` and
@@ -250,39 +252,51 @@ with an `AsyncMock` (and stub `app.state.runner` on the `TestClient` app via the
 
 #### 7.4.3 `tests/test_web_tasks.py` — `TaskRegistry` unit
 
-- [ ] `create()` returns unique ids (two calls differ).
-- [ ] `update()/get()` round-trip fields and `get()` returns a copy.
-- [ ] `update()` on unknown id is a no-op (does not raise).
-- [ ] `set_result()` → status `completed`, `completed_at` set.
-- [ ] `set_error()` → status `failed`, `error` stored.
-- **Route test:** `GET /api/tasks/{unknown}` → `404` `Unknown task id`.
+**Status:** ✅ DONE (2026-08-08, 9 tests: 6 unit + 1 route covered via 9 total cases)
+
+- [x] `create()` returns unique ids (two calls differ).
+- [x] `create()` initializes a `pending` record with `created_at` set.
+- [x] `update()/get()` round-trip fields and `get()` returns a copy.
+- [x] `update()` on unknown id is a no-op (does not raise).
+- [x] `get()` on unknown id returns `None`.
+- [x] `set_result()` → status `completed`, `result` stored, `completed_at` set.
+- [x] `set_error()` → status `failed`, `error` stored, `completed_at` set.
+- [x] **Route test:** `GET /api/tasks/{unknown}` → `404` `Unknown task id` (random hex id so it never collides with a live task).
 
 #### 7.4.4 `tests/test_web_outputs.py` — output file serving
 
-- **7.4.4.1** `GET /api/outputs/{filename}` of an existing file in `output/` → `200`, streaming the bytes.
+**Status:** ✅ DONE (2026-08-08, 3 tests)
+
+- **7.4.4.1** `GET /api/outputs/{filename}` of an existing file in `output/` → `200`, streaming the bytes. **Note:** asserts `response.content == bytes` + `application/pdf` content-type; `OUTPUT_DIR` monkeypatched to `tmp_path`.
 - **7.4.4.2** `GET /api/outputs/missing.pdf` → `404`.
-- **7.4.4.3** Path traversal: `GET /api/outputs/../../etc/passwd` → `404` (resolved path escapes `output/`).
+- **7.4.4.3** Path traversal: `GET /api/outputs/../secret.txt` → `404` (resolved path escapes `output/`; a decoy file outside `OUTPUT_DIR` is never served).
+
+**Implementation note:** the route only matches a single path segment (`{filename}`), so nested subdir paths are not routable — no test asserts nested serving.
 
 #### 7.4.5 `tests/test_web_files.py` — listing & deletion
 
+**Status:** ✅ DONE (2026-08-08, 11 tests)
+
 - **7.4.5.1** `GET /api/files/generated` → `200` `PagedFile` with `items/total/page`.
 - **7.4.5.2** Filtering: `?file_type=pdf`, `?q=name` narrow results.
-- **7.4.5.3** Sorting: `sort=newest|oldest|name_asc|name_desc`; unknown sort → `400`.
+- **7.4.5.3** Sorting: `sort=newest|oldest|name_asc|name_desc` (asserted via controlled `os.utime` mtimes); unknown sort → `400`.
 - **7.4.5.4** Paging: `page=2&page_size=1` returns 1 item; `page<1` → `400`.
 - **7.4.5.5** `GET /api/files/uploaded` — same shape on `uploads/`.
 - **7.4.5.6** `DELETE /api/files` with existing + missing keys → `deleted`/`missing` split.
 - **7.4.5.7** `DELETE /api/files` dir-qualified keys (`uploads/foo.txt`, `output/foo.pdf`) resolve correctly.
-- **7.4.5.8** Path traversal attempt → dropped to `missing`, never deletes outside dir.
-- Use `tmp_path` fixture + monkeypatched `OUTPUT_DIR`/`UPLOADS_DIR` (module constants) so tests don't touch the real `output/`/`uploads/`.
+- **7.4.5.8** Path traversal attempt (`../../secret.txt`) → dropped to `missing`, never deletes decoy outside dir.
+- Use `tmp_path` fixture + monkeypatched `OUTPUT_DIR`/`UPLOADS_DIR` (module constants) so tests don't touch the real `output/`/`uploads/`. **Note:** `output/`/`uploads/` are created under `tmp_path` so `build_file_meta` emits the same `path` prefixes; the `httpx2` `TestClient.delete()` has no `json=` kwarg, so deletes go through `client.request("DELETE", ..., json={...})`.
 
 #### 7.4.6 `tests/test_web_upload.py` — text extraction unit
 
-- [ ] `.txt` decodes (utf-8 / utf-8-sig / latin-1 fallback).
-- [ ] `.docx` via `python-docx`; **`.pdf` via `pypdf`** (construct minimal in-memory BytesIO).
-- [ ] Unsupported MIME raises `HTTPException` `400`.
-- [ ] Malformed/invalid `.docx`/`.pdf` bytes raise `400` (`Could not parse .docx file.` / `Could not parse .pdf file.`).
+**Status:** ✅ DONE (2026-08-08, 9 tests)
 
-**Files changed (7.4):** new `tests/test_web_health.py` (2 tests, DONE 7.4.1), `tests/test_web_pipeline.py` (9 tests, DONE 7.4.2); remaining `tests/test_web_tasks.py`, `tests/test_web_outputs.py`, `tests/test_web_files.py`, `tests/test_web_upload.py` (optionally consolidated into `tests/test_web_api.py`).
+- [x] `.txt` decodes (utf-8 / utf-8-sig / latin-1 fallback). **Note:** `_decode_txt` tries `utf-8` first, and valid `utf-8-sig` input is also valid `utf-8`, so the BOM file decodes via the `utf-8` branch (BOM kept as `\ufeff`) — the test asserts content is present rather than BOM-stripping.
+- [x] `.docx` via `python-docx`; **`.pdf` via `pypdf`** (construct minimal in-memory BytesIO).
+- [x] Unsupported MIME raises `HTTPException` `400`.
+- [x] Malformed/invalid `.docx`/`.pdf` bytes raise `400` (`Could not parse .docx file.` / `Could not parse .pdf file.`).
+
+**Files changed (7.4):** new `tests/test_web_health.py` (2 tests, DONE 7.4.1), `tests/test_web_pipeline.py` (9 tests, DONE 7.4.2), `tests/test_web_tasks.py` (9 tests, DONE 7.4.3), `tests/test_web_outputs.py` (3 tests, DONE 7.4.4), `tests/test_web_files.py` (11 tests, DONE 7.4.5), `tests/test_web_upload.py` (9 tests, DONE 7.4.6) — the entire 7.4 web test workstream is complete.
 
 > **Note:** pyright `exclude = ["tests"]` and `pytest asyncio_mode = "auto"` apply; these are *async-route* client tests via `TestClient`, which is synchronous — no extra `asyncio` decorator needed.
 
@@ -300,7 +314,7 @@ with an `AsyncMock` (and stub `app.state.runner` on the `TestClient` app via the
   - [ ] Describe the 7-agent chain (JD→Resume Parsing→Gap Analysis→Resume Rewrite→ATS→Tone→Cover).
   - [ ] Describe the two provider backends (Ollama / OpenAI).
   - [ ] Describe the renderer/formatter layers.
-- **7.3.1.2** Add a **data-flow diagram** (ASCII or Mermaid).
+- **7.3.1.2** Add a **data-flow diagram** (Mermaid).
   - [ ] Show input files.
   - [ ] Show agent order.
   - [ ] Show intermediate Pydantic models.
@@ -362,10 +376,10 @@ tests/
   test_pipeline.py               # NEW (Phase 7.2)
   test_web_health.py             # EXISTS (Phase 7.4, root)
   test_web_pipeline.py           # EXISTS (Phase 7.4, root)
-  test_web_tasks.py              # NEW (Phase 7.4)
-  test_web_outputs.py            # NEW (Phase 7.4)
-  test_web_files.py              # NEW (Phase 7.4)
-  test_web_upload.py             # NEW (Phase 7.4)
+  test_web_tasks.py              # EXISTS (Phase 7.4, root)
+  test_web_outputs.py            # EXISTS (Phase 7.4, root)
+  test_web_files.py              # EXISTS (Phase 7.4, root)
+  test_web_upload.py             # EXISTS (Phase 7.4, root)
 docs/
   architecture.md               # NEW (Phase 7.3)
   agents.md                     # NEW (Phase 7.3)
@@ -385,8 +399,8 @@ All other files referenced across Phases 1–9 (agents, clients, templates, form
 | 1 | 7.1: `test_real_files.py` integration test | ✅ DONE | all phases done | 1 |
 | 2 | 7.2.1: agent tests (`tests/test_agent_*.py`) | ✅ DONE (55 tests, FakeClient in conftest) | all phases done | 7 to 8 |
 | 3 | 7.2.2: pipeline tests (`tests/test_pipeline.py`) | ✅ DONE (17 tests) | Step 2 | 1 |
-| 4 | 7.4.1–7.4.2: web health + pipeline route tests | ✅ DONE (2 + 9 tests) | web layer done | 2 |
-| 5 | 7.4.3–7.4.5: web tasks, outputs, files tests | ❌ TODO | web layer done | 3 to 4 |
+| 4 | 7.4.1–7.4.5: web health + pipeline + tasks + outputs + files tests | ✅ DONE (2 + 9 + 9 + 3 + 11 tests) | web layer done | 5 |
+| 5 | 7.4.6: web upload/extract tests | ✅ DONE (9 tests) | web layer done | 1 |
 | 6 | 7.4.6: web upload/extract tests | ❌ TODO | web layer done | 1 |
 | 7 | 7.3.1: `docs/architecture.md` | ❌ TODO | all | 1 |
 | 8 | 7.3.2: `docs/agents.md` | ❌ TODO | Step 7 | 1 |
