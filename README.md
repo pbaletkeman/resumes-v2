@@ -65,6 +65,8 @@ no-argument form still runs the placeholder `sample_run()` demo.
 | Test | `uv run pytest` |
 | Test (verbose) | `uv run pytest -v` |
 | Test (single file) | `uv run pytest tests/test_format_detector.py` |
+| Test with coverage | `uv run pytest --cov` |
+| Coverage HTML report | `uv run pytest --cov --cov-report=html` |
 | Run web API | `uv run uvicorn app.main:app --reload` |
 
 See `docs/TESTING.md` for detailed testing instructions (individual agents, OpenAI provider, model registry).
@@ -249,7 +251,7 @@ app/                       # FastAPI web API layer
 - `client/skills/` - Shared `SkillNormalizer` + canonical skill taxonomy
 - `client/templates/` - Jinja2 templates (modern, classic, minimal, cover letter) + `renderer.py` (`ResumeRenderer`)
 - `docs/models.md` - Quick reference for all Pydantic models
-- `docs/TESTING.md` - Detailed testing guide
+- `docs/TESTING.md` - Detailed testing guide (including coverage)
 - `docs/logging-info.md` - Logging implementation plan and status
 - `docs/skill-taxonomy.md` - Skill taxonomy (`taxonomy.json`) reference and usage
 - `docs/architecture.md` - System overview + Mermaid data-flow diagram
@@ -260,3 +262,29 @@ app/                       # FastAPI web API layer
 - `resume-todo.md` - Remaining work (project complete - pointer to `resume-done.md`)
 - `resume-web-todo.md` - Web API (FastAPI) work log
 - `web-files-todo.md` - File-management endpoint work log
+
+## Test coverage
+
+Coverage is provided by **pytest-cov** (installed as a dev dependency). The
+configuration lives in `pyproject.toml` under `[tool.coverage.run]` /
+`[tool.coverage.report]` and measures the `app/`, `client/`, `config/`
+packages plus `pipeline.py` (tests and `wip_testing/` are excluded). Branch
+coverage is on.
+
+```bash
+# Terminal summary
+uv run pytest --cov
+
+# HTML report (opens like a webpage, browse by file/line)
+uv run pytest --cov --cov-report=html
+
+# Per-file HTML report for specific modules (e.g. the seven agents)
+uv run pytest --cov=client.agents --cov-report=html
+
+# XML report (CI / other tooling)
+uv run pytest --cov --cov-report=xml
+```
+
+Artifacts are written to `.coverage` (data) and `htmlcov/` (HTML). Both are
+git-ignored. The verbose `--cov-report=term-missing` flag shows the line
+numbers of uncovered statements.

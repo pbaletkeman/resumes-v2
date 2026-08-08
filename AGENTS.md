@@ -29,6 +29,8 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 | Test | `uv run pytest` |
 | Test (verbose) | `uv run pytest -v` |
 | Test (single file) | `uv run pytest tests/test_format_detector.py` |
+| Test with coverage | `uv run pytest --cov` |
+| Coverage HTML report | `uv run pytest --cov --cov-report=html` |
 
 No CI is configured. No `Makefile` exists.
 

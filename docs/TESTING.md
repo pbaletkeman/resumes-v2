@@ -179,7 +179,7 @@ uv run python basic.py
 
 ---
 
-## 7. Unit Tests (pytest)
+## 7. Unit Tests (pytest) + Coverage
 
 Run the full test suite:
 
@@ -198,6 +198,33 @@ Single file:
 ```bash
 uv run pytest tests/test_format_detector.py
 ```
+
+### Coverage reporting
+
+`pytest-cov` is available for coverage reporting. Configuration is in
+`pyproject.toml` under `[tool.coverage.run]` / `[tool.coverage.report]`
+and measures `app/`, `client/`, `config/`, and `pipeline.py` (tests and
+`wip_testing/` are excluded). Branch coverage is on.
+
+```bash
+# Terminal summary (the default)
+uv run pytest --cov
+
+# Terminal summary with line numbers of uncovered statements
+uv run pytest --cov --cov-report=term-missing
+
+# HTML report written to htmlcov/ (browse by file/line in a browser)
+uv run pytest --cov --cov-report=html
+
+# Coverage for a subset (e.g. just the rendering module)
+uv run pytest --cov=client.templates.renderer --cov-report=term-missing
+
+# XML report (for CI / other tooling)
+uv run pytest --cov --cov-report=xml
+```
+
+Artifacts: `.coverage` (data file) and `htmlcov/` (HTML report); both are
+git-ignored.
 
 Currently **477 tests across 23 files** (deterministic, no live LLM required):
 
