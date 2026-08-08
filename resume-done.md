@@ -1212,6 +1212,24 @@ Exposes the 7-agent pipeline as a FastAPI application. API-layer only (no API te
 
 ---
 
+## Verification Bugs (fixed 2026-08-06 during `resume-verify.md` live runs)
+
+Two `pipeline.py` bugs surfaced only under a live Ollama run and were fixed as part of the verification plan. Recorded here so the full bug history lives in the completed-work archive.
+
+### V1 — Event-loop lifecycle: `RuntimeError: Event loop is closed` — ✅ FIXED
+
+`AgentRunner.run_agent()` wrapped each of the 7 agents in its own `asyncio.run()`, opening+closing a fresh event loop per agent. The dedicated agent classes share a single `ollama.AsyncClient` bound to the first loop, so agent 1 (`jd_parsing_agent`) succeeded but agent 2 (`resume_parsing_agent`) and later failed with `RuntimeError: Event loop is closed`.
+
+**Fix:** added `AgentRunner.run_agent_async()` (async dispatch) and made sync `run_agent()` delegate via one `asyncio.run()`. `run_resume_pipeline()` now runs all 7 agents under a single event loop through a new `_run_pipeline_core()` coroutine, wrapped once in `asyncio.run()`.
+
+### V2 — `_extract_field` returns whole model instead of named field — ✅ FIXED
+
+`pipeline._extract_field()` only handled `dict` results, so when a dedicated agent returned a Pydantic model it returned the entire model rather than its named field. With ATS this passed an `ATSComplianceOutput` object into `tone_polishing_agent`, which raised `TypeError: object of type 'ATSComplianceOutput' has no len()`.
+
+**Fix:** added a `getattr` branch so model results yield their named field (e.g. `final_resume`, `cover_letter`) before falling back to the object itself.
+
+---
+
 ## Phase 7: Testing & Docs — ALL COMPLETE (2026-08-08)
 
 **Status:** ✅ DONE — Phase 7 finished. This was the final phase in `resume-todo.md`; all remaining work (live E2E test, unit test coverage, web API tests, and the four new docs guides) is complete.
