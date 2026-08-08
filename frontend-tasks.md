@@ -1,0 +1,262 @@
+# Frontend Implementation Tasks
+
+Detailed breakdown of `frontend-plan.md` into actionable, verifiable tasks. Each task lists the deliverable, its acceptance check(s), and how to verify. Assumed environment: Node v24/npm on Windows, backend on `localhost:8000` (`uv run uvicorn app.main:app --reload`).
+
+Conventions:
+
+- All `ui/` commands run with `ui/` as the working directory.
+- Python checks run from the repo root.
+- Follow `AGENTS.md` conventions (ruff/pyright strict, no comments unless asked).
+
+---
+
+## 1. Backend prep — serve built SPA from `app/main.py`
+
+### 1.1 Add a static-mount helper in `app/main.py`
+
+- Add a function (module-level) that, given the `ui/dist` directory, mounts the SPA:
+  - `StaticFiles` mount for `/assets` (or wherever Vite emits hashed assets).
+  - A catch-all `GET /{full_path:path}` returning `index.html` for non-`/api`/`/health`/dotfile paths (SPA fallback so `/files` deep links work on refresh).
+- **Accept:** exists; pure function of paths; no imports of frontend code.
+- **Verify:** `uv run ruff check .`; `uv run pyright`.
+
+### 1.2 Wire the mount in `lifespan`/app setup, guarded by build presence
+
+- Only register the static routes when `ui/dist/index.html` exists (config constant, e.g. `UI_DIST = Path("ui") / "dist"`).
+- When absent, app behavior is identical to today (API-only).
+- **Accept:** running with no build still serves `/health` and `/api/*`; tests pass.
+- **Verify:** `uv run pytest` (web tests must stay green).
+
+### 1.3 Add a backend test for the SPA fallback
+
+- In `tests/` (e.g. `test_web_spa.py`), test that:
+  - with a fake `dist/index.html` present, `/files` returns the HTML;
+  - `/api/models` still returns JSON (routing not shadowed);
+  - a 404 is returned for missing files.
+- Use `tmp_path` + monkeypatch of `UI_DIST`.
+- **Verify:** `uv run pytest tests/test_web_spa.py -v`.
+
+---
+
+## 2. Scaffold `ui/` (Vite + React + TS)
+
+### 2.1 Create the Vite project
+
+- Run `npm create vite@latest ui -- --template react-ts` (from repo root).
+- **Accept:** `ui/` exists with `index.html`, `src/main.tsx`, `tsconfig*.json`, `vite.config.ts`, `package.json`.
+- **Verify:** `npm install` succeeds; `npm run dev` serves a default page on :5173.
+
+### 2.2 Install dependencies
+
+- `npm i primereact primeicons react-router-dom @tanstack/react-query`
+- Add dev/test deps: `npm i -D vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom vite-tsconfig-paths` (see section 6).
+- **Accept:** entries in `ui/package.json`; `npm ls` shows no missing deps.
+
+### 2.3 Gitignore + prune scaffold boilerplate
+
+- Add to root `.gitignore`: `ui/node_modules/`, `ui/dist/`.
+- Delete Vite demo cruft (`src/App.css`, logo assets, counter demo code) so the app starts clean.
+- **Accept:** `git status` shows only intended additions; `npm run build` still passes.
+
+### 2.4 Wire PrimeReact themes (light + dark)
+
+- In `src/main.tsx`, import the base theme CSS for **both** modes — `primereact/resources/themes/lara-light-blue/theme.css` and `primereact/resources/themes/lara-dark-blue/theme.css` — plus `primereact/resources/primereact.min.css` and `primeicons/primeicons.css`.
+- Apply exactly one theme at runtime by toggling a `data-theme="light" | "dark"` attribute on the `<html>` element; scope the dark theme's `:root` custom-property overrides under a matching selector (e.g. `html[data-theme='dark']`) so both stylesheets can coexist and flip without a reload.
+- **Accept:** a bare `Button` renders with PrimeReact styling in both light and dark.
+- **Verify:** `npm run dev`, flip the attribute manually and visually confirm both palettes.
+
+### 2.5 Theme state — default to system, allow manual override
+
+- Create a theme module (e.g. `src/theme/ThemeToggle.tsx` + `useTheme` hook):
+  - **Initial value:** read `localStorage` override (`'light'` or `'dark'`) if present; otherwise derive from `window.matchMedia('(prefers-color-scheme: dark)')` (system default).
+  - Persist manual choices to `localStorage`; clearing the override returns to following the system.
+  - Apply/remove `data-theme` on `document.documentElement` on init and on change.
+  - Subscribe to the `change` event of the `prefers-color-scheme` media query so the theme follows the OS while no manual override is set.
+- **Accept:** first visit matches the OS theme; toggling light↔dark updates instantly and persists across reloads; a "system" reset option exists.
+- **Verify:** reload with OS dark → dark; toggle to light → light after reload; no flash of the wrong theme on load (set `data-theme` before first paint, e.g. in an inline script in `index.html`).
+
+---
+
+## 3. `vite.config.ts` — dev proxy
+
+### 3.1 Add the `/api` proxy
+
+- Extend `vite.config.ts` with `server.proxy = { "/api": "http://localhost:8000" }` (include `/health` too).
+- **Accept:** no CORS errors when the app calls the API from :5173.
+- **Verify:** with backend running, `fetch('/api/models')` from the browser console returns JSON.
+
+---
+
+## 4. `src/api/` — typed client + React Query hooks
+
+### 4.1 `src/api/types.ts`
+
+Define TS interfaces mirroring backend schemas (from `app/schemas.py` + agent output models):
+
+- `ModelSummary { agent, provider, model }`
+- `PipelineRunResponse` with all 7 result keys + `output_files: Record<string, string>`.
+- `TaskStatus { status: 'pending'|'running'|'completed'|'failed', result?, error?, created_at?, completed_at? }`.
+- `FileMeta { name, size, modified, type, path }`, `PagedFile { items, page, page_size, total, total_pages }`.
+- Loose/typed shapes for agent outputs (JD, Resume, Gap, Rewrite, ATS, Tone, Cover) — use the field lists from `client/models.py`.
+- **Verify:** `npx tsc --noEmit` clean.
+
+### 4.2 `src/api/client.ts` — fetch wrappers
+
+- `fetchModels()` → `GET /api/models`.
+- `runPipelineAsync(formData)` → `POST /api/pipeline/async`, body is `FormData` with `job_description`, `resume`, `job_file`, `resume_file`, `candidate_name`, `company_name` (omit empty text so files win when text empty — match `_read_text_input`).
+- `getTask(id)` → `GET /api/tasks/{id}`.
+- `listFiles(kind: 'generated'|'uploaded', params)` → `GET /api/files/{kind}` with `file_type`, `q`, `page`, `page_size`, `sort`.
+- `deleteFiles(files: string[])` → `DELETE /api/files` with JSON body `{ files }`.
+- Central `apiFetch` helper: base `/api`, JSON parse, error surface (throw on non-2xx with `detail` message).
+- **Verify:** `npx tsc --noEmit`; spot-check each via `fetch` in dev console.
+
+### 4.3 `src/api/download.ts`
+
+- `outputDownloadUrl(name: string)` → `/api/outputs/{name}` (encode name).
+- `fileDownloadUrl(path: string)` → same, extracting basename from `path` keys like `uploads/foo.pdf`.
+- **Verify:** typecheck; manual link click downloads a real file.
+
+### 4.4 `src/api/hooks.ts` — React Query hooks
+
+- `useModels()` — `useQuery(['models'], fetchModels)`.
+- `useInvokePipeline()` — `useMutation(runPipelineAsync)` returning `taskId`.
+- `useTask(id)` — `useQuery(['task', id], getTask, { refetchInterval: query.state.status in running/pending ? 2000 : false })`, plus a `usePollTask(id, onDone)` helper that stops polling at `completed`/`failed` and invalidates related queries (e.g. `['files']`).
+- `useFiles(kind, params)` — `useQuery(['files', kind, params], ...)`, keepPreviousData for paging.
+- `useDeleteFiles()` — mutation; onSuccess invalidate `['files', ...]`.
+- **Verify:** typecheck; manual run shows polling then settled state.
+
+---
+
+## 5. Views (PrimeReact)
+
+### 5.1 App shell — `src/App.tsx`
+
+- `BrowserRouter` + `Menubar` (logo/title, items: Run `/`, Files `/files`, Models `/models`) + `<Outlet/>`.
+- Add a theme switch to the end of the `Menubar`: a `ToggleButton` (sun/moon icons) that flips light↔dark via the `useTheme` hook from 2.5; optionally a three-way dropdown ("System | Light | Dark").
+- Small `Toast` ref provided via context for messages.
+- **Verify:** navigate between three routes; Menubar highlights active; the theme toggle flips the whole app in place without a reload.
+
+### 5.2 Run page — form (paste or upload)
+
+- JD & resume columns: `TextArea` for paste + `FileUpload` (choose mode, single file, accept `.txt,.docx,.pdf`) for upload. Text wins when non-empty.
+- Optional `InputText` for candidate/company name.
+- `Button` "Run Pipeline" disabled while a run is active.
+- Validation: at least one of paste/file per input (reuse the API's error `detail` on failure).
+- **Verify:** both input paths build valid `FormData` (inspect via network tab).
+
+### 5.3 Run page — async status
+
+- On submit: `useInvokePipeline` → show task id + `ProgressSpinner`; `usePollTask` updates a status `Tag` (pending/running/completed/failed) and surfaces `error` via Toast on failure.
+- **Verify:** with Ollama running, status transitions running → completed; without Ollama it surfaces a failure message.
+
+### 5.4 Run page — results `TabView`
+
+- After `completed`, render result tabs:
+  - **Parsed JD** — role/company/seniority; `Tag`s for required/preferred skills, keywords, industry terms; responsibilities list; company_signals table.
+  - **Parsed Resume** — summary, skills tags, experience entries (title/company/dates + responsibilities/achievements/metrics), projects/certs/education, contact line.
+  - **Gap Analysis** — tag lists for missing/weak/strong, emphasis, keyword strategy, bullet plan; tone guidance text.
+  - **Rewritten Resume** — structured summary + experience.
+  - **ATS** — `Tag` score (colored by band: <50 red, <80 orange, else green), missing keywords, issues, fixes, auto-fixes; `final_resume` in a `pre`/textarea.
+  - **Polished** — `polished_resume` text.
+  - **Cover Letter** — `cover_letter` text.
+  - Handle string-vs-object keys defensively (`polished_resume`/`cover_letter` may arrive as plain strings).
+- **Verify:** manual pipeline run populates every tab; empty agents show "no data" placeholders.
+
+### 5.5 Run page — downloads row
+
+- From `output_files` (keys: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, `cover_letter_plaintext`, `cover_letter_markdown`), render `Button`s (link) to `/api/outputs/{basename}` via `download.ts`.
+- **Verify:** each button downloads a non-empty file from `output/`.
+
+### 5.6 Files page
+
+- Toggle between generated/uploaded (`SegmentedButton` or `TabMenu`) → `useFiles(kind, ...)`.
+- `DataTable` columns: checkbox, name, type, modified, size, link. `Paginator` wired to page/page_size; `q` input + `file_type` dropdown; sort selector.
+- Selection state → "Delete selected (n)" `Button` → `ConfirmDialog` → `useDeleteFiles` → Toast with `deleted`/`missing`; refetch.
+- **Verify:** paging/filter/sort round-trip against `/api/files/*`; delete removes rows (check `output/` and `uploads/`).
+
+### 5.7 Models page
+
+- `DataTable` of `useModels()`: agent / provider / model. Empty state message if fetch fails.
+- **Verify:** matches `uv run python -c "from config.agents import get_model_summary; ..."` output.
+
+---
+
+## 6. Frontend unit tests (Vitest + Testing Library)
+
+### 6.1 Configure Vitest
+
+- Add a `test` block to `ui/vite.config.ts`: `environment: 'jsdom'`, `globals: true`, `setupFiles: './src/test/setup.ts'`, and a `ui/tsconfig` type entry for Vitest globals + jest-dom matchers.
+- Create `ui/src/test/setup.ts` importing `@testing-library/jest-dom` (and, if needed, a PrimeReact CSS stub so theme imports don't break jsdom).
+- Add `"test": "vitest run"` (and `"test:watch": "vitest"`) to `ui/package.json` scripts.
+- **Accept:** `npm test` runs a trivial passing test.
+- **Verify:** run `npm test` in `ui/`.
+
+### 6.2 Test the API client (`src/api/client.ts`)
+
+- Mock `global.fetch` (or `vi.stubGlobal`) in each test; cover:
+  - `runPipelineAsync` builds the expected `FormData` — text fields present, empty text omitted.
+  - `getTask`/`listFiles`/`deleteFiles` hit the correct URLs+methods and parse JSON.
+  - Non-2xx responses throw with the backend `detail` message surfaced.
+  - Download URLs produce the expected `/api/outputs/...` paths.
+- **Verify:** `npm test` in `ui/`.
+
+### 6.3 Test React Query hooks (`src/api/hooks.ts`)
+
+- Wrap components in `QueryClientProvider` (fresh `QueryClient` per test, e.g. via a `renderWithClient` helper that also flushes pending queries).
+- Cover: `useModels` renders data on success; `useFiles` passes page params through and keeps previous data while refetching; `useDeleteFiles` onSuccess invalidates the `['files', ...]` queries.
+- **Verify:** `npm test` in `ui/`.
+
+### 6.4 Test the theme hook (`useTheme`)
+
+- Mock `matchMedia` (jsdom doesn't implement it) to simulate `prefers-color-scheme: dark` and its `change` event.
+- Cover: defaults to the system scheme when no `localStorage` override exists; respects a stored `light`/`dark` override; toggling persists the choice; setting "system" removes the override and re-follows OS changes; `data-theme` is set/removed on `document.documentElement`.
+- **Verify:** `npm test` in `ui/`.
+
+### 6.5 Test components
+
+- **ThemeToggle** — clicking flips light↔dark and calls the theme hook's setter.
+- **Run page form** — paste text + uploaded file: text wins in the submitted `FormData`; the "Run Pipeline" button is disabled while a run is active; validation surfaces a message when both inputs are empty.
+- **Downloads row** — renders one link per `output_files` entry and points at the correct `/api/outputs/{name}` URL.
+- **Files page** — renders rows from a stubbed `PagedFile`, fires the delete mutation with the selected `path`s, shows the `ConfirmDialog`, and surfaces the delete result via Toast.
+- **Models page** — renders agent/provider/model rows; shows the empty-state message on fetch failure.
+- **ATS tab** — `Tag` severity maps score bands (<50 red, <80 orange, else green).
+- **Verify:** `npm test` in `ui/`; all pass.
+
+### 6.6 Run the full suite
+
+- **Accept:** `npm run lint` and `npm test` are both clean in `ui/`, alongside `npm run build` / `npx tsc --noEmit`.
+- **Verify:** `npm test` in `ui/` ends with a green summary.
+
+---
+
+## 7. Verification (whole app)
+
+### 7.1 Backend checks
+
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run pyright` (strict, no path arg)
+- `uv run pytest`
+- **Accept:** all clean/green.
+
+### 7.2 Frontend checks
+
+- In `ui/`: `npm run lint`, `npm test`, `npm run build`, `npx tsc --noEmit`.
+- **Accept:** no errors/warnings, all tests green.
+
+### 7.3 Manual E2E
+
+- Backend up (`uv run uvicorn app.main:app --reload`), `npm run dev` in `ui/`.
+- Run pipeline with `sample/jobs/*` + `sample/resume/*` (paste a sample text or upload the file).
+- Confirm: async status polling, all result tabs populated, all download buttons work.
+- Confirm theming: match OS theme on load, instant light↔dark toggle from the Menubar, preference survives refresh, "system" mode follows a live OS theme change.
+- Confirm SPA fallback: `npm run build`, then restart backend and visit `/files` directly (refresh works).
+
+---
+
+## 8. Docs (optional)
+
+### 7.1 Update `AGENTS.md`
+
+- Add a "UI" section: two-terminal quickstart (`uv run uvicorn app.main:app --reload` + `cd ui && npm run dev`), build command (`npm run build`), and note that production serves `ui/dist` from FastAPI.
+- **Accept:** commands in the doc match reality.
