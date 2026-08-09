@@ -8,7 +8,7 @@ import type {
 
 const API_BASE = '/api'
 
-export interface FileListParams {
+export type FileListParams = {
   file_type?: string
   q?: string
   page?: number

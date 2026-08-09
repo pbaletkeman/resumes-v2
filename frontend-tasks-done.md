@@ -237,3 +237,65 @@ New file `ui/src/api/hooks.ts` (server-rendered for TanStack Query v5 — `^5.10
 - `npx tsc --noEmit` — 0 errors (in `ui/`).
 - `npm run lint` (oxlint) — clean.
 - Query-client wiring (manual `started → polling → settled` run) is exercised end-to-end by the Run page tasks (5.2/5.3) and task 6.3 unit tests, once those land. Hooks themselves typecheck and are validated by the package's v5 API (`keepPreviousData` confirmed present at runtime).
+
+### 5.1 App shell — `src/App.tsx` — DONE
+
+Restructured the entrypoint into a routed shell.
+
+- `ui/src/App.tsx` (rewritten) — `QueryClient`/`QueryClientProvider` (covers the 4.x hooks) → `BrowserRouter` → `ToastProvider` → `Routes` with a layout route (`<Shell />` holding the `Menubar` + `<Outlet/>`) and three children: `index` → RunPage, `/files` → FilesPage, `/models` → ModelsPage.
+  - `Menubar` `start` slot = brand (`pi pi-briefcase` + "Resume Optimizer"); `model` items built from `NAV_ITEMS` (Run `/`, Files `/files`, Models `/models`) each using an item **template** that renders a `NavLink` (`end` on `/`) with base class `p-menuitem-link` plus ` p-menuitem-link-active` when `isActive` — Menubar highlighting comes from React Router, no command/state needed.
+  - `Menubar` `end` slot = the existing three-way `ThemeToggle` (System | Light | Dark from 2.5) — satisfies the theme switch; flips via `useTheme` by setting `data-theme` on `<html>` with no reload.
+- `ui/src/pages/RunPage.tsx`, `FilesPage.tsx`, `ModelsPage.tsx` (new) — minimal placeholder pages (headers only); filled in by 5.2–5.7.
+- `ui/src/toast/ToastContext.ts` + `ui/src/toast/ToastProvider.tsx` (new) — `ToastContext.Provider` owns one `Toast` ref; `useToast()` returns `{ show(message), clear() }` (throws outside the provider). Pages call `useToast().show({ severity, summary, detail })`.
+- `ui/src/index.css` — `.app-shell`/`.app-content` layout + active-link highlight rule (`var(--primary-300)` background, rounded).
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 lines (caught & fixed a **4.2-era bug**: `FileListParams` declared as an `interface` isn't assignable to `Record<string, string|number|undefined>` under `tsc -b`; converted to a `type` alias → build green).
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes; dist 411 kB JS / 416 kB CSS (theme scoping intact).
+- Dev-server smoke on :5173 — `/`, `/files`, `/models` all return 200 serving the SPA `index.html` (mount div + pre-paint theme script present); backend `/health` on :8000 returns 200.
+- Route navigation, active-link highlight, and the live theme flip are browser-interactive; covered manually in 7.3 and by the 6.x unit tests once Vitest lands.
+
+### 5.2 Run page — form (paste or upload) — DONE
+
+Built the Run page form + FormData construction.
+
+- `ui/src/pages/runForm.ts` (new) — pure, testable helpers:
+  - `RunInputs` type; `validateRunInputs()` returns a warning message when either JD or resume lacks both text and file.
+  - `buildRunFormData()` — appends `job_description`/`resume` when the pasted text is non-empty, else `job_file`/`resume_file` (text wins, matching backend `_read_text_input`); appends `candidate_name`/`company_name` only when non-empty.
+- `ui/src/pages/RunPage.tsx` (rewritten) — two-column grid (`run-grid`):
+  - **Job Description** / **Resume** columns each get an `InputTextarea` for paste + a `FileChosen` control: `FileUpload` (`mode="basic"`, single file, `accept=".txt,.docx,.pdf"`, `auto={false}` + `customUpload` so nothing posts until submit) shown when no file is chosen; once chosen, replaced by the file name + a text "Remove" `Button` (clears via `FileUpload.clear()` ref + state).
+  - Optional `candidateName`/`companyName` `InputText` fields rendered PrimeReact `p-float-label` style.
+  - "Run Pipeline" `Button` (pi pi-play) disabled while `useInvokePipeline().isPending` (run active).
+  - `handleSubmit()`: `validateRunInputs` short-circuit → Toast warn on missing input; otherwise `invokePipeline.mutate(formData, { onError })` → Toast error reusing the API's `detail` (surfaced by `client.ts`'s `parseErrorDetail`).
+- CSS: `.run-page`, `.run-grid` (1fr/1fr, responsive-safe column stack via grid gap), `.run-column`, `.run-file`, `.run-file-name`, `.run-options`.
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 errors; `npm run lint` (oxlint) — clean; `npm run build` (`tsc -b && vite build`) — passes (472 kB JS).
+- FormData semantics node-checked: text-only → `['job_description','resume']`; file-only → `['job_file','resume_file','candidate_name','company_name']`; text+wins omits files (`['job_description','resume']`).
+- Dev-server smoke: `GET /src/pages/RunPage.tsx` through Vite transforms cleanly (200).
+- Live backend check: POST `/api/pipeline/async` with `job_description` + `resume` form fields → 200 `{ task_id }`, confirming the exact field names/contract (`_read_text_input`, `app/main.py:130`).
+- Interactive verify (both input paths via network tab + disabled-while-running) is browser-manual; the async status UI on top is task 5.3.
+
+### 5.3 Run page — async status — DONE
+
+Added live async status tracking to `ui/src/pages/RunPage.tsx`.
+
+- On submit success, stores the `task_id` from `useInvokePipeline()`'s mutation data (`onSuccess: (data) => setTaskId(data.task_id)`); the button stays disabled through polling.
+- Polls via `usePollTask(taskId, handleTaskDone)` (polling at 2 s while `pending`/`running`, auto-stops on `completed`/`failed`, invalidates `['files']`).
+- `handleTaskDone` (stable via `useCallback([show])`) surfaces a `failed` task's `error` string through a Toast (`severity: 'error'`), falling back to "Unknown pipeline error".
+- Status panel (`run-status` block, visible when `taskId !== null`):
+  - Task id rendered as `code`.
+  - While `undefined`/`pending`/`running`: `ProgressSpinner` (`2rem`, `strokeWidth=4`) + a status `Tag` (`info`).
+  - Settled: `Tag` with `STATUS_SEVERITY` map (`completed` → `success`, `failed` → `danger`).
+  - On `failed`: inline `run-status-error` text with `taskError`.
+- Button label reflects state (`Starting...`/`Running...` with a spinning icon while active), plus a secondary "Reset" button that clears the task id (`disabled={active}`).
+- CSS: `.run-actions`, `.run-status`, `.run-status-label`, `.run-status-active`, `.run-status-error`.
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 errors; `npm run lint` (oxlint) — clean; `npm run build` — passes (488 kB JS).
+- **Live success path** (Ollama up, port 8000): POST `/api/pipeline/async` → polled `/api/tasks/{id}` → `running` × 4 → `completed`; result carries all 7 keys (`parsed_job_description` … `cover_letter`) + `output_files`. Status transition running → completed confirmed.
+- **Live failure path** (`OLLAMA_HOST` → dead port 1, backend on 8001): POST → first poll already `status=failed`, `error` = "Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible." — proves the Toast path surfaces the message end-to-end.

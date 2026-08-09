@@ -15,3 +15,105 @@
 body {
   margin: 0;
 }
+
+.app-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  margin-inline-end: 1rem;
+}
+
+.app-content {
+  flex: 1;
+  padding: 1.5rem;
+}
+
+.p-menubar .p-menuitem-link-active,
+.p-menubar-root-list > .p-menuitem > .p-menuitem-content > .p-menuitem-link-active {
+  background: var(--primary-300);
+  border-radius: 6px;
+}
+
+.run-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.run-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.run-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.run-column .p-inputtextarea {
+  width: 100%;
+}
+
+.run-file {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.run-file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.run-options {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.run-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.run-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.run-status-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.run-status-label code {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: var(--surface-100);
+}
+
+.run-status-active {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.run-status-error {
+  color: var(--red-500);
+}

@@ -20,26 +20,6 @@ Conventions:
 
 ## 5. Views (PrimeReact)
 
-### 5.1 App shell — `src/App.tsx`
-
-- `BrowserRouter` + `Menubar` (logo/title, items: Run `/`, Files `/files`, Models `/models`) + `<Outlet/>`.
-- Add a theme switch to the end of the `Menubar`: a `ToggleButton` (sun/moon icons) that flips light↔dark via the `useTheme` hook from 2.5; optionally a three-way dropdown ("System | Light | Dark").
-- Small `Toast` ref provided via context for messages.
-- **Verify:** navigate between three routes; Menubar highlights active; the theme toggle flips the whole app in place without a reload.
-
-### 5.2 Run page — form (paste or upload)
-
-- JD & resume columns: `TextArea` for paste + `FileUpload` (choose mode, single file, accept `.txt,.docx,.pdf`) for upload. Text wins when non-empty.
-- Optional `InputText` for candidate/company name.
-- `Button` "Run Pipeline" disabled while a run is active.
-- Validation: at least one of paste/file per input (reuse the API's error `detail` on failure).
-- **Verify:** both input paths build valid `FormData` (inspect via network tab).
-
-### 5.3 Run page — async status
-
-- On submit: `useInvokePipeline` → show task id + `ProgressSpinner`; `usePollTask` updates a status `Tag` (pending/running/completed/failed) and surfaces `error` via Toast on failure.
-- **Verify:** with Ollama running, status transitions running → completed; without Ollama it surfaces a failure message.
-
 ### 5.4 Run page — results `TabView`
 
 - After `completed`, render result tabs:
