@@ -16,21 +16,6 @@ Conventions:
 
 ## 4. `src/api/` — typed client + React Query hooks
 
-### 4.3 `src/api/download.ts`
-
-- `outputDownloadUrl(name: string)` → `/api/outputs/{name}` (encode name).
-- `fileDownloadUrl(path: string)` → same, extracting basename from `path` keys like `uploads/foo.pdf`.
-- **Verify:** typecheck; manual link click downloads a real file.
-
-### 4.4 `src/api/hooks.ts` — React Query hooks
-
-- `useModels()` — `useQuery(['models'], fetchModels)`.
-- `useInvokePipeline()` — `useMutation(runPipelineAsync)` returning `taskId`.
-- `useTask(id)` — `useQuery(['task', id], getTask, { refetchInterval: query.state.status in running/pending ? 2000 : false })`, plus a `usePollTask(id, onDone)` helper that stops polling at `completed`/`failed` and invalidates related queries (e.g. `['files']`).
-- `useFiles(kind, params)` — `useQuery(['files', kind, params], ...)`, keepPreviousData for paging.
-- `useDeleteFiles()` — mutation; onSuccess invalidate `['files', ...]`.
-- **Verify:** typecheck; manual run shows polling then settled state.
-
 ---
 
 ## 5. Views (PrimeReact)

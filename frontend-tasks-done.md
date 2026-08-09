@@ -206,3 +206,34 @@ New file `ui/src/api/client.ts`.
   - `GET /api/tasks/{id}` → 200 `{ status: 'running', created_at, result: null }`; a bogus id surfaces 404.
   - `GET /api/files/generated?page=1&page_size=5&sort=newest` → 200 `PagedFile` (23 total in `output/`).
   - `DELETE /api/files` with `{ files: ["nonexistent.pdf"] }` → 200 `{ deleted: [], missing: ["nonexistent.pdf"] }`.
+
+### 4.3 `src/api/download.ts` — download URL helpers — DONE
+
+New file `ui/src/api/download.ts`.
+
+- `outputDownloadUrl(name)` → `/api/outputs/{encodeURIComponent(name)}` — encodes the basename so spaces/`&`/etc. survive the URL.
+- `fileDownloadUrl(path)` → same, normalizing backslashes (`\` → `/`) then extracting the basename via `split('/').pop()` from dir-qualified `path` keys like `uploads/foo.pdf` / `output/foo.pdf`.
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 errors (in `ui/`).
+- URL logic spot-checked (node): `my resume v2.pdf` → `/api/outputs/my%20resume%20v2.pdf`; `uploads/foo.pdf` → `/api/outputs/foo.pdf`; `output/a b&c.txt` → `/api/outputs/a%20b%26c.txt`.
+- Live download: listed `output/` via `/api/files/generated`, then `GET /api/outputs/{name}` returned 200 with 2523 bytes (`text/markdown`).
+
+### 4.4 `src/api/hooks.ts` — React Query hooks — DONE
+
+New file `ui/src/api/hooks.ts` (server-rendered for TanStack Query v5 — `^5.101.4` installed).
+
+- `useModels()` — `useQuery(['models'], fetchModels)`.
+- `useInvokePipeline()` — `useMutation(runPipelineAsync)`; `.data` carries the `TaskCreated.task_id`.
+- `useTask(taskId)` — `useQuery(['task', taskId], …)` disabled when `taskId` is null; `refetchInterval={(query) => query.state.data?.status is pending/running ? 2000 : false}` so polling auto-stops once settled.
+- `usePollTask(taskId, onDone)` — wraps `useTask`; a `useEffect` fires `queryClient.invalidateQueries(['files'])` and calls `onDone(status)` exactly when the task enters `completed`/`failed`.
+- `useFiles(kind, params)` — `useQuery(['files', kind, params], …)` with `placeholderData: keepPreviousData` for paging continuity.
+- `useDeleteFiles()` — `useMutation(deleteFiles)` whose `onSuccess` invalidates `['files', …]` queries, so listings refetch after a delete.
+- Re-exports the `ModelSummary`/`PagedFile` types for consumer convenience.
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 errors (in `ui/`).
+- `npm run lint` (oxlint) — clean.
+- Query-client wiring (manual `started → polling → settled` run) is exercised end-to-end by the Run page tasks (5.2/5.3) and task 6.3 unit tests, once those land. Hooks themselves typecheck and are validated by the package's v5 API (`keepPreviousData` confirmed present at runtime).
