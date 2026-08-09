@@ -9,6 +9,8 @@ import { useInvokePipeline, usePollTask } from '../api/hooks'
 import type { TaskStatus } from '../api/types'
 import { useToast } from '../toast/ToastContext'
 import { buildRunFormData, validateRunInputs } from './runForm'
+import { asStringMap } from './results/coerce'
+import DownloadsRow from './results/DownloadsRow'
 import ResultsTabView from './results/ResultsTabView'
 
 interface FileChosenProps {
@@ -210,7 +212,10 @@ function RunPage() {
         </div>
       )}
       {status === 'completed' && (
-        <ResultsTabView result={taskQuery.data?.result ?? null} />
+        <>
+          <DownloadsRow outputFiles={asStringMap(taskQuery.data?.result?.output_files)} />
+          <ResultsTabView result={taskQuery.data?.result ?? null} />
+        </>
       )}
     </section>
   )

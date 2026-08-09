@@ -426,3 +426,54 @@ Whole task complete — all 7 tab sub-tasks (5.4.1–5.4.7) are archived individ
 #### Verification
 
 - Whole-task verify (manual pipeline run populates every tab; empty agents show "no data" placeholders) is browser-manual and belongs to task 7.3; per-tab `tsc`/lint/build cleanliness was verified in each sub-task record.
+
+### 5.5 Run page — downloads row — DONE
+
+Built the downloads row under the Run page results.
+
+- `ui/src/pages/results/DownloadsRow.tsx` (new) — `DownloadsRow({ outputFiles })` takes the `output_files` map and renders one download link per known format key:
+  - `DOWNLOAD_LABELS` maps the backend's 6 keys (`resume_plaintext`/`resume_markdown`/`resume_docx`/`resume_pdf`/`cover_letter_plaintext`/`cover_letter_markdown` — confirmed against `client/templates/renderer.py:381` and its cover-letter counterparts) to display labels.
+  - Entries with unknown keys are dropped; empty/null map → component renders `null`.
+  - Each link is an `<a>` carrying the PrimeReact button classes (`p-button p-button-secondary p-button-outlined` + `pi-download` icon) so it looks like `Button`s (v10 `Button` has no `href`/`as` prop) and points at `fileDownloadUrl(path)` from `download.ts` → `/api/outputs/{basename}` (path values are `output/...` — basename extracted).
+- `ui/src/pages/RunPage.tsx` — on `completed`, renders `<DownloadsRow outputFiles={asStringMap(taskQuery.data?.result?.output_files)} />` above `<ResultsTabView />`; new `asStringMap` import from `results/coerce.ts`.
+- `ui/src/index.css` — `.run-downloads` (wrap row, gap) + `.run-downloads .p-button { text-decoration: none }`.
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (515 kB JS / 418 kB CSS).
+- Live backend spot-check (uvicorn on :8000): `GET /api/outputs/20260809_1417_test-user_test-co_resume.md` → 200 with 91 bytes (`text/markdown`), confirming the download URL scheme (`fileDownloadUrl` → `/api/outputs/{basename}`) serves output files from `output/`. Non-existent names → 404 as expected.
+
+### 5.6 Files page — DONE
+
+Built the Files page with listing/filtering/deletion.
+
+- `ui/src/pages/FilesPage.tsx` (rewritten) —
+  - **Kind toggle** via `TabMenu` (Generated/Uploaded; v10.9.8 has no `SegmentedButton`, `TabMenu` is the plan's alternative). Switching resets page + selection.
+  - **Filters row**: `q` search `InputText` (Enter applies; applied value lives separate from typing state so only committed searches refetch), `file_type` `Dropdown` (All types/txt/md/docx/pdf) and `sort` `Dropdown` (newest/oldest/name_asc/name_desc) — both reset to page 1 on change.
+  - **DataTable**: `dataKey="path"`, checkbox selection (`selectionMode="checkbox"`, `selectionPageOnly`), lazy + `Paginator` (`rows`, `first`, `totalRecords`, `rowsPerPageOptions`, `onPage` maps `first/rows + 1` → page). Columns: selection, Name, Type, Modified (locale string), Size (`formatSize` B/KB/MB), Link (download `p-button` anchor via `fileDownloadUrl(row.path)`). `emptyMessage` switches between Loading…/No files found.
+  - **Delete**: `useDeleteFiles` mutation (invalidates `['files']` on success via the hook) → ConfirmDialog (accept = delete, clears selection; Toast success on `deleted` count, warn on `missing`, error on mutation failure). Button disabled when nothing selected or while pending, label reflects `Delete selected (n)`.
+- `ui/src/index.css` — `.files-page`, `.files-toolbar`, `.files-filters`, `.files-filter-type`, `.files-filter-sort`, `.files-actions`, `.files-name`.
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (840 kB JS / 419 kB CSS; DataTable/TabMenu/ConfirmDialog pulled in).
+- Live backend round-trip on :8000 (uvicorn): paging (`page=2&page_size=5` returns a different first file than page 1), sort (`oldest` first = 20260806 file, `newest` = 20260809), `q=cover` returns only cover-letter names, `file_type=pdf` returns only PDFs — all matching `GET /api/files/*`.
+- Delete round-trip: created `uploads/__deleteme_test.txt`, `DELETE /api/files` with `{"files":["uploads/__deleteme_test.txt"]}` → `{deleted:[...], missing:[]}`; confirmed the file is removed from disk and from a follow-up listing.
+
+### 5.7 Models page — DONE
+
+Built the Models page.
+
+- `ui/src/pages/ModelsPage.tsx` (rewritten) — `DataTable` fed by `useModels()` with columns Agent / Provider / Model (all `sortable`, `dataKey="agent"`):
+  - Provider rendered as a `Tag` (openai → `info`, ollama → `success`, anything else → `warning`).
+  - `loading={isLoading}`; `emptyMessage` flips to "Failed to load models. Is the backend running?" when the fetch errors (isError), else "No models found".
+  - Paginator enabled only when more than 10 rows.
+- `ui/src/index.css` — `.models-page` (column layout, gap).
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (840 kB JS / 419 kB CSS).
+- Live match check: `GET /api/models` (uvicorn on :8000) returns exactly `[{'agent': 'jd_parsing_agent', 'provider': 'ollama', 'model': 'qwen2.5:7b-instruct'}, …]` for all 7 agents, identical to `uv run python -c "from config.agents import get_model_summary; …"` — the task verify.

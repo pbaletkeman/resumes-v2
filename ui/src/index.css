@@ -124,6 +124,54 @@ body {
   gap: 1rem;
 }
 
+.run-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.run-downloads .p-button {
+  text-decoration: none;
+}
+
+.files-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.files-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.files-filters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.files-filter-type,
+.files-filter-sort {
+  width: 10rem;
+}
+
+.files-actions {
+  display: flex;
+}
+
+.files-name {
+  font-weight: 500;
+}
+
+.models-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .results-panel {
   display: flex;
   flex-direction: column;

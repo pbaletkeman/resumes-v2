@@ -20,23 +20,6 @@ Conventions:
 
 ## 5. Views (PrimeReact)
 
-### 5.5 Run page — downloads row
-
-- From `output_files` (keys: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, `cover_letter_plaintext`, `cover_letter_markdown`), render `Button`s (link) to `/api/outputs/{basename}` via `download.ts`.
-- **Verify:** each button downloads a non-empty file from `output/`.
-
-### 5.6 Files page
-
-- Toggle between generated/uploaded (`SegmentedButton` or `TabMenu`) → `useFiles(kind, ...)`.
-- `DataTable` columns: checkbox, name, type, modified, size, link. `Paginator` wired to page/page_size; `q` input + `file_type` dropdown; sort selector.
-- Selection state → "Delete selected (n)" `Button` → `ConfirmDialog` → `useDeleteFiles` → Toast with `deleted`/`missing`; refetch.
-- **Verify:** paging/filter/sort round-trip against `/api/files/*`; delete removes rows (check `output/` and `uploads/`).
-
-### 5.7 Models page
-
-- `DataTable` of `useModels()`: agent / provider / model. Empty state message if fetch fails.
-- **Verify:** matches `uv run python -c "from config.agents import get_model_summary; ..."` output.
-
 ---
 
 ## 6. Frontend unit tests (Vitest + Testing Library)
