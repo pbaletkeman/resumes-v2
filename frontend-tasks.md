@@ -12,41 +12,6 @@ Conventions:
 
 ## 2. Scaffold `ui/` (Vite + React + TS)
 
-### 2.1 Create the Vite project
-
-- Run `npm create vite@latest ui -- --template react-ts` (from repo root).
-- **Accept:** `ui/` exists with `index.html`, `src/main.tsx`, `tsconfig*.json`, `vite.config.ts`, `package.json`.
-- **Verify:** `npm install` succeeds; `npm run dev` serves a default page on :5173.
-
-### 2.2 Install dependencies
-
-- `npm i primereact primeicons react-router-dom @tanstack/react-query`
-- Add dev/test deps: `npm i -D vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom vite-tsconfig-paths` (see section 6).
-- **Accept:** entries in `ui/package.json`; `npm ls` shows no missing deps.
-
-### 2.3 Gitignore + prune scaffold boilerplate
-
-- Add to root `.gitignore`: `ui/node_modules/`, `ui/dist/`.
-- Delete Vite demo cruft (`src/App.css`, logo assets, counter demo code) so the app starts clean.
-- **Accept:** `git status` shows only intended additions; `npm run build` still passes.
-
-### 2.4 Wire PrimeReact themes (light + dark)
-
-- In `src/main.tsx`, import the base theme CSS for **both** modes — `primereact/resources/themes/lara-light-blue/theme.css` and `primereact/resources/themes/lara-dark-blue/theme.css` — plus `primereact/resources/primereact.min.css` and `primeicons/primeicons.css`.
-- Apply exactly one theme at runtime by toggling a `data-theme="light" | "dark"` attribute on the `<html>` element; scope the dark theme's `:root` custom-property overrides under a matching selector (e.g. `html[data-theme='dark']`) so both stylesheets can coexist and flip without a reload.
-- **Accept:** a bare `Button` renders with PrimeReact styling in both light and dark.
-- **Verify:** `npm run dev`, flip the attribute manually and visually confirm both palettes.
-
-### 2.5 Theme state — default to system, allow manual override
-
-- Create a theme module (e.g. `src/theme/ThemeToggle.tsx` + `useTheme` hook):
-  - **Initial value:** read `localStorage` override (`'light'` or `'dark'`) if present; otherwise derive from `window.matchMedia('(prefers-color-scheme: dark)')` (system default).
-  - Persist manual choices to `localStorage`; clearing the override returns to following the system.
-  - Apply/remove `data-theme` on `document.documentElement` on init and on change.
-  - Subscribe to the `change` event of the `prefers-color-scheme` media query so the theme follows the OS while no manual override is set.
-- **Accept:** first visit matches the OS theme; toggling light↔dark updates instantly and persists across reloads; a "system" reset option exists.
-- **Verify:** reload with OS dark → dark; toggle to light → light after reload; no flash of the wrong theme on load (set `data-theme` before first paint, e.g. in an inline script in `index.html`).
-
 ---
 
 ## 3. `vite.config.ts` — dev proxy
