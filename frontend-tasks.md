@@ -14,38 +14,7 @@ Conventions:
 
 ---
 
-## 3. `vite.config.ts` — dev proxy
-
-### 3.1 Add the `/api` proxy
-
-- Extend `vite.config.ts` with `server.proxy = { "/api": "http://localhost:8000" }` (include `/health` too).
-- **Accept:** no CORS errors when the app calls the API from :5173.
-- **Verify:** with backend running, `fetch('/api/models')` from the browser console returns JSON.
-
----
-
 ## 4. `src/api/` — typed client + React Query hooks
-
-### 4.1 `src/api/types.ts`
-
-Define TS interfaces mirroring backend schemas (from `app/schemas.py` + agent output models):
-
-- `ModelSummary { agent, provider, model }`
-- `PipelineRunResponse` with all 7 result keys + `output_files: Record<string, string>`.
-- `TaskStatus { status: 'pending'|'running'|'completed'|'failed', result?, error?, created_at?, completed_at? }`.
-- `FileMeta { name, size, modified, type, path }`, `PagedFile { items, page, page_size, total, total_pages }`.
-- Loose/typed shapes for agent outputs (JD, Resume, Gap, Rewrite, ATS, Tone, Cover) — use the field lists from `client/models.py`.
-- **Verify:** `npx tsc --noEmit` clean.
-
-### 4.2 `src/api/client.ts` — fetch wrappers
-
-- `fetchModels()` → `GET /api/models`.
-- `runPipelineAsync(formData)` → `POST /api/pipeline/async`, body is `FormData` with `job_description`, `resume`, `job_file`, `resume_file`, `candidate_name`, `company_name` (omit empty text so files win when text empty — match `_read_text_input`).
-- `getTask(id)` → `GET /api/tasks/{id}`.
-- `listFiles(kind: 'generated'|'uploaded', params)` → `GET /api/files/{kind}` with `file_type`, `q`, `page`, `page_size`, `sort`.
-- `deleteFiles(files: string[])` → `DELETE /api/files` with JSON body `{ files }`.
-- Central `apiFetch` helper: base `/api`, JSON parse, error surface (throw on non-2xx with `detail` message).
-- **Verify:** `npx tsc --noEmit`; spot-check each via `fetch` in dev console.
 
 ### 4.3 `src/api/download.ts`
 

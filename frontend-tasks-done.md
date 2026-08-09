@@ -148,3 +148,61 @@ Note: this task assumed PrimeReact v10-classic (`resources/themes/*`). See the v
 - `npm run lint` (oxlint) — clean; `npx tsc --noEmit` — 0 errors.
 - Dev-server smoke on :5199 — served `index.html` contains the inline pre-paint script (`localStorage.getItem('theme')`, `prefers-color-scheme: dark`, `dataset.theme` assignment); Vite transforms dev theme CSS as in 2.4.
 - `git add -A --dry-run ui` — lists only intended files (`src/theme/useTheme.ts`, `src/theme/ThemeToggle.tsx` added; no `node_modules`, no `dist`).
+
+### 3.1 Add the `/api` dev proxy — DONE
+
+`ui/vite.config.ts` gained a `server.proxy` block (Vite 8 config, `vite.config.ts:39-46`) proxying both `/api` and `/health` to the local backend:
+
+```ts
+server: {
+  proxy: {
+    '/api': 'http://localhost:8000',
+    '/health': 'http://localhost:8000',
+  },
+},
+```
+
+- Browser fetches from the Vite dev server (:5173) hit the backend (:8000) directly, so no CORS errors occur during development. Keys are unprefixed (no trailing `/`) per Vite proxy convention.
+- The `scopeDarkThemeCss` plugin (task 2.4) is untouched; the proxy is additive.
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 errors (in `ui/`).
+- `npm run lint` (oxlint) — clean.
+- End-to-end proxy smoke: backend via `uv run uvicorn app.main:app --port 8000`, dev server via `npm run dev -- --port 5173 --strictPort`; `GET http://localhost:5173/api/models` returned 200 with the 7-agent model summary JSON, and `GET http://localhost:5173/health` returned 200 `{"status":"ok"}`.
+
+### 4.1 `src/api/types.ts` — backend schema types — DONE
+
+New file `ui/src/api/types.ts`.
+
+- Mirrors `app/schemas.py` exactly: `ModelSummary`, `TaskStatus` (with `TaskStatusName` status union `'pending'|'running'|'completed'|'failed'` and optional `result?`/`error?`/`created_at?`/`completed_at?`), `FileMeta`, `PagedFile`, `DeleteFilesResponse`.
+- `PipelineRunResponse` with all 7 result keys + `output_files: Record<string, string>`. Each result key is typed as `StageResult<T> = T | Record<string, unknown> | null` — a typed agent-output shape unioned with a loose `Record<string, unknown>` so unknown/variant backend payloads (the API uses `Any`) don't break the type.
+- Agent output shapes copied from the field lists in `client/models.py`: `ExperienceEntry`, `JDParsingOutput` (includes `company_signals: Record<string, string>`), `ResumeParsingOutput`, `GapAnalysisOutput`, `RewriteOutput`, `ATSComplianceOutput`, `TonePolishingOutput`, `CoverLetterOutput`.
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 errors (in `ui/`).
+
+### 4.2 `src/api/client.ts` — fetch wrappers — DONE
+
+New file `ui/src/api/client.ts`.
+
+- `API_BASE = '/api'` with a private `apiFetch<T>(path, init)` helper that prepends the base, parses JSON, and surfaces backend errors: on non-2xx it throws an `Error` carrying the FastAPI `detail` (string, or FastAPI's list-of-`{msg}` validation errors joined with `'; '`), falling back to a status message. `parseErrorDetail` is a separate helper so the 6.x unit tests can target it.
+- Wrappers, matching `app/main.py` routes exactly:
+  - `fetchModels()` → `GET /api/models` → `ModelSummary[]`.
+  - `runPipelineAsync(formData)` → `POST /api/pipeline/async` with the caller-supplied `FormData` (field names follow `_read_text_input`: `job_description`, `resume`, `job_file`, `resume_file`, `candidate_name`, `company_name`) → `TaskCreated`.
+  - `getTask(taskId)` → `GET /api/tasks/{id}` (id `encodeURIComponent`-encoded) → `TaskStatus`.
+  - `listFiles(kind: 'generated'|'uploaded', params)` → `GET /api/files/{kind}` building a query string from `file_type`, `q`, `page`, `page_size`, `sort` (undefined values omitted) → `PagedFile`.
+  - `deleteFiles(files)` → `DELETE /api/files` with JSON body `{ files }` → `DeleteFilesResponse`.
+- `FileListParams` type exported. Added `TaskCreated { task_id }` to `types.ts` (mirrors `app/schemas.py:42-45`, needed by `runPipelineAsync`).
+- Also added `buildQuery` helper (query-string builder used by `listFiles`).
+
+#### Verification
+
+- `npx tsc --noEmit` — 0 errors (in `ui/`).
+- Live spot-checks against the running backend (`uv run uvicorn app.main:app --port 8000`), matching each wrapper's URL/method/body:
+  - `GET /api/models` → 200, 7 agents.
+  - `POST /api/pipeline/async` (multipart with `job_description` + `resume` text) → 200 `{ task_id }`.
+  - `GET /api/tasks/{id}` → 200 `{ status: 'running', created_at, result: null }`; a bogus id surfaces 404.
+  - `GET /api/files/generated?page=1&page_size=5&sort=newest` → 200 `PagedFile` (23 total in `output/`).
+  - `DELETE /api/files` with `{ files: ["nonexistent.pdf"] }` → 200 `{ deleted: [], missing: ["nonexistent.pdf"] }`.

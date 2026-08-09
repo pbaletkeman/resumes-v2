@@ -34,4 +34,10 @@ const scopeDarkThemeCss = (): Plugin => ({
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), scopeDarkThemeCss()],
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8000',
+      '/health': 'http://localhost:8000',
+    },
+  },
 })
