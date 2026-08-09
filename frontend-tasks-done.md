@@ -4,7 +4,7 @@ Archive of tasks from `frontend-tasks.md` as they are completed. See [frontend-t
 
 ## Overview
 
-The React + PrimeReact UI will live in `ui/`. During development it talks to the backend through a Vite proxy; in production FastAPI serves the built SPA from `ui/dist`. Tasks 1.1 (SPA-serving helper), 1.2 (guarded wiring), 1.3 (backend SPA fallback tests), 2.1 (Vite scaffold), 2.2 (dependencies), 2.3 (gitignore + boilerplate prune), 2.4 (PrimeReact light/dark themes wired), and 2.5 (theme state: system default + manual override) are complete.
+The React + PrimeReact UI will live in `ui/`. During development it talks to the backend through a Vite proxy; in production FastAPI serves the built SPA from `ui/dist`. Tasks 1.1 (SPA-serving helper), 1.2 (guarded wiring), 1.3 (backend SPA fallback tests), 2.1 (Vite scaffold), 2.2 (dependencies), 2.3 (gitignore + boilerplate prune), 2.4 (PrimeReact light/dark themes wired), and 2.5 (theme state: system default + manual override) are complete. The results `TabView` (5.4) is complete with all 7 tabs (5.4.1–5.4.7) — see the records below.
 
 > **Version note (PrimeReact v10, not v11):** task 2.2 originally installed `primereact@11.1.0`, which turned out to be a new "unstyled primitives" line with no `resources/themes/*.css`, no classic component suite (`TabView`/`Menubar`/`FileUpload`/`SegmentedButton`/`ConfirmDialog`), and a different design-token theming runtime (`@primeuix/themes`). Tasks 2.4 and 5.x are written for the classic v10 API, so I pinned `ui/` to **`primereact@10.9.8`** (the officially tagged `v10-stable`, React 19 compatible) and removed the v11-only `@primeuix/themes` dependency. All theme/component work below uses the classic API as the plan specifies.
 
@@ -299,3 +299,130 @@ Added live async status tracking to `ui/src/pages/RunPage.tsx`.
 - `npx tsc --noEmit` — 0 errors; `npm run lint` (oxlint) — clean; `npm run build` — passes (488 kB JS).
 - **Live success path** (Ollama up, port 8000): POST `/api/pipeline/async` → polled `/api/tasks/{id}` → `running` × 4 → `completed`; result carries all 7 keys (`parsed_job_description` … `cover_letter`) + `output_files`. Status transition running → completed confirmed.
 - **Live failure path** (`OLLAMA_HOST` → dead port 1, backend on 8001): POST → first poll already `status=failed`, `error` = "Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible." — proves the Toast path surfaces the message end-to-end.
+
+### 5.4.1 Results container + Parsed JD tab — DONE
+
+Built the shared results tab container + defensive extraction, with the Parsed JD tab fully implemented.
+
+- `ui/src/pages/results/coerce.ts` (new) — pure defensive-extraction helpers over `unknown` values pulled from the loose `TaskStatus.result`:
+  - `asRecord()` (object-and-not-array → `Record<string, unknown>`, else `null`), `asString()`, `asStringList()`, `asStringMap()` (record → `Record<string, string>`, dropping non-string values),
+  - `pickString()`/`pickList()`/`pickMap()` conveniences for reading a key off a `Record<string, unknown> | null`.
+- `ui/src/pages/results/parts.tsx` (new) — small shared render atoms used by later tabs:
+  - `NoData` (italic "no data" placeholder), `TagSection` (`Tag`s for a `string[]`), `BulletSection` (`<ul>` list), `KeyValueTable` (key→value `<table>` for maps like `company_signals`). Sections render `null` when their list/map is empty; the whole-tab fallback is `NoData`.
+- `ui/src/pages/results/ParsedJDTab.tsx` (new) — takes `value: unknown`, coerces to a record via `pick*` helpers, and renders: role/company/seniority (Role section), required/preferred skills + keywords + industry terms as `Tag`s, responsibilities as bullets, company_signals as a key→value table. Non-object value → `NoData`.
+- `ui/src/pages/results/ResultsTabView.tsx` (new) — `ResultsTabView({ result })` renders a `TabView` with all 7 result tabs in order (keys `parsed_job_description` … `cover_letter`, headers Parsed JD / Parsed Resume / Gap Analysis / Rewritten Resume / ATS / Polished / Cover Letter). `renderTabBody()` delegates by key; non-JD tabs currently fall through to `NoData` (filled by 5.4.2–5.4.7). Null/undefined result → renders nothing.
+- `ui/src/pages/RunPage.tsx` — `{status === 'completed' && <ResultsTabView result={taskQuery.data?.result ?? null} />}` appended after the status panel.
+- `ui/src/index.css` — `.run-results`, `.results-panel`, `.results-section`, `.results-tags`, `.results-bullets`, `.results-table`, `.results-no-data` styles.
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (507 kB JS / 418 kB CSS).
+- JD tab render correctness is browser-manual (needs a completed live run); container + coercion are fully typed and unit-testable for the 6.x suite.
+
+### 5.4.2 Parsed Resume tab — DONE
+
+Built the Parsed Resume result tab.
+
+- `ui/src/pages/results/ParsedResumeTab.tsx` (new) — takes `value: unknown` (whole-resume non-object → `NoData`) and renders:
+  - **Summary** and **Contact** as always-visible `Section`s (label + content or `NoData` placeholder), contact line = non-empty `name`/`phone`/`email`/`linkedin`/`github` joined with ` · `.
+  - **Skills** via `TagSection` (`emptyText="No data"`).
+  - **Experience** via per-entry `ExperienceEntryView`: head row (title · company · dates, dates right-aligned) + Responsibilities/Achievements/Metrics `BulletSection`s; entries come from the new `pickObjectList` coercion (array-of-objects; string items dropped). Empty list → `NoData`.
+  - **Projects** / **Certifications** / **Education** via `BulletSection` (`emptyText="No data"`).
+- `ui/src/pages/results/coerce.ts` — added `asObjectList()` + `pickObjectList()` for experience entries (object arrays within `Record<string, unknown>`).
+- `ui/src/pages/results/parts.tsx` — `TagSection`/`BulletSection`/`KeyValueTable` gained an optional `emptyText` prop: when set, empty sections render `<h3>` + `NoData` instead of returning `null` (JD tab behavior unchanged).
+- `ui/src/pages/results/ResultsTabView.tsx` — `parsed_resume` case now renders `<ParsedResumeTab />`.
+- `ui/src/index.css` — `.results-experiences`, `.results-experience*` (bordered card, head row, right-aligned dates).
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (510 kB JS / 418 kB CSS).
+- Tab render correctness is browser-manual (needs a completed live run).
+
+### 5.4.3 Gap Analysis tab — DONE
+
+Built the Gap Analysis result tab.
+
+- `ui/src/pages/results/GapAnalysisTab.tsx` (new) — takes `value: unknown` (non-object → `NoData`) and renders the tailoring strategy: Missing skills / Weak skills / Strong matches / Recommended emphasis / Keyword strategy / Bullet plan via `TagSection` (`emptyText="No data"`), plus `tone_guidance` as a `results-text` paragraph when present.
+- `ui/src/pages/results/coerce.ts` — added `pickText()`: reads a text field from a `Record<string, unknown> | null` that may arrive as a plain string, an array (joined `, `), or an object (`k: v` pairs joined `, `, empty values skipped) — mirrors the backend `_coerce_tone_guidance` in `client/models.py:206`.
+- `ui/src/pages/results/ResultsTabView.tsx` — `tailoring_strategy` case now renders `<GapAnalysisTab />`.
+- `ui/src/index.css` — `.results-text` (pre-wrap paragraph for guidance text).
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (511 kB JS / 418 kB CSS).
+- Tab render correctness is browser-manual (needs a completed live run).
+
+### 5.4.4 Rewritten Resume tab — DONE
+
+Built the Rewritten Resume result tab.
+
+- `ui/src/pages/results/RewrittenResumeTab.tsx` (new) — takes `value: unknown` (non-object → `NoData`) and renders the rewritten resume: summary `Section`, skills `TagSection`, experience via shared `ExperienceEntryView` cards, plus projects/certifications/education `BulletSection`s (`emptyText="No data"`).
+- `ui/src/pages/results/parts.tsx` — moved `Section` (label + content-or-`NoData` wrapper) and `ExperienceEntryView` (title/company/dates head + Responsibilities/Achievements/Metrics subsection cards) out of `ParsedResumeTab.tsx` into shared parts so 5.4.2 and 5.4.4 reuse them. `parts.tsx` now imports `pickList`/`pickString` from `coerce.ts`.
+- `ui/src/pages/results/ParsedResumeTab.tsx` — refactored to import the shared `Section`/`ExperienceEntryView`; no behavior change.
+- `ui/src/pages/results/ResultsTabView.tsx` — `rewritten_resume` case now renders `<RewrittenResumeTab />`.
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (512 kB JS / 418 kB CSS).
+- Tab render correctness is browser-manual (needs a completed live run).
+
+### 5.4.5 ATS tab — DONE
+
+Built the ATS Compliance result tab.
+
+- `ui/src/pages/results/ATSTab.tsx` (new) — takes `value: unknown` (non-object → `NoData`) and renders:
+  - **Score** `Section` with a `Tag` colored by band via `scoreSeverity()` (`<50` danger/red, `<80` warning/orange, else success/green). Missing score (null) → no chip (section still shows `NoData` label).
+  - **Missing keywords** via `TagSection`; **Formatting issues** / **Clarity issues** / **Recommended fixes** / **Auto-fixes applied** via `BulletSection` (all `emptyText="No data"`).
+  - **Final resume** as a read-only `<pre>` block (`results-pre`), fed by `pickText` (tolerates string/array/object payloads from backend `_coerce_final_resume`).
+- `ui/src/pages/results/coerce.ts` — added `pickNumber()` (parses number-or-numeric-string values from a record, `NaN`/empty → `null`).
+- `ui/src/pages/results/ResultsTabView.tsx` — `ats_optimized_resume` case now renders `<ATSTab />`.
+- `ui/src/index.css` — `.results-pre` (border, `surface-100` background, `pre-wrap` + `word-break`).
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (513 kB JS / 418 kB CSS).
+- Tab render correctness is browser-manual (needs a completed live run).
+
+### 5.4.6 Polished tab — DONE
+
+Built the Polished result tab with string-vs-object tolerance.
+
+- `ui/src/pages/results/PolishedTab.tsx` (new) — takes `value: unknown` and coerces `polished_resume` via `textFromValue(value, ['polished_resume', 'text'])`, so the value may arrive as a plain string OR an object whose `polished_resume`/`text` field holds the text. Non-text value → `NoData`; otherwise renders a `Section` with the text in a `<pre>` (`results-pre`).
+- `ui/src/pages/results/coerce.ts` — added `textFromValue(value, keys)`: whole-value coercion for the string-vs-object keys — plain string → itself (trimmed); object → first non-empty via `pickText` across the given `keys`; else `null`.
+- `ui/src/pages/results/ResultsTabView.tsx` — `polished_resume` case now renders `<PolishedTab />`.
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes.
+- Tab render correctness is browser-manual (needs a completed live run).
+
+### 5.4.7 Cover Letter tab — DONE
+
+Built the Cover Letter result tab with string-vs-object tolerance; completes the 5.4 tab series.
+
+- `ui/src/pages/results/CoverLetterTab.tsx` (new) — counterpoint to `PolishedTab`: coerces `cover_letter` via `textFromValue(value, ['cover_letter', 'text'])` (plain string OR object text field). Non-text value → `NoData`; otherwise a `Section` with the text in a `<pre>`.
+- `ui/src/pages/results/ResultsTabView.tsx` — `cover_letter` case now renders `<CoverLetterTab />`; all 7 result keys now have real tab components, so the `default: <NoData />` fallback in `renderTabBody()` was removed (and the now-unused `NoData` import dropped).
+
+#### Verification
+
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (514 kB JS / 418 kB CSS).
+- Tab render correctness is browser-manual (needs a completed live run); the series' whole-task verify (every tab populated, empty agents show "no data") belongs to 7.3.
+
+### 5.4 Run page — results `TabView` — DONE
+
+Whole task complete — all 7 tab sub-tasks (5.4.1–5.4.7) are archived individually above.
+
+- Results render in a 7-tab `TabView` after a run reaches `completed`, fed by the settled `TaskStatus.result`.
+- Every result key has a dedicated tab component: Parsed JD (`ParsedJDTab`), Parsed Resume (`ParsedResumeTab`), Gap Analysis (`GapAnalysisTab`), Rewritten Resume (`RewrittenResumeTab`), ATS (`ATSTab`), Polished (`PolishedTab`), Cover Letter (`CoverLetterTab`).
+- Shared plumbing under `ui/src/pages/results/`: `ResultsTabView.tsx` (container + key→tab dispatch), `coerce.ts` (defensive extractors incl. string-vs-object `pickText`/`textFromValue`), `parts.tsx` (shared `NoData`/`Section`/`TagSection`/`BulletSection`/`KeyValueTable`/`ExperienceEntryView`), CSS in `ui/src/index.css`.
+
+#### Verification
+
+- Whole-task verify (manual pipeline run populates every tab; empty agents show "no data" placeholders) is browser-manual and belongs to task 7.3; per-tab `tsc`/lint/build cleanliness was verified in each sub-task record.

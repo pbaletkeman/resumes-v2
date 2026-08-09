@@ -9,6 +9,7 @@ import { useInvokePipeline, usePollTask } from '../api/hooks'
 import type { TaskStatus } from '../api/types'
 import { useToast } from '../toast/ToastContext'
 import { buildRunFormData, validateRunInputs } from './runForm'
+import ResultsTabView from './results/ResultsTabView'
 
 interface FileChosenProps {
   file: File | null
@@ -207,6 +208,9 @@ function RunPage() {
             <div className="run-status-error">{taskError}</div>
           )}
         </div>
+      )}
+      {status === 'completed' && (
+        <ResultsTabView result={taskQuery.data?.result ?? null} />
       )}
     </section>
   )

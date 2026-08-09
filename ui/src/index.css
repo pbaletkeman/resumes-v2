@@ -117,3 +117,114 @@ body {
 .run-status-error {
   color: var(--red-500);
 }
+
+.run-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.results-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.results-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.results-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.results-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.results-bullets {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.results-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.results-table td,
+.results-table th {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.results-table td:first-child {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.results-no-data {
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
+.results-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.results-pre {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-100);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.results-experiences {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.results-experience {
+  padding: 0.75rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+}
+
+.results-experience-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.results-experience-title {
+  font-weight: 600;
+}
+
+.results-experience-company {
+  color: var(--text-color-secondary);
+}
+
+.results-experience-dates {
+  color: var(--text-color-secondary);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.results-experience-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

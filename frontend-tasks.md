@@ -20,55 +20,6 @@ Conventions:
 
 ## 5. Views (PrimeReact)
 
-### 5.4 Run page — results `TabView`
-
-Split into 7 sub-tasks, one per result tab. 5.4.1 also scaffolds the shared `TabView` container and result-extraction helpers; 5.4.6/5.4.7 handle the string-vs-object tolerance.
-
-- **Verify (whole):** manual pipeline run populates every tab; empty agents show "no data" placeholders.
-
-#### 5.4.1 Results container + Parsed JD tab
-
-- `src/pages/results/ResultsTabView.tsx` (new) — after `completed`, renders a `TabView` of result tabs, fed by the settled `TaskStatus.result`. Extract the 7 result keys defensively (each `parsed_*` key may be an object, plain string, or null).
-- Parsed JD tab: role/company/seniority; `Tag`s for required skills / preferred skills / keywords / industry terms; responsibilities list; company_signals key→value table.
-- Empty value → "no data" placeholder text in the tab body.
-- **Verify:** tsc/lint clean; JD tab renders from a completed run.
-
-#### 5.4.2 Parsed Resume tab
-
-- Tab that renders parsed resume: summary text; skills `Tag`s; experience entries (title/company/dates + responsibilities/achievements/metrics); projects, certifications, education; contact line.
-- Empty/missing sections → per-section "no data" placeholders.
-- **Verify:** tsc/lint clean; tab renders from a completed run.
-
-#### 5.4.3 Gap Analysis tab
-
-- Tab that renders tailoring strategy: tag lists for missing/weak/strong skills, emphasis area, keyword strategy, bullet plan; tone-guidance text (may arrive as string or object — coerce defensively).
-- Empty → "no data" placeholder.
-- **Verify:** tsc/lint clean; tab renders from a completed run.
-
-#### 5.4.4 Rewritten Resume tab
-
-- Tab that renders rewritten resume: structured summary + experience (title/company/dates + responsibilities/achievements/metrics).
-- Empty → "no data" placeholder.
-- **Verify:** tsc/lint clean; tab renders from a completed run.
-
-#### 5.4.5 ATS tab
-
-- Tab that renders ATS compliance: `Tag` score colored by band (<50 red, <80 orange, else green); missing keywords list; issues list; fixes list; auto-fixes list; `final_resume` body in a read-only `Textarea`/`pre`.
-- Empty → "no data" placeholder; missing score → no score chip.
-- **Verify:** tsc/lint clean; tab renders from a completed run.
-
-#### 5.4.6 Polished tab
-
-- Tab that renders `polished_resume`, tolerating it arriving as a plain string OR an object with a text field (coerce defensively).
-- Empty → "no data" placeholder.
-- **Verify:** tsc/lint clean; tab renders from a completed run.
-
-#### 5.4.7 Cover Letter tab
-
-- Tab that renders `cover_letter`, tolerating it arriving as a plain string OR an object with a text field (coerce defensively).
-- Empty → "no data" placeholder.
-- **Verify:** tsc/lint clean; tab renders from a completed run.
-
 ### 5.5 Run page — downloads row
 
 - From `output_files` (keys: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, `cover_letter_plaintext`, `cover_letter_markdown`), render `Button`s (link) to `/api/outputs/{basename}` via `download.ts`.
