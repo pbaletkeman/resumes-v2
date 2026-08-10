@@ -732,3 +732,68 @@ ordering -> skill sanitization -> deterministic fallback.  Cross-check with
   (`_parsed_to_rewrite`).
 
 **Commit:** `simplify: phase 5f - resume rewrite module docstring (full correctness story)`
+
+---
+
+## Phase 5 - Resume Rewrite agent + post-validation  ✅ COMPLETED
+
+**Files:** `client/agents/resume_rewrite.py`
+
+621 lines: `run()` -> `_try_llm()` -> post-validation helpers, plus fallback
+tailoring (`_parsed_to_rewrite`, `_tailor_skills`, `_as_dict`,
+`_read_str_list`, `_is_ascii`) and skill matching (`_sanitize_skills`,
+`_skill_matches`, `_normalize_skill`, `_load_str_list`).
+
+### Phase 5 Completion record
+
+**Overview:** Phase 5 re-ordered `resume_rewrite.py` into banner-grouped
+sections, routed the three fabrication-guard `json.loads` sites through the
+shared `load_json_safe`, gave every post-validation helper a full
+`Args:`/`Returns:` + "why" docstring, extracted the dense `_skill_matches`
+conditionals into named helpers, documented the `model_copy` never-mutate
+contract on both post-processors, made `_tailor_skills` read step-by-step,
+and rewrote the module docstring with the full correctness story.  All
+changes were docstring/comment/re-ordering/logical-extraction only — no
+behavior change (verified differentially in 5.4, and by the 63-test
+validation suite throughout).
+
+**Changes made (by sub-task):**
+
+- **5.1** — Re-ordered the file: public `ResumeRewriteAgent` class first,
+  then the 20 module helpers under five banner sections (shared
+  serialization/parsing utilities -> validation -> deterministic
+  post-processors -> tailoring -> skill matching).  AST-compare against
+  `HEAD` confirmed identical function/class sets and bodies.
+- **5.2** — Routed `_validate_experience_count`, `_validate_certifications`,
+  `_validate_companies` through `load_json_safe` (replacing the repeated
+  guarded `json.loads`); each keeps the "can't validate, pass" early
+  return.  `_load_str_list` guard left in place (out of 5.2 scope).
+- **5.3** — Full `Args:`/`Returns:` + one-line "why" on all 7 post-validation
+  helpers (`_validate_*`, `_extract_companies`, `_company_matches`,
+  `_sanitize_skills`); `_ensure_chronological` already documented.
+- **5.4** — Extracted `_exact_match`, `_substring_match`, `_token_match`,
+  and `_tokenize` from `_skill_matches`; `_skill_matches` reads as a
+  strategy chain.  Differential test across 100 skill-vs-input combos:
+  0 diffs vs `HEAD`.
+- **5.5** — Explicit "never mutates in place / `model_copy(update=...)`"
+  paragraphs in `_ensure_chronological` + `_sanitize_skills` docstrings;
+  `_tailor_skills` got `# Sources:` / `# Step 1. Reorder:` / `# Step 2.
+  Augment:` comments + `Args:`/`Returns:`.
+- **5.6** — Module docstring narrates the six-step correctness story:
+  LLM -> Pydantic -> post-validation -> chronological fix -> skill
+  sanitization -> deterministic fallback (`_parsed_to_rewrite`).
+  Cross-checked `docs/agents.md` — no drift.
+- **5.7** — Guardrails run across the phase (below); phase moved here.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings (full run)
+- `uv run pytest` — 493 passed, including `tests/test_resume_rewrite_validation.py` (63) and `tests/test_agent_resume_rewrite.py` (8)
+- Phase 5.4 differential test: 100 cases, 0 behavior diffs vs `HEAD`.
+- Fallback behavior unchanged: LLM success -> validated+post-processed
+  `RewriteOutput`; total failure -> `_parsed_to_rewrite` with
+  JD-tailored skills.
+
+**Commit:** `simplify: phase 5 - resume rewrite re-order + shared guards + docs (5.1-5.7)`
