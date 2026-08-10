@@ -4,7 +4,7 @@ Archive of tasks from `frontend-tasks.md` as they are completed. See [frontend-t
 
 ## Overview
 
-The React + PrimeReact UI will live in `ui/`. During development it talks to the backend through a Vite proxy; in production FastAPI serves the built SPA from `ui/dist`. Tasks 1.1 (SPA-serving helper), 1.2 (guarded wiring), 1.3 (backend SPA fallback tests), 2.1 (Vite scaffold), 2.2 (dependencies), 2.3 (gitignore + boilerplate prune), 2.4 (PrimeReact light/dark themes wired), and 2.5 (theme state: system default + manual override) are complete. The results `TabView` (5.4) is complete with all 7 tabs (5.4.1–5.4.7) — see the records below.
+The React + PrimeReact UI will live in `ui/`. During development it talks to the backend through a Vite proxy; in production FastAPI serves the built SPA from `ui/dist`. Tasks 1.1 (SPA-serving helper), 1.2 (guarded wiring), 1.3 (backend SPA fallback tests), 2.1 (Vite scaffold), 2.2 (dependencies), 2.3 (gitignore + boilerplate prune), 2.4 (PrimeReact light/dark themes wired), and 2.5 (theme state: system default + manual override) are complete. The results `TabView` (5.4) is complete with all 7 tabs (5.4.1–5.4.7) — see the records below. Sections 5 (Downloads, Files, Models pages), 6 (Vitest unit tests for the client, hooks, theme, and components), 7.1/7.2 (backend + frontend verification suites), and 8.1 (`AGENTS.md` UI section) are complete. Only the manual E2E (7.3) remains.
 
 > **Version note (PrimeReact v10, not v11):** task 2.2 originally installed `primereact@11.1.0`, which turned out to be a new "unstyled primitives" line with no `resources/themes/*.css`, no classic component suite (`TabView`/`Menubar`/`FileUpload`/`SegmentedButton`/`ConfirmDialog`), and a different design-token theming runtime (`@primeuix/themes`). Tasks 2.4 and 5.x are written for the classic v10 API, so I pinned `ui/` to **`primereact@10.9.8`** (the officially tagged `v10-stable`, React 19 compatible) and removed the v11-only `@primeuix/themes` dependency. All theme/component work below uses the classic API as the plan specifies.
 
@@ -41,7 +41,7 @@ Added `mount_spa(app_instance, ui_dist)` in `app/main.py`.
   - **No build present** (`ui/dist` absent): `ruff` clean, `pyright` 0 errors, `pytest` 477 passed.
   - **Build present** (temp `ui/dist/index.html` + `ui/dist/assets/app.js`, removed after): `/` and `/files` served SPA html, `/api/models` + `/health` JSON, `/api/nope` and `/file.txt` 404, `/assets/app.js` 200, `/docs` 200.
 
-#### Verification
+#### Verification 1.2
 
 - `uv run ruff check .` — All checks passed.
 - `uv run pyright` (strict, no path arg) — 0 errors, 0 warnings, 0 informations.
@@ -61,7 +61,7 @@ New file `tests/test_web_spa.py` (8 tests).
   - build present → `/files` serves SPA html while API/static routes stay intact;
   - build absent → unknown non-API GET is a plain 404, API still works.
 
-#### Verification
+#### Verification 1.3
 
 - `uv run ruff check .` — All checks passed.
 - `uv run pyright` (strict, no path arg) — 0 errors, 0 warnings, 0 informations.
@@ -76,7 +76,7 @@ Scaffolded `ui/` with `npm create vite@latest ui -- --template react-ts` (create
 - `ui/` contains: `index.html`, `src/main.tsx`, `src/App.tsx`, `tsconfig.json` + `tsconfig.app.json` + `tsconfig.node.json`, `vite.config.ts`, `package.json`, `public/`, plus scaffold extras (`.oxlintrc.json`, `.gitignore`, `README.md`).
 - `npm install` — 27 packages, 0 vulnerabilities.
 
-#### Verification
+#### Verification 2.1
 
 - `npm install` — succeeded.
 - `npm run dev` — started dev server; `GET http://localhost:5173/` returned 200 with the Vite root `#root` div + `<title>`.
@@ -92,7 +92,7 @@ Installed both dep groups in `ui/`.
 - Dev/test: `npm i -D vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom vite-tsconfig-paths` → `vitest@4.1.10`, `@testing-library/react@16.3.2`, `@testing-library/user-event@14.6.3`, `@testing-library/jest-dom@7.0.0`, `jsdom@30.0.1`, `vite-tsconfig-paths@6.1.1`.
 - Only transient note: `npm warn deprecated tsconfck@3.1.6` (unmaintained) — a transitive dep pulled in by a `vite-tsconfig-paths` peer; harmless (TypeScript 6 / Vite 8 still resolve paths via it).
 
-#### Verification
+#### Verification 2.2
 
 - `npm ls` — all packages resolved, no missing deps (complete tree: react/router/query/primereact/primeicons + vitest + jsdom + testing-library set + vite-tsconfig-paths + existing template deps).
 - Both installs reported 0 vulnerabilities.
@@ -103,7 +103,7 @@ Installed both dep groups in `ui/`.
 - Pruned the Vite demo: deleted `ui/src/App.css`, `ui/src/assets/` (react.svg, vite.svg, hero.png), `ui/public/icons.svg`.
 - Replaced the demo `App.tsx` with a minimal clean component (`<main><h1>Resume Optimizer</h1></main>`), and trimmed `index.css` to a minimal reset (`:root` font + light/dark `color-scheme`, `#root` flex column, `body { margin: 0 }`).
 
-#### Verification
+#### Verification 2.3
 
 - `git status` shows only intended additions; `git add -A --dry-run ui` lists exactly: `ui/.gitignore`, `.oxlintrc.json`, `index.html`, `package.json`, `package-lock.json`, `public/favicon.svg`, `README.md`, `src/App.tsx`, `src/index.css`, `src/main.tsx`, `tsconfig*.json`, `vite.config.ts` — no `node_modules/`, no `dist/`.
 - `npm run build` — passes (index.html 0.45 kB, `index-*.js` 190.41 kB, `index-*.css` 0.39 kB); `dist/` remains ignored.
@@ -123,7 +123,7 @@ Note: this task assumed PrimeReact v10-classic (`resources/themes/*`). See the v
 - `ui/src/App.tsx`: kept the minimal shell with a `Button` that toggles `document.documentElement.dataset.theme` between `light`/`dark` (used to verify the flip; hard split "severity" props match the v10 Button type).
 - `ui/src/index.css`: unchanged minimal reset (independent of theme).
 
-#### Verification
+#### Verification 2.4
 
 - `npm run build` — passes (dist CSS ~416 kB: ~1900 dark-scoped rules + unscoped light).
 - Build inspection of `dist/assets/index-*.css`: `html[data-theme='dark'] { ... }` blocks (2, carrying `color-scheme: dark`), `html[data-theme='dark'] .p-*` selectors (1904), plus unscoped `.p-*` light rules (112) with the light palette (`--color: #3b82f6` intact on light).
@@ -142,7 +142,7 @@ Note: this task assumed PrimeReact v10-classic (`resources/themes/*`). See the v
 - `ui/src/theme/ThemeToggle.tsx` (new) — a three-way `SelectButton` (System | Light | Dark) driven by `useTheme`; the toggle is wired into `ui/src/App.tsx` alongside the demo Buttons.
 - `ui/index.html` (new inline script in `<head>`) — pre-paint `data-theme` setter: reads the `localStorage` override (`'theme'` key), else falls back to `prefers-color-scheme: dark`; sets `document.documentElement.dataset.theme` before first paint to avoid a flash of the wrong theme.
 
-#### Verification
+#### Verification 2.5
 
 - `npm run build` — succeeds; TypeScript clean (`tsc -b`), dist JS 296 kB.
 - `npm run lint` (oxlint) — clean; `npx tsc --noEmit` — 0 errors.
@@ -165,7 +165,7 @@ server: {
 - Browser fetches from the Vite dev server (:5173) hit the backend (:8000) directly, so no CORS errors occur during development. Keys are unprefixed (no trailing `/`) per Vite proxy convention.
 - The `scopeDarkThemeCss` plugin (task 2.4) is untouched; the proxy is additive.
 
-#### Verification
+#### Verification 3.1
 
 - `npx tsc --noEmit` — 0 errors (in `ui/`).
 - `npm run lint` (oxlint) — clean.
@@ -179,7 +179,7 @@ New file `ui/src/api/types.ts`.
 - `PipelineRunResponse` with all 7 result keys + `output_files: Record<string, string>`. Each result key is typed as `StageResult<T> = T | Record<string, unknown> | null` — a typed agent-output shape unioned with a loose `Record<string, unknown>` so unknown/variant backend payloads (the API uses `Any`) don't break the type.
 - Agent output shapes copied from the field lists in `client/models.py`: `ExperienceEntry`, `JDParsingOutput` (includes `company_signals: Record<string, string>`), `ResumeParsingOutput`, `GapAnalysisOutput`, `RewriteOutput`, `ATSComplianceOutput`, `TonePolishingOutput`, `CoverLetterOutput`.
 
-#### Verification
+#### Verification 4.1
 
 - `npx tsc --noEmit` — 0 errors (in `ui/`).
 
@@ -197,7 +197,7 @@ New file `ui/src/api/client.ts`.
 - `FileListParams` type exported. Added `TaskCreated { task_id }` to `types.ts` (mirrors `app/schemas.py:42-45`, needed by `runPipelineAsync`).
 - Also added `buildQuery` helper (query-string builder used by `listFiles`).
 
-#### Verification
+#### Verification 4.2
 
 - `npx tsc --noEmit` — 0 errors (in `ui/`).
 - Live spot-checks against the running backend (`uv run uvicorn app.main:app --port 8000`), matching each wrapper's URL/method/body:
@@ -214,7 +214,7 @@ New file `ui/src/api/download.ts`.
 - `outputDownloadUrl(name)` → `/api/outputs/{encodeURIComponent(name)}` — encodes the basename so spaces/`&`/etc. survive the URL.
 - `fileDownloadUrl(path)` → same, normalizing backslashes (`\` → `/`) then extracting the basename via `split('/').pop()` from dir-qualified `path` keys like `uploads/foo.pdf` / `output/foo.pdf`.
 
-#### Verification
+#### Verification 4.3
 
 - `npx tsc --noEmit` — 0 errors (in `ui/`).
 - URL logic spot-checked (node): `my resume v2.pdf` → `/api/outputs/my%20resume%20v2.pdf`; `uploads/foo.pdf` → `/api/outputs/foo.pdf`; `output/a b&c.txt` → `/api/outputs/a%20b%26c.txt`.
@@ -232,7 +232,7 @@ New file `ui/src/api/hooks.ts` (server-rendered for TanStack Query v5 — `^5.10
 - `useDeleteFiles()` — `useMutation(deleteFiles)` whose `onSuccess` invalidates `['files', …]` queries, so listings refetch after a delete.
 - Re-exports the `ModelSummary`/`PagedFile` types for consumer convenience.
 
-#### Verification
+#### Verification 4.4
 
 - `npx tsc --noEmit` — 0 errors (in `ui/`).
 - `npm run lint` (oxlint) — clean.
@@ -249,7 +249,7 @@ Restructured the entrypoint into a routed shell.
 - `ui/src/toast/ToastContext.ts` + `ui/src/toast/ToastProvider.tsx` (new) — `ToastContext.Provider` owns one `Toast` ref; `useToast()` returns `{ show(message), clear() }` (throws outside the provider). Pages call `useToast().show({ severity, summary, detail })`.
 - `ui/src/index.css` — `.app-shell`/`.app-content` layout + active-link highlight rule (`var(--primary-300)` background, rounded).
 
-#### Verification
+#### Verification 5.1
 
 - `npx tsc --noEmit` — 0 lines (caught & fixed a **4.2-era bug**: `FileListParams` declared as an `interface` isn't assignable to `Record<string, string|number|undefined>` under `tsc -b`; converted to a `type` alias → build green).
 - `npm run lint` (oxlint) — clean.
@@ -271,7 +271,7 @@ Built the Run page form + FormData construction.
   - `handleSubmit()`: `validateRunInputs` short-circuit → Toast warn on missing input; otherwise `invokePipeline.mutate(formData, { onError })` → Toast error reusing the API's `detail` (surfaced by `client.ts`'s `parseErrorDetail`).
 - CSS: `.run-page`, `.run-grid` (1fr/1fr, responsive-safe column stack via grid gap), `.run-column`, `.run-file`, `.run-file-name`, `.run-options`.
 
-#### Verification
+#### Verification 5.2
 
 - `npx tsc --noEmit` — 0 errors; `npm run lint` (oxlint) — clean; `npm run build` (`tsc -b && vite build`) — passes (472 kB JS).
 - FormData semantics node-checked: text-only → `['job_description','resume']`; file-only → `['job_file','resume_file','candidate_name','company_name']`; text+wins omits files (`['job_description','resume']`).
@@ -294,7 +294,7 @@ Added live async status tracking to `ui/src/pages/RunPage.tsx`.
 - Button label reflects state (`Starting...`/`Running...` with a spinning icon while active), plus a secondary "Reset" button that clears the task id (`disabled={active}`).
 - CSS: `.run-actions`, `.run-status`, `.run-status-label`, `.run-status-active`, `.run-status-error`.
 
-#### Verification
+#### Verification 5.3
 
 - `npx tsc --noEmit` — 0 errors; `npm run lint` (oxlint) — clean; `npm run build` — passes (488 kB JS).
 - **Live success path** (Ollama up, port 8000): POST `/api/pipeline/async` → polled `/api/tasks/{id}` → `running` × 4 → `completed`; result carries all 7 keys (`parsed_job_description` … `cover_letter`) + `output_files`. Status transition running → completed confirmed.
@@ -314,7 +314,7 @@ Built the shared results tab container + defensive extraction, with the Parsed J
 - `ui/src/pages/RunPage.tsx` — `{status === 'completed' && <ResultsTabView result={taskQuery.data?.result ?? null} />}` appended after the status panel.
 - `ui/src/index.css` — `.run-results`, `.results-panel`, `.results-section`, `.results-tags`, `.results-bullets`, `.results-table`, `.results-no-data` styles.
 
-#### Verification
+#### Verification 5.4.1
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (507 kB JS / 418 kB CSS).
@@ -334,7 +334,7 @@ Built the Parsed Resume result tab.
 - `ui/src/pages/results/ResultsTabView.tsx` — `parsed_resume` case now renders `<ParsedResumeTab />`.
 - `ui/src/index.css` — `.results-experiences`, `.results-experience*` (bordered card, head row, right-aligned dates).
 
-#### Verification
+#### Verification 5.4.2
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (510 kB JS / 418 kB CSS).
@@ -349,7 +349,7 @@ Built the Gap Analysis result tab.
 - `ui/src/pages/results/ResultsTabView.tsx` — `tailoring_strategy` case now renders `<GapAnalysisTab />`.
 - `ui/src/index.css` — `.results-text` (pre-wrap paragraph for guidance text).
 
-#### Verification
+#### Verification 5.4.3
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (511 kB JS / 418 kB CSS).
@@ -364,7 +364,7 @@ Built the Rewritten Resume result tab.
 - `ui/src/pages/results/ParsedResumeTab.tsx` — refactored to import the shared `Section`/`ExperienceEntryView`; no behavior change.
 - `ui/src/pages/results/ResultsTabView.tsx` — `rewritten_resume` case now renders `<RewrittenResumeTab />`.
 
-#### Verification
+#### Verification 5.4.4
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (512 kB JS / 418 kB CSS).
@@ -382,7 +382,7 @@ Built the ATS Compliance result tab.
 - `ui/src/pages/results/ResultsTabView.tsx` — `ats_optimized_resume` case now renders `<ATSTab />`.
 - `ui/src/index.css` — `.results-pre` (border, `surface-100` background, `pre-wrap` + `word-break`).
 
-#### Verification
+#### Verification 5.4.5
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (513 kB JS / 418 kB CSS).
@@ -396,7 +396,7 @@ Built the Polished result tab with string-vs-object tolerance.
 - `ui/src/pages/results/coerce.ts` — added `textFromValue(value, keys)`: whole-value coercion for the string-vs-object keys — plain string → itself (trimmed); object → first non-empty via `pickText` across the given `keys`; else `null`.
 - `ui/src/pages/results/ResultsTabView.tsx` — `polished_resume` case now renders `<PolishedTab />`.
 
-#### Verification
+#### Verification 5.4.6
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes.
@@ -409,7 +409,7 @@ Built the Cover Letter result tab with string-vs-object tolerance; completes the
 - `ui/src/pages/results/CoverLetterTab.tsx` (new) — counterpoint to `PolishedTab`: coerces `cover_letter` via `textFromValue(value, ['cover_letter', 'text'])` (plain string OR object text field). Non-text value → `NoData`; otherwise a `Section` with the text in a `<pre>`.
 - `ui/src/pages/results/ResultsTabView.tsx` — `cover_letter` case now renders `<CoverLetterTab />`; all 7 result keys now have real tab components, so the `default: <NoData />` fallback in `renderTabBody()` was removed (and the now-unused `NoData` import dropped).
 
-#### Verification
+#### Verification 5.4.7
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (514 kB JS / 418 kB CSS).
@@ -423,7 +423,7 @@ Whole task complete — all 7 tab sub-tasks (5.4.1–5.4.7) are archived individ
 - Every result key has a dedicated tab component: Parsed JD (`ParsedJDTab`), Parsed Resume (`ParsedResumeTab`), Gap Analysis (`GapAnalysisTab`), Rewritten Resume (`RewrittenResumeTab`), ATS (`ATSTab`), Polished (`PolishedTab`), Cover Letter (`CoverLetterTab`).
 - Shared plumbing under `ui/src/pages/results/`: `ResultsTabView.tsx` (container + key→tab dispatch), `coerce.ts` (defensive extractors incl. string-vs-object `pickText`/`textFromValue`), `parts.tsx` (shared `NoData`/`Section`/`TagSection`/`BulletSection`/`KeyValueTable`/`ExperienceEntryView`), CSS in `ui/src/index.css`.
 
-#### Verification
+#### Verification 5.4
 
 - Whole-task verify (manual pipeline run populates every tab; empty agents show "no data" placeholders) is browser-manual and belongs to task 7.3; per-tab `tsc`/lint/build cleanliness was verified in each sub-task record.
 
@@ -438,7 +438,7 @@ Built the downloads row under the Run page results.
 - `ui/src/pages/RunPage.tsx` — on `completed`, renders `<DownloadsRow outputFiles={asStringMap(taskQuery.data?.result?.output_files)} />` above `<ResultsTabView />`; new `asStringMap` import from `results/coerce.ts`.
 - `ui/src/index.css` — `.run-downloads` (wrap row, gap) + `.run-downloads .p-button { text-decoration: none }`.
 
-#### Verification
+#### Verification 5.5
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (515 kB JS / 418 kB CSS).
@@ -455,7 +455,7 @@ Built the Files page with listing/filtering/deletion.
   - **Delete**: `useDeleteFiles` mutation (invalidates `['files']` on success via the hook) → ConfirmDialog (accept = delete, clears selection; Toast success on `deleted` count, warn on `missing`, error on mutation failure). Button disabled when nothing selected or while pending, label reflects `Delete selected (n)`.
 - `ui/src/index.css` — `.files-page`, `.files-toolbar`, `.files-filters`, `.files-filter-type`, `.files-filter-sort`, `.files-actions`, `.files-name`.
 
-#### Verification
+#### Verification 5.6
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (840 kB JS / 419 kB CSS; DataTable/TabMenu/ConfirmDialog pulled in).
@@ -472,8 +472,163 @@ Built the Models page.
   - Paginator enabled only when more than 10 rows.
 - `ui/src/index.css` — `.models-page` (column layout, gap).
 
-#### Verification
+#### Verification 5.7
 
 - `npm run lint` (oxlint) — clean.
 - `npm run build` (`tsc -b && vite build`) — passes (840 kB JS / 419 kB CSS).
 - Live match check: `GET /api/models` (uvicorn on :8000) returns exactly `[{'agent': 'jd_parsing_agent', 'provider': 'ollama', 'model': 'qwen2.5:7b-instruct'}, …]` for all 7 agents, identical to `uv run python -c "from config.agents import get_model_summary; …"` — the task verify.
+
+### 6.1 Configure Vitest — DONE
+
+Configured Vitest + Testing Library in `ui/`.
+
+- `ui/vite.config.ts` — switched `defineConfig`/`Plugin` imports from `'vite'` to `'vitest/config'` (re-exports Vite types with the `test` block) and added:
+
+  ```ts
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
+  },
+  ```
+
+  The `scopeDarkThemeCss` plugin + dev proxy are untouched. No CSS stub was needed — jsdom started clean with the theme imports.
+- `ui/src/test/setup.ts` (new) — `import '@testing-library/jest-dom/vitest'` (jest-dom's Vitest entry: both registers matchers and augments `vitest`'s `Assertion` interface). This single import satisfies the "PrimeReact CSS stub / jest-dom" item without extra stubs.
+- `ui/src/test/smoke.test.ts` (new) — trivial top-level `describe`/`it` using globals, passes `expect(1 + 1).toBe(2)` (the 6.1 acceptance test; will be superseded by 6.2–6.6 tests).
+- `ui/tsconfig.app.json` — added `"vitest/globals"` to the `types` array (alongside `vite/client`) so global `describe`/`it`/`expect`/etc. type-check under `tsc -b`; jest-dom matcher types come from the `@testing-library/jest-dom/vitest` augmentation.
+- `ui/package.json` — added scripts `"test": "vitest run"` and `"test:watch": "vitest"`.
+
+#### Verification 6.1
+
+- `npm test` in `ui/` — **1 passed** (1 file), Vitest 4.1.10 (jsdom env; the ~21 s environment setup is one-time jsdom boot).
+- `npm run lint` (oxlint) — clean.
+- `npm run build` (`tsc -b && vite build`) — passes (840 kB JS / 419 kB CSS).
+
+### 6.2 Test the API client (`src/api/client.ts`) — DONE
+
+Added `ui/src/api/client.test.ts` (17 tests) mocking `global.fetch` via `vi.stubGlobal`/`vi.fn()` (cleaned up with `vi.unstubAllGlobals()` in `afterEach`; responses stubbed through a `makeResponse` helper using jsdom's real `File`/`FormData`).
+
+Coverage:
+
+- **FormData building** (`src/pages/runForm.ts:buildRunFormData`, where the task's "expected FormData" behavior actually lives — `runPipelineAsync` just POSTs whatever it's given): text fields appended when present (`job_description`, `resume`, `candidate_name`, `company_name`); empty/whitespace text omitted; file fallback only when text blank (`job_file`/`resume_file`); text wins over an uploaded file. `validateRunInputs` also covered (null on valid, job/resume-specific messages).
+- **`fetchModels`** GETs `/api/models` and parses JSON.
+- **`runPipelineAsync`** POSTs the same `FormData` instance as the body to `/api/pipeline/async` (+ `method: 'POST'`).
+- **`getTask`** GETs the URL-encoded task id (`abc%2F123`) and parses JSON.
+- **`listFiles`** GETs `/api/files/generated` with only set query params (`?q=cover&page=2`) and `/api/files/uploaded` with no query string when params are empty; passes `undefined` init.
+- **`deleteFiles`** DELETEs `/api/files` with `Content-Type: application/json` and `JSON.stringify({ files })` body.
+- **Non-2xx** throws the backend `detail` string message; joins `detail: [{msg}]` arrays as `"first; second"`; falls back to `Request failed with status <code>` when detail is absent.
+- **Download URLs** (`src/api/download.ts`): `outputDownloadUrl` URL-encodes the name; `fileDownloadUrl` strips both `output/` and `output\` directory prefixes to the basename.
+
+#### Verification 6.2
+
+- `npm test` in `ui/` — **19 passed** (client + smoke), Vitest 4.1.10; jsdom env now boots in ~1.6 s (warm).
+- `npm run lint` (oxlint) — clean.
+- `npx tsc -b` — clean (tsc includes `*.test.ts` under `src`; no const-assertion or unused-var issues).
+
+### 6.3 Test React Query hooks (`src/api/hooks.ts`) — DONE
+
+Added `ui/src/api/hooks.test.ts` (3 tests) using `@testing-library/react`'s `renderHook`/`waitFor`/`act` and a fresh `QueryClient` per test via a new shared `ui/src/test/utils.tsx` helper (`createTestQueryClient()` sets `retry: false` + `gcTime: Infinity`; `renderWithClient()` wraps in `QueryClientProvider`; `withClient()` is the un-rendered wrapper variant used with `renderHook`'s `wrapper` option). This helper is reused by later 6.x component tests.
+
+Coverage:
+
+- **`useModels`** — resolves models from a stubbed `GET /api/models` fetch and surfaces `isSuccess` + data.
+- **`useFiles`** — an `initialProps`-driven `rerender(page: 3)` asserts the param is passed through as `GET /api/files/generated?page=3`, and that `placeholderData: keepPreviousData` keeps the previous `data` object (with `isPlaceholderData: true`) while the new page refetches.
+- **`useDeleteFiles`** — after `mutateAsync`, a `vi.spyOn(queryClient, 'invalidateQueries')` records a call with `{ queryKey: ['files'] }` (the onSuccess invalidation).
+
+#### Verification 6.3
+
+- `npm test` in `ui/` — **22 passed** (hooks + client + smoke).
+- `npm run lint` (oxlint) — clean (after removing an unused `query` param from the `makePaged` helper that lint + `tsc -b` flagged).
+- `npx tsc -b` — clean.
+
+### 6.4 Test the theme hook (`useTheme`) — DONE
+
+Added `ui/src/theme/useTheme.test.ts` (6 tests). Stubbed `window.matchMedia` (jsdom lacks it) via `vi.stubGlobal('matchMedia', vi.fn(() => media))` with a hand-rolled `media` mock exposing `media`, `addEventListener`/`removeEventListener`, a getter-backed `matches` flag (so the only `Object.defineProperty` is the private `dark` state), and a `trigger(isDark)` that flips it and fires listeners — simulating real `prefers-color-scheme` changes.
+
+Coverage:
+
+- **`resolveTheme`** (unit) — returns `light`/`dark` when stored; falls back to the system theme for `null`/`system`.
+- **Defaults to system** — `mode === 'system'`, `resolved === 'dark'`, `data-theme="dark"` on `<html>` when no override exists.
+- **Stored override** — `localStorage.theme='light'` → resolved light; `'dark'` → resolved dark (separate mounts since the state initializer reads storage only once).
+- **Toggle persists** — `setTheme('light')`/`setTheme('dark')` write `localStorage` (`theme`) and set `data-theme`.
+- **Clear override** — `clearOverride()` resets `mode` to `system`, removes the `localStorage` key, and re-follows OS changes (`trigger(true/false)` updates `data-theme` on `<html>`).
+- **Override blocks OS re-follow** — while a `light` override is set, `trigger(true)` keeps `data-theme="light"`; after `clearOverride()` it re-syncs to the OS (`dark`).
+
+Testing note: OS-change following only mutates `document.documentElement.dataset.theme` (via the effect's `apply(getSystemTheme())`); `resolved`/`mode` state does not re-run, so assertions for OS-change cases target the DOM attribute, not `result.current.resolved`.
+
+#### Verification 6.4
+
+- `npm test` in `ui/` — **28 passed** (theme + hooks + client + smoke).
+- `npm run lint` (oxlint) — clean.
+- `npx tsc -b` — clean.
+
+### 6.5 Test components — DONE
+
+Added six component test files (18 tests) covering every item in the task:
+
+- **`src/theme/ThemeToggle.test.tsx`** (3 tests) — renders System/Light/Dark options; clicking an option calls `setTheme` (localStorage `theme` + `data-theme` applied); clicking System removes the stored override. Uses the shared `stubMatchMedia(false)` helper.
+- **`src/pages/RunPage.test.tsx`** (3 tests) — mock `../api/hooks` (`useInvokePipeline`/`usePollTask` via `vi.hoisted` state), `useToast` spy, and a `vi.mock('primereact/fileupload', async () => …)` factory with an in-factory `forwardRef`-wrapped stub (must use `await import('react')` — `vi.hoisted` can't reference imports). Verifies: **text wins over uploaded file** (files clicked for both job+resume, still submits `job_description`/`resume` text with `job_file`/`resume_file` null); **Run button disabled** while `isPending` (`Starting...`); **empty-input validation** surfaces a `severity: 'warn'` toast and never calls `mutate`.
+- **`src/pages/results/DownloadsRow.test.tsx`** (3 tests) — null/undefined renders empty; one `<a>` per **known** `output_files` key with href `/api/outputs/<basename>`; drop unknown keys; all knowns empty → empty.
+- **`src/pages/FilesPage.test.tsx`** (2 tests) — renders rows from a stubbed `/api/files/generated` PagedFile (name + `2.0 KB` size); select-first-row checkbox (find the row `<tr>`, click its `.p-checkbox-input` — DataTable v10 has no `.p-checkbox-icon`; its accessible-label query also matches the header select-all, so scope to the row), click `Delete selected (1)`, assert `Confirm deletion` dialog, accept via `.p-confirm-dialog-accept` button, then assert the `DELETE /api/files` call carries `{files:[selected path]}` and the success toast fires.
+- **`src/pages/ModelsPage.test.tsx`** (3 tests) — renders agent/provider/model rows; error fetch → "Failed to load models. Is the backend running?"; empty array → "No models found".
+- **`src/pages/results/ATSTab.test.tsx`** (4 tests) — score-severity band mapping by checking the `Tag`'s closest `.p-tag` class: <50 → `p-tag-danger`, 50–79 → `p-tag-warning`, 80+ → `p-tag-success`; missing `ats_score` renders no tag.
+- **`src/test/utils.tsx`** — added `stubMatchMedia(dark)` (getter-backed `matches`, addEventListener/removeEventListener tracking, `setDark()` dispatching `change`).
+
+PrimeReact v10 jsdom notes captured in the tests: DataTable selection checkbox is `.p-checkbox-input` scoped to the row `tr`; ConfirmDialog accept/reject use `.p-confirm-dialog-accept`/`reject` classes (no `data-pc-section="accept"`); `Tag` severity lives on the outer `.p-tag`, not `.p-tag-value`.
+
+Also removed `src/test/smoke.test.ts` (the 6.1 placeholder) — its purpose is now served by the real tests.
+
+#### Verification 6.5
+
+- `npm test` in `ui/` — **45 passed** (9 files, all unit tests).
+- `npm run lint` (oxlint) — clean.
+- `npx tsc -b` — clean.
+- `npm run build` (`tsc -b && vite build`) — passes.
+
+### 6.6 Run the full suite — DONE
+
+Final green run across both stacks. **Frontend (in `ui/`):** `npm run lint` (oxlint) clean; `npm test` — **45 passed** (9 files); `npx tsc -b` clean; `npx tsc --noEmit` clean; `npm run build` (`tsc -b && vite build`) passes. **Backend (repo root):** `uv run ruff check .` all checks passed; `uv run ruff format --check .` 92 files already formatted; `uv run pyright` (strict, no path) 0 errors/warnings/informations; `uv run pytest` — **485 passed** (includes the `test_web_spa.py` tasks 1.x tests).
+
+#### Verification 6.6
+
+- `npm test` in `ui/` — **45 passed** (9 files), green summary.
+- Backend + lint/typecheck/build all clean per the task's acceptance list.
+
+### 7.1 Backend checks — DONE
+
+Ran the full backend verification suite from the repo root:
+
+- `uv run ruff check .` — All checks passed.
+- `uv run ruff format --check .` — 92 files already formatted.
+- `uv run pyright` (strict, no path arg) — 0 errors, 0 warnings, 0 informations.
+- `uv run pytest` — **485 passed**.
+
+#### Verification 7.1
+
+All clean/green per the task's acceptance.
+
+### 7.2 Frontend checks — DONE
+
+Ran the full frontend verification suite in `ui/`:
+
+- `npm run lint` (oxlint) — clean, no warnings.
+- `npm test` (Vitest) — **45 passed** (9 files).
+- `npm run build` (`tsc -b && vite build`) — passes (`✓ built`; only the pre-existing informational chunk-size-over-500kB warning, which doesn't affect the build).
+- `npx tsc --noEmit` — clean.
+
+#### Verification 7.2
+
+No errors/warnings and all tests green per the task's acceptance.
+
+### 8.1 Update `AGENTS.md` — DONE
+
+Added a "UI (`ui/`)" section to `AGENTS.md` placed right after the "Quick commands" table / "No CI" note and before "Architecture":
+
+- Two-terminal quickstart (backend `uv run uvicorn app.main:app --reload` + frontend `cd ui && npm install && npm run dev`).
+- Explicit note that Vite proxies `/api`/`/health` to `localhost:8000` in dev, and FastAPI mounts `ui/dist` at runtime in production (when `ui/dist/index.html` exists).
+- A `ui/` command table: dev server, build (`npm run build`, runs `tsc -b && vite build`), lint (oxlint), unit tests (`npm test`), watch (`npm run test:watch`), typecheck (`npx tsc -b` / `npx tsc --noEmit`).
+- Stated that all `ui/` commands run with `ui/` as the working directory.
+
+#### Verification 8.1
+
+- Commands in the doc match reality (each was exercised during tasks 6/7 verification).

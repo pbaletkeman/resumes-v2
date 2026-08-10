@@ -34,6 +34,33 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 
 No CI is configured. No `Makefile` exists.
 
+## UI (`ui/`)
+
+The React + PrimeReact frontend lives in `ui/`. During development it talks to the backend through a Vite dev proxy (`/api`, `/health` → `localhost:8000`); in production FastAPI serves the built SPA from `ui/dist` (mounted automatically when `ui/dist/index.html` exists).
+
+Two-terminal quickstart:
+
+```text
+# terminal 1 — backend
+uv run uvicorn app.main:app --reload
+
+# terminal 2 — frontend
+cd ui
+npm install
+npm run dev
+```
+
+All `ui/` commands run with `ui/` as the working directory.
+
+| What | Command |
+|---|---|
+| Dev server | `npm run dev` (Vite, proxies `/api` to the backend) |
+| Build SPA to `ui/dist` | `npm run build` (runs `tsc -b && vite build`) |
+| Lint (oxlint) | `npm run lint` |
+| Unit tests (Vitest + Testing Library) | `npm test` |
+| Tests (watch) | `npm run test:watch` |
+| Typecheck | `npx tsc -b` / `npx tsc --noEmit` |
+
 ## Architecture
 
 ```plaintext

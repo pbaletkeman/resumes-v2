@@ -22,68 +22,7 @@ Conventions:
 
 ---
 
-## 6. Frontend unit tests (Vitest + Testing Library)
-
-### 6.1 Configure Vitest
-
-- Add a `test` block to `ui/vite.config.ts`: `environment: 'jsdom'`, `globals: true`, `setupFiles: './src/test/setup.ts'`, and a `ui/tsconfig` type entry for Vitest globals + jest-dom matchers.
-- Create `ui/src/test/setup.ts` importing `@testing-library/jest-dom` (and, if needed, a PrimeReact CSS stub so theme imports don't break jsdom).
-- Add `"test": "vitest run"` (and `"test:watch": "vitest"`) to `ui/package.json` scripts.
-- **Accept:** `npm test` runs a trivial passing test.
-- **Verify:** run `npm test` in `ui/`.
-
-### 6.2 Test the API client (`src/api/client.ts`)
-
-- Mock `global.fetch` (or `vi.stubGlobal`) in each test; cover:
-  - `runPipelineAsync` builds the expected `FormData` — text fields present, empty text omitted.
-  - `getTask`/`listFiles`/`deleteFiles` hit the correct URLs+methods and parse JSON.
-  - Non-2xx responses throw with the backend `detail` message surfaced.
-  - Download URLs produce the expected `/api/outputs/...` paths.
-- **Verify:** `npm test` in `ui/`.
-
-### 6.3 Test React Query hooks (`src/api/hooks.ts`)
-
-- Wrap components in `QueryClientProvider` (fresh `QueryClient` per test, e.g. via a `renderWithClient` helper that also flushes pending queries).
-- Cover: `useModels` renders data on success; `useFiles` passes page params through and keeps previous data while refetching; `useDeleteFiles` onSuccess invalidates the `['files', ...]` queries.
-- **Verify:** `npm test` in `ui/`.
-
-### 6.4 Test the theme hook (`useTheme`)
-
-- Mock `matchMedia` (jsdom doesn't implement it) to simulate `prefers-color-scheme: dark` and its `change` event.
-- Cover: defaults to the system scheme when no `localStorage` override exists; respects a stored `light`/`dark` override; toggling persists the choice; setting "system" removes the override and re-follows OS changes; `data-theme` is set/removed on `document.documentElement`.
-- **Verify:** `npm test` in `ui/`.
-
-### 6.5 Test components
-
-- **ThemeToggle** — clicking flips light↔dark and calls the theme hook's setter.
-- **Run page form** — paste text + uploaded file: text wins in the submitted `FormData`; the "Run Pipeline" button is disabled while a run is active; validation surfaces a message when both inputs are empty.
-- **Downloads row** — renders one link per `output_files` entry and points at the correct `/api/outputs/{name}` URL.
-- **Files page** — renders rows from a stubbed `PagedFile`, fires the delete mutation with the selected `path`s, shows the `ConfirmDialog`, and surfaces the delete result via Toast.
-- **Models page** — renders agent/provider/model rows; shows the empty-state message on fetch failure.
-- **ATS tab** — `Tag` severity maps score bands (<50 red, <80 orange, else green).
-- **Verify:** `npm test` in `ui/`; all pass.
-
-### 6.6 Run the full suite
-
-- **Accept:** `npm run lint` and `npm test` are both clean in `ui/`, alongside `npm run build` / `npx tsc --noEmit`.
-- **Verify:** `npm test` in `ui/` ends with a green summary.
-
----
-
 ## 7. Verification (whole app)
-
-### 7.1 Backend checks
-
-- `uv run ruff check .`
-- `uv run ruff format --check .`
-- `uv run pyright` (strict, no path arg)
-- `uv run pytest`
-- **Accept:** all clean/green.
-
-### 7.2 Frontend checks
-
-- In `ui/`: `npm run lint`, `npm test`, `npm run build`, `npx tsc --noEmit`.
-- **Accept:** no errors/warnings, all tests green.
 
 ### 7.3 Manual E2E
 
@@ -97,7 +36,4 @@ Conventions:
 
 ## 8. Docs (optional)
 
-### 7.1 Update `AGENTS.md`
-
-- Add a "UI" section: two-terminal quickstart (`uv run uvicorn app.main:app --reload` + `cd ui && npm run dev`), build command (`npm run build`), and note that production serves `ui/dist` from FastAPI.
-- **Accept:** commands in the doc match reality.
+Complete — see `frontend-tasks-done.md`.

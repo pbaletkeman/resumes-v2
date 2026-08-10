@@ -1,6 +1,6 @@
 import postcss from 'postcss'
-import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { defineConfig, type Plugin } from 'vitest/config'
 
 const darkThemeScope = "html[data-theme='dark']"
 
@@ -39,5 +39,10 @@ export default defineConfig({
       '/api': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
     },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
   },
 })
