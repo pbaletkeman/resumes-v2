@@ -532,3 +532,54 @@ Original instruction: route `_validate_experience_count`,
   `tests/test_agent_resume_rewrite.py` (8)
 
 **Commit:** `simplify: phase 5b - resume rewrite validation guards via load_json_safe`
+
+---
+
+## Phase 5 - Completed sub-task 5.3: full `Args:`/`Returns:` + "why" on every post-validation helper
+
+Original instruction: give every post-validation helper a full
+`Args:`/`Returns:` docstring and a one-line "why" (guarding against LLM
+fabrication).
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/resume_rewrite.py`** — expanded docstrings on all 7
+  post-validation helpers in the validation + deterministic
+  post-processor banner sections.  Each now has a one-line "why"
+  (guarantee vs. LLM fabrication/dropped facts) plus `Args:`/`Returns:`.
+  No code changes — docstrings only.
+  - `_validate_experience_count` — "why": the rewrite must never invent
+    extra experience entries beyond the input resume.
+  - `_validate_certifications` — "why": every input certification must
+    survive the rewrite.
+  - `_validate_companies` — "why": the rewrite must not invent employers;
+    matching is by name (case-insensitive substring) because the LLM may
+    reorder entries.
+  - `_extract_companies` — "why": accepts either Pydantic
+    ``ExperienceEntry`` objects or plain dicts so the validator reads
+    companies from any serialized shape.
+  - `_company_matches` — "why": bidirectional substring tolerates LLM
+    renaming (``"Acme Corp"`` vs ``"Acme Corporation"``).
+  - `_validate_chronological` — "why": guards the newest-to-oldest
+    ordering contract the LLM is told to honor.
+  - `_sanitize_skills` — "why": skills not in the input resume (and not a
+    canonical variant of one) are dropped; ``None`` rejects the rewrite
+    when most skills are fabricated.
+  - `_ensure_chronological` already carried full `Args:`/`Returns:` and a
+    "why" (fix instead of reject, pure-Python, never mutates) from
+    earlier work — left unchanged.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_resume_rewrite_validation.py` (63) and
+  `tests/test_agent_resume_rewrite.py` (8)
+- `git diff` reviewed: 80 insertions, all inside docstrings (no code
+  lines changed)
+
+**Commit:** `simplify: phase 5c - post-validation helper docstrings (Args/Returns + why)`

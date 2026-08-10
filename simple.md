@@ -644,7 +644,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 - [x] 5.1 Re-order file: public class first, then module helpers grouped (validation -> tailoring -> skill matching) with banner comments. ✅ See `simple-done.md`.
 - [x] 5.2 Route `_validate_experience_count`, `_validate_certifications`, `_validate_companies` guards through `load_json_safe`. ✅ See `simple-done.md`.
-- [ ] 5.3 Full `Args:`/`Returns:` + one-line "why" on every post-validation helper.
+- [x] 5.3 Full `Args:`/`Returns:` + one-line "why" on every post-validation helper. ✅ See `simple-done.md`.
 - [ ] 5.4 Convert dense `_skill_matches` conditionals into named helpers (`_exact_match`, `_substring_match`, `_token_match`).
 - [ ] 5.5 Verify `_ensure_chronological` / `_sanitize_skills` docstrings explain the `model_copy` never-mutate contract; `_tailor_skills` reads step-by-step.
 - [ ] 5.6 Module docstring: LLM -> Pydantic -> post-validation -> chronological -> sanitize -> fallback story.

@@ -310,7 +310,19 @@ def _extract_start_year(dates: str) -> int | None:
 
 
 def _validate_experience_count(result: RewriteOutput, resume_json: str) -> bool:
-    """Return True if the output does not have more experiences than input."""
+    """Return True if the output does not have more experiences than input.
+
+    Guards against LLM fabrication: the rewrite must never invent extra
+    experience entries beyond what the input resume actually lists.
+
+    Args:
+        result: A validated ``RewriteOutput`` from the LLM.
+        resume_json: The serialized input resume (from ``_serialize``).
+
+    Returns:
+        True when the output is safe to accept; False when the LLM added
+        more experience entries than the input contained.
+    """
     resume_data = load_json_safe(resume_json)
     if resume_data is None:
         return True  # can't validate, pass
@@ -328,7 +340,19 @@ def _validate_experience_count(result: RewriteOutput, resume_json: str) -> bool:
 
 
 def _validate_certifications(result: RewriteOutput, resume_json: str) -> bool:
-    """Return True if all input certifications appear in the output."""
+    """Return True if all input certifications appear in the output.
+
+    Guards against the LLM dropping facts: every certification from the
+    input resume must survive the rewrite (case-insensitively).
+
+    Args:
+        result: A validated ``RewriteOutput`` from the LLM.
+        resume_json: The serialized input resume (from ``_serialize``).
+
+    Returns:
+        True when all input certifications are present in the output;
+        False when the output is missing a required certification.
+    """
     resume_data = load_json_safe(resume_json)
     if resume_data is None:
         return True  # can't validate, pass
@@ -348,9 +372,18 @@ def _validate_certifications(result: RewriteOutput, resume_json: str) -> bool:
 def _validate_companies(result: RewriteOutput, resume_json: str) -> bool:
     """Return True if every output company matches an input employer.
 
+    Guards against LLM fabrication: the rewrite must not invent employers.
     Companies are matched case-insensitively by substring against the set
     of input company names (the LLM may reorder entries, so match by name
     rather than by position).  Empty output companies are skipped.
+
+    Args:
+        result: A validated ``RewriteOutput`` from the LLM.
+        resume_json: The serialized input resume (from ``_serialize``).
+
+    Returns:
+        True when every non-empty output company matches an input
+        employer; False when the output contains a fabricated company.
     """
     resume_data = load_json_safe(resume_json)
     if resume_data is None:
@@ -369,7 +402,17 @@ def _validate_companies(result: RewriteOutput, resume_json: str) -> bool:
 
 
 def _extract_companies(experiences: list[Any]) -> list[str]:
-    """Extract non-empty company names from a list of experience entries."""
+    """Extract non-empty company names from a list of experience entries.
+
+    Accepts either Pydantic ``ExperienceEntry`` objects or plain dicts so
+    the validator can read companies from any serialized shape.
+
+    Args:
+        experiences: A list of experience entries (objects or dicts).
+
+    Returns:
+        The stripped, non-empty company names from every entry.
+    """
     companies: list[str] = []
     for exp in experiences:
         if isinstance(exp, dict):
@@ -382,7 +425,18 @@ def _extract_companies(experiences: list[Any]) -> list[str]:
 
 
 def _company_matches(output: str, input_: str) -> bool:
-    """Case-insensitive substring match between two company names."""
+    """Return True when two company names match case-insensitively.
+
+    Uses bidirectional substring matching so ``"Acme Corp"`` matches
+    ``"Acme Corporation"``, tolerating LLM renaming.
+
+    Args:
+        output: A company name from the rewritten resume.
+        input_: A company name from the input resume.
+
+    Returns:
+        True when either name contains the other (case-insensitive).
+    """
     out = output.lower()
     inp = input_.lower()
     return out in inp or inp in out
@@ -391,8 +445,17 @@ def _company_matches(output: str, input_: str) -> bool:
 def _validate_chronological(result: RewriteOutput) -> bool:
     """Return True if experiences are listed most-recent-first.
 
-    Entries without a parseable start year are skipped.  A result with
-    fewer than two parseable years is accepted (cannot be validated).
+    Guards the ordering contract the LLM is told to honor: experience
+    must flow newest to oldest.  Entries without a parseable start year
+    are skipped.  A result with fewer than two parseable years is
+    accepted (cannot be validated).
+
+    Args:
+        result: A validated ``RewriteOutput`` from the LLM.
+
+    Returns:
+        True when ordering is acceptable; False when a later entry starts
+        before an earlier one.
     """
     years: list[int] = []
     for entry in result.experience:
@@ -454,9 +517,20 @@ def _ensure_chronological(result: RewriteOutput) -> RewriteOutput:
 def _sanitize_skills(result: RewriteOutput, resume_json: str) -> RewriteOutput | None:
     """Filter output skills to those present in the input resume.
 
+    Guards against LLM fabrication: skills the rewrite "invented" (not
+    in the input resume and not a canonical variant of one) are dropped.
     Returns a copy of ``result`` with fabricated skills removed, or
     ``None`` when more than half of the output skills are fabricated
     (the caller should fall back to ``_parsed_to_rewrite``).
+
+    Args:
+        result: A validated ``RewriteOutput`` from the LLM.
+        resume_json: The serialized input resume (from ``_serialize``).
+
+    Returns:
+        A ``RewriteOutput`` with fabricated skills removed, the original
+        ``result`` when there is nothing to drop, or ``None`` when most
+        skills are fabricated (reject the rewrite).
     """
     input_skills = _load_str_list(resume_json, "skills")
     if not input_skills or not result.skills:
