@@ -695,26 +695,65 @@ def _skill_matches(skill: str, input_skills: list[str]) -> bool:
     tolerate LLM renaming (e.g., 'SQL' vs 'PostgreSQL').  First tries the
     shared canonical taxonomy so that variants/abbreviations match their
     canonical form.
+
+    Args:
+        skill: A skill name from the rewritten resume.
+        input_skills: Normalized skills from the input resume.
+
+    Returns:
+        True when ``skill`` matches an input skill by any strategy.
+    """
+    if _exact_match(skill, input_skills):
+        return True
+
+    norm = _normalize_skill(skill)
+    if not norm:
+        return False
+    if _exact_match(norm, input_skills):
+        return True
+
+    norm_tokens = _tokenize(norm)
+    for raw_inp in input_skills:
+        inp = raw_inp.lower()
+        if not inp:
+            continue
+        if _substring_match(norm, inp):
+            return True
+        if _token_match(norm_tokens, _tokenize(inp)):
+            return True
+    return False
+
+
+def _exact_match(skill: str, input_skills: list[str]) -> bool:
+    """Return True when skill equals an input skill exactly.
+
+    First tries the shared canonical taxonomy (so variants like "JS"
+    match their canonical form), then the plain normalized spellings.
     """
     canonical = _NORMALIZER.normalize(skill)
     if canonical in input_skills:
         return True
     norm = _normalize_skill(skill)
-    if not norm:
-        return False
-    if norm in input_skills:
-        return True
-    norm_tokens = {t for t in norm.split() if len(t) >= 2}
-    for raw_inp in input_skills:
-        inp = raw_inp.lower()
-        if not inp:
-            continue
-        if len(norm) >= 3 and (norm in inp or inp in norm):
-            return True
-        inp_tokens = {t for t in inp.split() if len(t) >= 2}
-        if norm_tokens & inp_tokens:
-            return True
-    return False
+    return bool(norm) and norm in input_skills
+
+
+def _substring_match(norm: str, inp: str) -> bool:
+    """Return True when either text contains the other, requiring len >= 3.
+
+    The length floor stops short abbreviations (e.g. "AI") from matching
+    by accident.
+    """
+    return len(norm) >= 3 and (norm in inp or inp in norm)
+
+
+def _token_match(skill_tokens: set[str], input_tokens: set[str]) -> bool:
+    """Return True when the two normalized token sets share a token."""
+    return bool(skill_tokens & input_tokens)
+
+
+def _tokenize(text: str) -> set[str]:
+    """Split text into whitespace-separated tokens, keeping ones >= 2 chars."""
+    return {t for t in text.split() if len(t) >= 2}
 
 
 def _normalize_skill(skill: str) -> str:

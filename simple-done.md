@@ -583,3 +583,56 @@ fabrication).
   lines changed)
 
 **Commit:** `simplify: phase 5c - post-validation helper docstrings (Args/Returns + why)`
+
+---
+
+## Phase 5 - Completed sub-task 5.4: extract named skill-match helpers from `_skill_matches`
+
+Original instruction: convert dense `_skill_matches` conditionals into
+named helpers (`_exact_match`, `_substring_match`, `_token_match`), each
+with a one-line docstring.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/resume_rewrite.py`** — in the skill-matching banner
+  section, `_skill_matches` now reads as an obvious strategy chain instead
+  of one dense body.  The inline conditionals became four named helpers:
+  - `_exact_match(skill, input_skills) -> bool` — canonical-taxonomy
+    match first, then normalized-spelling match (preserves the original
+    two-step exact check).
+  - `_substring_match(norm, inp) -> bool` — substring containment with
+    the ``len >= 3`` floor (stops short abbreviations like "AI" from
+    matching by accident).
+  - `_token_match(skill_tokens, input_tokens) -> bool` — shared-token
+    intersection.
+  - `_tokenize(text) -> set[str]` — the shared token-set builder (was
+    inlined twice at the two call sites).
+  - `_skill_matches` docstring expanded with `Args:`/`Returns:` and the
+    strategy list (exact -> substring -> token).
+  - Note on parity: `_exact_match` re-canonicalizes its second call's
+    already-normalized input, which is safe because
+    `SkillNormalizer.normalize` and `_normalize_skill` are idempotent on
+    normalized strings (tokenized-lowercase in -> same tokens out), and
+    the first exact call already exhausted the canonical check.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_resume_rewrite_validation.py` (63) and
+  `tests/test_agent_resume_rewrite.py` (8)
+- Differential test: extracted `_skill_matches` + `_normalize_skill`
+  source from `HEAD`, ran both implementations across 100
+  skill-vs-input-list combinations (taxonomy variants JS/K8s/ML, exact,
+  substring, token, empty-norm, len-1-token, no-match cases) — **0
+  diffs**.
+- Manual probes confirm representative cases: exact `'Python'` -> True,
+  substring `'SQL'` vs `['postgresql']` -> True, token
+  `'machine learning'` vs `['learning']` -> True, `'!!!'` (empty norm)
+  -> False, `'cobol'` vs `['python','rust']` -> False.
+
+**Commit:** `simplify: phase 5d - skill matching named helpers (_exact_match/_substring_match/_token_match)`
