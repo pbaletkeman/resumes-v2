@@ -59,3 +59,55 @@ This is the shared "plumbing" layer every other module uses. Simplifying here is
   - `get_model_summary()` -> 7 rows, all agents on `qwen2.5:7b-instruct` / `ollama` by default (identical)
 
 **Commit:** `simplify: phase 1 - foundation plumbing (config/logging/errors/clients/json utils)`
+
+---
+
+## Phase 2 - Pydantic models & coercion  ✅ COMPLETED
+
+**Files:** `client/models.py`
+
+Holds every agent output model plus the coercion validators (`_coerce_str_list`, `_coerce_tone_guidance`, `_coerce_final_resume`, etc.) that forgive LLMs returning dicts where strings/lists are expected.
+
+**Inspect for:**
+
+- Does every model and every field have a description written for a human (what the LLM populates) rather than restating the field name?
+- The coercion validators: are they written in clear multi-step logic or terse `dict.get` chains? Are the edge cases (empty dict, `None`, list of dicts) explicit?
+
+**Simplify toward:**
+
+- Break any validator longer than ~25 lines into named helper functions (`_to_str_list`, `_to_str`, `_to_str_list_from_dict_value`).
+- Use explicit `if/else` over complex boolean expressions so a reader can trace each fallback.
+- Add a short comment at the top of the file explaining the *reason* coercion exists (LLMs produce inconsistent shapes; we forgive at the model boundary).
+- Keep `model_dump`/`model_validate` output shapes identical - the pipeline and API depend on them.
+
+**Documentation:** field descriptions on every field of every output model (`JDParsingOutput`, `ResumeParsingOutput`, `GapAnalysisOutput`, `RewriteOutput`, `ATSComplianceOutput`, `TonePolishingOutput`, `CoverLetterOutput`, and the `Parsed*` format-detector models). Cross-check with `docs/models.md` (consolidated in Phase 19).
+
+**Verify:** ruff + pyright + `uv run pytest` (watch `tests/test_cover_letter_validation.py`, `tests/test_resume_rewrite_validation.py`).
+
+### Completion record
+
+**Changes made:**
+
+- **Module docstring** — rewrote to be self-contained. Added a "Why coercion exists" section explaining that providers are asked for JSON matching the models but do not always comply, so `mode="before"` validators forgive the LLM at the model boundary; helpers are pure/deterministic; `model_dump()` shape is stable and consumed by downstream agents + the web API.
+- **Field descriptions** — every field of every model now carries a human-readable `Field(description=...)` explaining *what the LLM populates* (e.g. `ats_score` = "ATS compatibility score from 0 to 100", `company_name` = "Employer name exactly as written in the JD; empty if absent"). Covers `ParsedResume`, `ParsedJobDescription`, `JDParsingOutput`, `ExperienceEntry`, `ResumeParsingOutput`, `GapAnalysisOutput`, `RewriteOutput`, `ATSComplianceOutput`, `TonePolishingOutput`, `CoverLetterOutput`.
+- **Killed validator duplication** — `GapAnalysisOutput._coerce_tone_guidance` was a **verbatim copy** of the `_coerce_str` helper (same dict-flatten + list-join + falsy logic). It now delegates to `_coerce_str()`, so the two code paths can never drift.
+- **Cleaned the coercion helpers** (`_coerce_str_list`, `_coerce_str`, `_coerce_experience_list`, `_coerce_company_signals`, `_coerce_final_resume`) — replaced scattered `# type: ignore` noise with explicit `cast()` calls (`cast(list[Any], v)`, `cast(dict[str, Any], item)`), named locals (`item_dict`, `entry_data`, `joined`, `lines`), and step-by-step comments. Behavior is byte-for-byte identical (verified by probe below).
+- **`ExperienceEntry` list fields** — switched `default_factory=list` to `default_factory=list[ExperienceEntry]` for the two `list[ExperienceEntry]` fields so pyright strict mode infers `list[ExperienceEntry]` instead of `list[Unknown]` (no behavior change; the factory still returns `[]`).
+- **Repo-wide helper names preserved** — kept `_coerce_str_list` / `_coerce_str` / `_coerce_tone_guidance` / `_coerce_final_resume` names because AGENTS.md and docs reference them; consolidation happens in Phase 19.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format .` — applied (1 file reformatted; no behavior change)
+- `uv run pyright` — 0 errors, 0 warnings (full run, not just `models.py`)
+- `uv run pytest` — 485 passed in ~9s
+- Manual probes (identical to previous behavior):
+  - `JDParsingOutput(company_signals=['growing startup','Series B'])` -> `{'1': 'growing startup', '2': 'Series B'}`
+  - `GapAnalysisOutput(tone_guidance={'tone': 'confident'})` -> `'tone: confident'` (delegated `_coerce_str`)
+  - `ATSComplianceOutput(final_resume={'summary': 'hi'})` -> pretty-printed JSON string
+  - `ResumeParsingOutput(experience=['Led team', 'Built API'])` -> 2 `ExperienceEntry` with `responsibilities=['Led team']`
+  - `ResumeParsingOutput(skills=['Python', {'a': 'JS'}])` -> `['Python', 'JS']`
+  - `ResumeParsingOutput(email={'work': 'a@b.com'})` -> `'work: a@b.com'`
+  - Empty defaults unchanged: `RewriteOutput().summary == ''`, `ATSComplianceOutput().ats_score == 0`
+
+**Commit:** `simplify: phase 2 - pydantic models & coercion (field descriptions + dedupe tone_guidance)`

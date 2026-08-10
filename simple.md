@@ -187,7 +187,10 @@ This is the shared "plumbing" layer every other module uses. Simplifying here is
 
 ---
 
-## Phase 2 - Pydantic models & coercion
+## Phase 2 - Pydantic models & coercion  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `client/models.py`
 
