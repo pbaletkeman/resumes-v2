@@ -20,7 +20,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
-from client.json_utils import model_to_json_schema, parse_json_response
+from client.json_utils import load_json_safe, model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import RewriteOutput
 from client.skills import SkillNormalizer
@@ -311,9 +311,8 @@ def _extract_start_year(dates: str) -> int | None:
 
 def _validate_experience_count(result: RewriteOutput, resume_json: str) -> bool:
     """Return True if the output does not have more experiences than input."""
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    resume_data = load_json_safe(resume_json)
+    if resume_data is None:
         return True  # can't validate, pass
     input_exp: list[Any] = resume_data.get("experience", [])
     if not input_exp:
@@ -330,9 +329,8 @@ def _validate_experience_count(result: RewriteOutput, resume_json: str) -> bool:
 
 def _validate_certifications(result: RewriteOutput, resume_json: str) -> bool:
     """Return True if all input certifications appear in the output."""
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    resume_data = load_json_safe(resume_json)
+    if resume_data is None:
         return True  # can't validate, pass
     input_certs: list[Any] = resume_data.get("certifications", [])
     if not input_certs:
@@ -354,9 +352,8 @@ def _validate_companies(result: RewriteOutput, resume_json: str) -> bool:
     of input company names (the LLM may reorder entries, so match by name
     rather than by position).  Empty output companies are skipped.
     """
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    resume_data = load_json_safe(resume_json)
+    if resume_data is None:
         return True  # can't validate, pass
     input_companies = _extract_companies(resume_data.get("experience", []))
     if not input_companies:

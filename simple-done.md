@@ -491,3 +491,44 @@ with banner comments.
   `tests/test_resume_rewrite_validation.py` (63)
 
 **Commit:** `simplify: phase 5a - resume rewrite re-order (class first, helpers grouped with banners)`
+
+---
+
+## Phase 5 - Completed sub-task 5.2: route validation guards through `load_json_safe`
+
+Original instruction: route `_validate_experience_count`,
+`_validate_certifications`, `_validate_companies` guards through
+`load_json_safe`.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/resume_rewrite.py`** — the three validation helpers
+  now parse their serialized-resume input through `load_json_safe`
+  (from `client/json_utils.py`) instead of the repeated
+  ``try: json.loads(...) / except (json.JSONDecodeError, TypeError)``
+  block.  On a `None` result each helper keeps its existing
+  "can't validate, pass" early return (validators only reject proven
+  violations, so unparseable input still passes).
+  - `_validate_experience_count` (experience-count guard)
+  - `_validate_certifications` (certifications-set guard)
+  - `_validate_companies` (fabricated-company guard)
+  - Import updated: `load_json_safe` added to the shared-utils import.
+  - Behavior is identical: `_serialize` always produces object JSON, so
+    `load_json_safe` succeeds exactly where `json.loads` did, and the
+    `None` -> pass mapping mirrors the old except-branch return.
+  - Out of scope: `_load_str_list` keeps its own guard for now (the
+    Phase 5 plan scopes 5.2 to the three validators; `_load_str_list`
+    remains a candidate shared-utility cleanup).
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_resume_rewrite_validation.py` (63) and
+  `tests/test_agent_resume_rewrite.py` (8)
+
+**Commit:** `simplify: phase 5b - resume rewrite validation guards via load_json_safe`
