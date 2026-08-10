@@ -6,6 +6,12 @@ Generates a tailored cover letter using the parsed job description,
 parsed resume, and tailoring strategy.  Uses an LLM to produce a
 ``CoverLetterOutput``.  Falls back to a minimal generic cover letter
 on LLM failure.
+
+File layout: the public ``CoverLetterAgent`` class comes first, then the
+module-level helpers grouped by purpose with banner comments -- shared
+serialization/parsing utilities, prompt helpers, validation guards,
+deterministic post-processors, and the rendering/formatting helpers that
+build the data-driven fallback letter.
 """
 
 import json
@@ -71,13 +77,6 @@ _STRICT_RULES = [
 _SCHEMA_HINT = (
     "Output a JSON object with a single key: "
     "cover_letter (string with the full cover letter text, 450-600 words)."
-)
-
-_PLACEHOLDER_TOKENS = (
-    "[Company Name]",
-    "[Company]",
-    "<Company Name>",
-    "[Employer Name]",
 )
 
 
@@ -299,6 +298,11 @@ class CoverLetterAgent:
         return _apply_contact_info(result, resume_json)
 
 
+# ---------------------------------------------------------------------------
+# Shared serialization / parsing utilities
+# ---------------------------------------------------------------------------
+
+
 def _serialize(value: Any) -> str:
     """Serialize a Pydantic model or dict to a JSON string."""
     if hasattr(value, "model_dump"):
@@ -306,6 +310,61 @@ def _serialize(value: Any) -> str:
     if isinstance(value, dict):
         return json.dumps(value, indent=2, default=str)
     return str(value)
+
+
+def _parse_json(raw: str) -> dict[str, Any] | None:
+    """Best-effort JSON extraction from an LLM response.
+
+    Thin wrapper over :func:`client.json_utils.parse_json_response`.
+    Handles responses wrapped in markdown fences, and plain text
+    responses that are not wrapped in JSON.
+    """
+    return parse_json_response(raw, plain_text_fallback="cover_letter")
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Convert a Pydantic model or dict to a plain dict."""
+    result: dict[str, Any]
+    if hasattr(value, "model_dump"):
+        result = value.model_dump()
+    elif isinstance(value, dict):
+        result = dict(value)  # type: ignore[reportUnknownArgumentType]
+    else:
+        result = {}
+    return result
+
+
+def _read_str(data: dict[str, Any], field: str) -> str:
+    """Read a string field from a dict, returning empty when absent."""
+    value = data.get(field, "")
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def _read_str_list(data: dict[str, Any], field: str) -> list[str]:
+    """Read a list-of-strings field from a dict, ignoring non-strings."""
+    value = data.get(field, [])
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
+
+
+def _load_str_list(json_text: str, field: str) -> list[str]:
+    """Load a list-of-strings field from a serialized object."""
+    try:
+        data: dict[str, Any] = json.loads(json_text)
+    except json.JSONDecodeError, TypeError:
+        return []
+    value = data.get(field, [])
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
+
+
+# ---------------------------------------------------------------------------
+# Prompt helpers -- compose the parts of the LLM prompt that need parsing
+# ---------------------------------------------------------------------------
 
 
 def _contact_from_resume(resume_json: str) -> str:
@@ -336,61 +395,27 @@ def _contact_from_resume(resume_json: str) -> str:
     return "\n".join(lines)
 
 
-def _apply_contact_info(
-    result: CoverLetterOutput, resume_json: str
-) -> CoverLetterOutput:
-    """Ensure the letter carries the candidate's contact details.
+def _company_directive(jd_json: str) -> str:
+    """Return a prompt directive pinning the exact target company name.
 
-    Reads ``phone``, ``email``, ``linkedin``, and ``github`` from the
-    resume JSON.  When at least one contact value is present AND none of
-    the present values already appears in the letter, a contact line is
-    appended after the signature so the letter is self-contained even if
-    the renderer template omits the contact header.  When the values are
-    already present or no contact info exists, the letter is returned
-    unchanged.  Pure string post-processing -- no LLM call.
+    An empty string is returned when the JD has no resolvable company so the
+    prompt stays neutral.  The directive tells the LLM to name the target
+    company (never a past employer from the resume).
     """
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
-        return result
-    contact_values = [
-        v.strip()
-        for v in (
-            resume_data.get("phone", ""),
-            resume_data.get("email", ""),
-            resume_data.get("linkedin", ""),
-            resume_data.get("github", ""),
-        )
-        if isinstance(v, str) and v.strip()
-    ]
-    if not contact_values:
-        return result
-
-    letter_lower = result.cover_letter.lower()
-    present = [v for v in contact_values if v.lower() in letter_lower]
-    missing = [v for v in contact_values if v not in present]
-    if not missing:
-        return result
-
-    contact_line = " | ".join(contact_values)
-    letter = result.cover_letter.rstrip() + "\n\n" + contact_line + "\n"
-    logger.info(
-        "Injected contact info into cover letter (added %d of %d values)",
-        len(missing),
-        len(contact_values),
+    target = _get_company_name(jd_json)
+    if not target:
+        return ""
+    return (
+        f'The exact target company name is "{target}". '
+        "Your letter MUST name this exact company. "
+        "NEVER use a company from the candidate's resume (e.g. a past employer) "
+        "as the target company.\n"
     )
-    return CoverLetterOutput(cover_letter=letter)
 
 
-def _parse_json(raw: str) -> dict[str, Any] | None:
-    """Best-effort JSON extraction from an LLM response.
-
-    Thin wrapper over :func:`client.json_utils.parse_json_response`.
-    Handles responses wrapped in markdown fences, and plain text
-    responses that are not wrapped in JSON.
-    """
-    return parse_json_response(raw, plain_text_fallback="cover_letter")
-
+# ---------------------------------------------------------------------------
+# Validation -- guards on LLM output (advisory warnings or hard reject)
+# ---------------------------------------------------------------------------
 
 _ROLE_FILLER_WORDS = {
     "senior",
@@ -439,6 +464,20 @@ def _validate_role(result: CoverLetterOutput, jd_json: str) -> bool:
     )
 
 
+def _company_mentioned(letter_lower: str, company: str) -> bool:
+    """Return True if ``company`` appears in the letter.
+
+    Mirrors ``_check_company``: an exact case-insensitive match passes, or
+    at least one significant token of the company appears as a whole word.
+    """
+    if company.lower() in letter_lower:
+        return True
+    tokens = [t for t in re.findall(r"[a-z0-9]+", company.lower()) if len(t) >= 3]
+    return bool(tokens) and any(
+        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
+    )
+
+
 def _check_company(result: CoverLetterOutput, jd_json: str) -> None:
     """Warn if the cover letter omits the JD company name (never rejects).
 
@@ -468,6 +507,104 @@ def _check_company(result: CoverLetterOutput, jd_json: str) -> None:
     )
 
 
+def _check_skills(result: CoverLetterOutput, resume_json: str, jd_json: str) -> None:
+    """Warn if the letter mentions skills absent from the resume (advisory).
+
+    Candidate skill nouns come from the JD's required/preferred skills and
+    the resume's skill list.  A skill mentioned in the letter but missing
+    from the resume is flagged with a warning; nothing is rejected because
+    cover letter prose paraphrases freely.  Word boundaries keep short
+    tokens like "ai" from matching inside words like "aimed".
+    """
+    resume_skills = _load_str_list(resume_json, "skills")
+    jd_skills = _load_str_list(jd_json, "required_skills") + _load_str_list(
+        jd_json, "preferred_skills"
+    )
+    candidates = list(dict.fromkeys(jd_skills + resume_skills))
+    if not candidates:
+        return
+    letter_lower = result.cover_letter.lower()
+    foreign: list[str] = []
+    for skill in candidates:
+        if not _skill_mentioned(letter_lower, skill):
+            continue
+        if not _skill_in_list(skill, resume_skills):
+            foreign.append(skill)
+    if foreign:
+        logger.warning(
+            "Cover letter mentions skills not in resume: %s",
+            ", ".join(foreign),
+        )
+
+
+def _skill_mentioned(letter_lower: str, skill: str) -> bool:
+    """Return True if ``skill`` appears in the letter as whole words."""
+    tokens = [t for t in re.findall(r"[a-z0-9]+", skill.lower()) if len(t) >= 2]
+    if not tokens:
+        return False
+    return all(
+        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
+    )
+
+
+def _skill_in_list(skill: str, skills: list[str]) -> bool:
+    """Fuzzy-match ``skill`` against a list of skills (case-insensitive).
+
+    First tries the shared canonical taxonomy, then tolerates exact,
+    substring (len >= 3), and shared-token matches.
+    """
+    if _NORMALIZER.normalize(skill) in _NORMALIZER.normalize_list(skills):
+        return True
+    norm = " ".join(re.findall(r"[a-z0-9]+", skill.lower()))
+    if not norm:
+        return True
+    for candidate in skills:
+        candidate_norm = " ".join(re.findall(r"[a-z0-9]+", candidate.lower()))
+        if not candidate_norm:
+            continue
+        if norm == candidate_norm:
+            return True
+        if len(norm) >= 3 and (norm in candidate_norm or candidate_norm in norm):
+            return True
+        if set(norm.split()) & set(candidate_norm.split()):
+            return True
+    return False
+
+
+def _validate_length(result: CoverLetterOutput) -> bool:
+    """Return True unless the letter is an extreme length outlier.
+
+    The spec is 450-600 words.  Mid-range deviations (200-450 and 600-800)
+    are accepted with a warning; only <200 or >800 words trigger rejection
+    so the caller falls back to the template letter.
+    """
+    word_count = len(result.cover_letter.split())
+    if word_count < 200:
+        logger.warning("Cover letter too short (%d words) -- rejecting", word_count)
+        return False
+    if word_count > 800:
+        logger.warning("Cover letter too long (%d words) -- rejecting", word_count)
+        return False
+    if word_count < 450 or word_count > 600:
+        logger.warning(
+            "Cover letter length %d words outside 450-600 spec (accepting)",
+            word_count,
+        )
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Deterministic post-processors -- fix the letter (never mutate in place)
+# ---------------------------------------------------------------------------
+
+_PLACEHOLDER_TOKENS = (
+    "[Company Name]",
+    "[Company]",
+    "<Company Name>",
+    "[Employer Name]",
+)
+
+
 def _get_company_name(jd_json: str) -> str:
     """Return the JD company name, or an empty string when unavailable."""
     try:
@@ -493,38 +630,6 @@ def _company_from(jd_data: dict[str, Any]) -> str:
         if name.strip():
             return name.strip()
     return ""
-
-
-def _company_directive(jd_json: str) -> str:
-    """Return a prompt directive pinning the exact target company name.
-
-    An empty string is returned when the JD has no resolvable company so the
-    prompt stays neutral.  The directive tells the LLM to name the target
-    company (never a past employer from the resume).
-    """
-    target = _get_company_name(jd_json)
-    if not target:
-        return ""
-    return (
-        f'The exact target company name is "{target}". '
-        "Your letter MUST name this exact company. "
-        "NEVER use a company from the candidate's resume (e.g. a past employer) "
-        "as the target company.\n"
-    )
-
-
-def _company_mentioned(letter_lower: str, company: str) -> bool:
-    """Return True if ``company`` appears in the letter.
-
-    Mirrors ``_check_company``: an exact case-insensitive match passes, or
-    at least one significant token of the company appears as a whole word.
-    """
-    if company.lower() in letter_lower:
-        return True
-    tokens = [t for t in re.findall(r"[a-z0-9]+", company.lower()) if len(t) >= 3]
-    return bool(tokens) and any(
-        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
-    )
 
 
 def _replace_placeholders(text: str, target: str) -> str:
@@ -595,8 +700,8 @@ def _apply_company_name(
 
     Pure string post-processing (no LLM call).  Resolves the JD company via
     ``_company_from``, replaces literal placeholder tokens (``[Company Name]``
-    and friends), and — when the letter instead names a company from the
-    candidate's resume — substitutes the first wrong mention with the JD
+    and friends), and -- when the letter instead names a company from the
+    candidate's resume -- substitutes the first wrong mention with the JD
     company.  A letter that is already correct (or has no target) is returned
     unchanged.
     """
@@ -663,6 +768,57 @@ def _apply_candidate_name(
     if letter == result.cover_letter:
         return result
     return CoverLetterOutput(cover_letter=letter)
+
+
+def _apply_contact_info(
+    result: CoverLetterOutput, resume_json: str
+) -> CoverLetterOutput:
+    """Ensure the letter carries the candidate's contact details.
+
+    Reads ``phone``, ``email``, ``linkedin``, and ``github`` from the
+    resume JSON.  When at least one contact value is present AND none of
+    the present values already appears in the letter, a contact line is
+    appended after the signature so the letter is self-contained even if
+    the renderer template omits the contact header.  When the values are
+    already present or no contact info exists, the letter is returned
+    unchanged.  Pure string post-processing -- no LLM call.
+    """
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return result
+    contact_values = [
+        v.strip()
+        for v in (
+            resume_data.get("phone", ""),
+            resume_data.get("email", ""),
+            resume_data.get("linkedin", ""),
+            resume_data.get("github", ""),
+        )
+        if isinstance(v, str) and v.strip()
+    ]
+    if not contact_values:
+        return result
+
+    letter_lower = result.cover_letter.lower()
+    present = [v for v in contact_values if v.lower() in letter_lower]
+    missing = [v for v in contact_values if v not in present]
+    if not missing:
+        return result
+
+    contact_line = " | ".join(contact_values)
+    letter = result.cover_letter.rstrip() + "\n\n" + contact_line + "\n"
+    logger.info(
+        "Injected contact info into cover letter (added %d of %d values)",
+        len(missing),
+        len(contact_values),
+    )
+    return CoverLetterOutput(cover_letter=letter)
+
+
+# ---------------------------------------------------------------------------
+# Rendering/formatting -- data-driven fallback cover letter (no LLM)
+# ---------------------------------------------------------------------------
 
 
 def _build_fallback_cover_letter(jd: Any, resume: Any, strategy: Any) -> str:
@@ -840,129 +996,3 @@ def _most_recent_achievement(resume_data: dict[str, Any]) -> str:
             if isinstance(item, str) and item.strip():
                 return item.strip()
     return ""
-
-
-def _as_dict(value: Any) -> dict[str, Any]:
-    """Convert a Pydantic model or dict to a plain dict."""
-    result: dict[str, Any]
-    if hasattr(value, "model_dump"):
-        result = value.model_dump()
-    elif isinstance(value, dict):
-        result = dict(value)  # type: ignore[reportUnknownArgumentType]
-    else:
-        result = {}
-    return result
-
-
-def _read_str(data: dict[str, Any], field: str) -> str:
-    """Read a string field from a dict, returning empty when absent."""
-    value = data.get(field, "")
-    if isinstance(value, str):
-        return value
-    return ""
-
-
-def _read_str_list(data: dict[str, Any], field: str) -> list[str]:
-    """Read a list-of-strings field from a dict, ignoring non-strings."""
-    value = data.get(field, [])
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
-
-
-def _check_skills(result: CoverLetterOutput, resume_json: str, jd_json: str) -> None:
-    """Warn if the letter mentions skills absent from the resume (advisory).
-
-    Candidate skill nouns come from the JD's required/preferred skills and
-    the resume's skill list.  A skill mentioned in the letter but missing
-    from the resume is flagged with a warning; nothing is rejected because
-    cover letter prose paraphrases freely.  Word boundaries keep short
-    tokens like "ai" from matching inside words like "aimed".
-    """
-    resume_skills = _load_str_list(resume_json, "skills")
-    jd_skills = _load_str_list(jd_json, "required_skills") + _load_str_list(
-        jd_json, "preferred_skills"
-    )
-    candidates = list(dict.fromkeys(jd_skills + resume_skills))
-    if not candidates:
-        return
-    letter_lower = result.cover_letter.lower()
-    foreign: list[str] = []
-    for skill in candidates:
-        if not _skill_mentioned(letter_lower, skill):
-            continue
-        if not _skill_in_list(skill, resume_skills):
-            foreign.append(skill)
-    if foreign:
-        logger.warning(
-            "Cover letter mentions skills not in resume: %s",
-            ", ".join(foreign),
-        )
-
-
-def _skill_mentioned(letter_lower: str, skill: str) -> bool:
-    """Return True if ``skill`` appears in the letter as whole words."""
-    tokens = [t for t in re.findall(r"[a-z0-9]+", skill.lower()) if len(t) >= 2]
-    if not tokens:
-        return False
-    return all(
-        re.search(rf"\b{re.escape(t)}\b", letter_lower) is not None for t in tokens
-    )
-
-
-def _skill_in_list(skill: str, skills: list[str]) -> bool:
-    """Fuzzy-match ``skill`` against a list of skills (case-insensitive).
-
-    First tries the shared canonical taxonomy, then tolerates exact,
-    substring (len >= 3), and shared-token matches.
-    """
-    if _NORMALIZER.normalize(skill) in _NORMALIZER.normalize_list(skills):
-        return True
-    norm = " ".join(re.findall(r"[a-z0-9]+", skill.lower()))
-    if not norm:
-        return True
-    for candidate in skills:
-        candidate_norm = " ".join(re.findall(r"[a-z0-9]+", candidate.lower()))
-        if not candidate_norm:
-            continue
-        if norm == candidate_norm:
-            return True
-        if len(norm) >= 3 and (norm in candidate_norm or candidate_norm in norm):
-            return True
-        if set(norm.split()) & set(candidate_norm.split()):
-            return True
-    return False
-
-
-def _load_str_list(json_text: str, field: str) -> list[str]:
-    """Load a list-of-strings field from a serialized object."""
-    try:
-        data: dict[str, Any] = json.loads(json_text)
-    except json.JSONDecodeError, TypeError:
-        return []
-    value = data.get(field, [])
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
-
-
-def _validate_length(result: CoverLetterOutput) -> bool:
-    """Return True unless the letter is an extreme length outlier.
-
-    The spec is 450-600 words.  Mid-range deviations (200-450 and 600-800)
-    are accepted with a warning; only <200 or >800 words trigger rejection
-    so the caller falls back to the template letter.
-    """
-    word_count = len(result.cover_letter.split())
-    if word_count < 200:
-        logger.warning("Cover letter too short (%d words) -- rejecting", word_count)
-        return False
-    if word_count > 800:
-        logger.warning("Cover letter too long (%d words) -- rejecting", word_count)
-        return False
-    if word_count < 450 or word_count > 600:
-        logger.warning(
-            "Cover letter length %d words outside 450-600 spec (accepting)",
-            word_count,
-        )
-    return True

@@ -797,3 +797,65 @@ validation suite throughout).
   JD-tailored skills.
 
 **Commit:** `simplify: phase 5 - resume rewrite re-order + shared guards + docs (5.1-5.7)`
+
+---
+
+## Phase 6 - Completed sub-task 6.1: `cover_letter.py` banner sections (class first, helpers grouped)
+
+Original instruction: split helpers into banner sections
+(`# --- validation ---`, `# --- deterministic post-processors ---`,
+`# --- rendering/formatting ---`), matching the Phase 5 re-order of
+`resume_rewrite.py`.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/cover_letter.py`** (968 lines) — re-ordered the file so
+  the public `CoverLetterAgent` class comes first, followed by module
+  helpers under five banner sections:
+  - `# Shared serialization / parsing utilities` — `_serialize`,
+    `_parse_json`, `_as_dict`, `_read_str`, `_read_str_list`,
+    `_load_str_list`.
+  - `# Prompt helpers -- compose the parts of the LLM prompt that need
+    parsing` — `_contact_from_resume`, `_company_directive`.
+  - `# Validation -- guards on LLM output (advisory warnings or hard
+    reject)` — `_ROLE_FILLER_WORDS`, `_validate_role`, `_company_mentioned`,
+    `_check_company`, `_check_skills`, `_skill_mentioned`, `_skill_in_list`,
+    `_validate_length`.
+  - `# Deterministic post-processors -- fix the letter (never mutate in
+    place)` — `_PLACEHOLDER_TOKENS`, `_get_company_name`, `_company_from`,
+    `_replace_placeholders`, `_resume_companies`,
+    `_resume_company_in_letter`, `_replace_first_casefold`,
+    `_apply_company_name`, `_NAME_PLACEHOLDER_TOKENS`,
+    `_candidate_name_from_resume`, `_apply_candidate_name`,
+    `_apply_contact_info`.
+  - `# Rendering/formatting -- data-driven fallback cover letter (no LLM)`
+    — `_build_fallback_cover_letter`, `_contact_signature_line`,
+    `_opening_paragraph`, `_middle_paragraph`, `_closing_paragraph`,
+    `_join_skills`, `_overlapping_skills`, `_most_recent_achievement`.
+  - Module docstring updated with a "File layout" paragraph naming the
+    banner groups (mirrors the `resume_rewrite.py` 5.6 layout note);
+    no body text changed.
+  - Every helper body copied verbatim from `HEAD`; only line order and
+    the module docstring changed.
+
+**Behavior verification:**
+
+- AST structural compare vs `HEAD` (same script as 5.1): identical
+  function/class sets (33 top-level helpers + `CoverLetterAgent`), and
+  0 body diffs across all functions and class methods.  The only diff is
+  the module docstring (expected — new "File layout" paragraph) and a
+  trailing-newline fix applied by `ruff format`.
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_cover_letter.py` (10) and
+  `tests/test_cover_letter_validation.py` (109)
+- The seven `json.loads` guards (in `_load_str_list`, `_contact_from_resume`,
+  `_validate_role`, `_get_company_name`, `_resume_company_in_letter`,
+  `_candidate_name_from_resume`, `_apply_contact_info`) are intentionally
+  left in place for 6.2.
+
+**Commit:** `simplify: phase 6a - cover letter banner sections (class first, helpers grouped)`
