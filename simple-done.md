@@ -163,6 +163,52 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
+## Phase 4 - LLM-only agents: Gap Analysis, ATS Compliance, Tone Polishing + shared validation cleanup  ✅ COMPLETED
+
+**Files:** `client/agents/gap_analysis.py`, `client/agents/ats_compliance.py`, `client/agents/tone_polishing.py`
+
+**Inspect for:**
+
+- `ats_compliance.py` (and its siblings in Phases 5-6) use the `except json.JSONDecodeError, TypeError:` form. Standardize and route each guard through one shared helper (below) so the intent is obvious.
+- The three agents' `_try_llm` methods are near-identical (prompt, rules, chat, parse, validate). Note the *small* differences (output shape, prompt strings) - keep those, de-duplicate only the scaffolding.
+- `tone_polishing.py`: tone guidance coercion; verify it is as clearly written as the equivalent in `models.py`.
+
+**Simplify toward:**
+
+- Add one shared helper - `load_json_safe(text) -> dict | None` in `client/json_utils.py` - and have the guarded `json.loads` sites use it.
+- Extract the duplicated chat/parse/validate scaffolding into `client/agents/_validation.py` (`chat_and_validate` + `serialize`) shared by the LLM-only agents.
+- Ensure each validation helper is a self-contained, clearly documented predicate.
+
+**Documentation:** module docstrings explain the "LLM only, deterministic fallback" role of these three agents: which output model each produces and what happens on total failure (gap = empty model, ATS = default low-score, tone = pass-through).
+
+**Verify:** watch `tests/test_agent_gap_analysis.py`, `tests/test_agent_ats_compliance.py`, `tests/test_agent_tone_polishing.py`.
+
+### Phase 4 Completion record
+
+**Overview:** Phase 4 created one shared guarded-JSON loader (`load_json_safe`), one shared LLM-call/validate scaffold (`client/agents/_validation.py`), and brought all three LLM-only agents onto them. Each agent now keeps only its prompt/rules and its deterministic fallback; the repeated `client.chat` + parse + Pydantic-validate boilerplate lives in one place. The three `client.chat(...)` call sites that moved into `_validation.py` were removed from `tests/test_model_clients.py`'s `CALL_SITE_FILES` (stable call-site count 13 -> 9 across sub-tasks 4.3-4.5).
+
+**Changes made (by sub-task):**
+
+- **4.1** — `client/json_utils.py`: added `load_json_safe(text) -> dict | None` (fence-stripping + guard, never raises). Added `TestLoadJsonSafe` (8 tests).
+- **4.2** — Standardized the `except json.JSONDecodeError, TypeError:` sites. Resolution: the parenthesized form is not enforceable - ruff 0.16 + `target-version = "py314"` auto-canonicalizes to the PEP 758 comma form; all 13 sites already used the canonical form (no code change). These guards are routed through `load_json_safe` in later phases.
+- **4.3** — `client/agents/_validation.py`: extracted the shared `chat_and_validate()` + `serialize()` scaffold (attempt logging, provider-error handling, response logging, JSON parsing, Pydantic validation). `client/agents/gap_analysis.py`: `_try_llm` now calls `chat_and_validate`; module docstring expanded ("LLM only, deterministic fallback = empty model").
+- **4.4** — `client/agents/ats_compliance.py`: adopted the shared scaffold; `_extract_resume_text` guarded `json.loads` now routes through `load_json_safe`; deleted duplicated `_serialize`/`_parse_json`; module + `_default_result` docstrings expanded.
+- **4.5** — `client/agents/tone_polishing.py`: adopted the shared scaffold (kept the agent-specific empty-`polished_resume` fill); expanded module/`run()`/`_try_llm` docstrings. `client/models.py`: expanded `_coerce_tone_guidance` docstring to point at shared `_coerce_str` and why it exists. All three LLM-only agents now share one scaffold.
+- **4.6** — Guardrails run across the phase (below).
+- **4.7** — Phase moved here; `simple.md` checkbox section marked complete and narrative section stubbed.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format .` / `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings (full run)
+- `uv run pytest` — 493 passed, including `tests/test_agent_gap_analysis.py` (7), `tests/test_agent_ats_compliance.py` (8), `tests/test_agent_tone_polishing.py` (6), `tests/test_model_clients.py` (11), `tests/test_json_utils.py` (23)
+- Fallback behavior preserved per agent: gap analysis returns an empty `GapAnalysisOutput` on total LLM failure; ATS returns `ats_score=30` with resume text unchanged; tone returns the input resume unchanged.
+
+**Commit:** `simplify: phase 4 - llm-only agents + shared validation cleanup (load_json_safe + _validation scaffold)`
+
+---
+
 ## Phase 4 - Completed sub-task 4.1: shared `load_json_safe` helper
 
 Added the guarded JSON-object parser that Phases 4.2-4.6 will route the

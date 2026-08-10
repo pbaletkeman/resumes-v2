@@ -242,7 +242,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 4 - LLM-only agents: Gap Analysis, ATS Compliance, Tone Polishing + shared validation cleanup
+## Phase 4 - LLM-only agents: Gap Analysis, ATS Compliance, Tone Polishing + shared validation cleanup  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `client/agents/gap_analysis.py`, `client/agents/ats_compliance.py`, `client/agents/tone_polishing.py`
 
@@ -624,15 +627,18 @@ Phases 1-3 are complete (records in `simple-done.md`). The remaining work is
 split into sub-tasks below. Work one phase at a time; commit per phase with a
 phase-tagged message. Check each sub-task off in place as it is completed.
 
-### Phase 4 - LLM-only agents + shared validation cleanup
+### Phase 4 - LLM-only agents + shared validation cleanup ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here so the working checklist stays intact.
 
 - [x] 4.1 Add `load_json_safe(text) -> dict | None` shared helper in `client/json_utils.py` with docstring explaining fence-stripping + guard. ✅ See `simple-done.md`.
 - [x] 4.2 Standardize the `except json.JSONDecodeError, TypeError:` sites. Resolution: ruff 0.16 + `target-version = "py314"` auto-canonicalizes the parenthesized form to the PEP 758 comma form (`except A, B:`) with no formatter opt-out, so the tuple form is not enforceable in this repo's toolchain. All 13 sites across `json_utils.py`, `ats_compliance.py`, `cover_letter.py`, `resume_rewrite.py` already use the canonical form (verified via `ruff format --check` + git-clean diff). These guards get routed through `load_json_safe` in 4.4-4.6 anyway. ✅ See `simple-done.md`.
 - [x] 4.3 `gap_analysis.py`: dedupe `_try_llm` scaffolding, verify module docstring ("LLM only, deterministic fallback", output model, failure = empty model). ✅ See `simple-done.md`.
 - [x] 4.4 `ats_compliance.py`: route its `_validate_*` helpers through `load_json_safe`, expand `Returns True when ...` docstrings. ✅ See `simple-done.md`.
 - [x] 4.5 `tone_polishing.py`: verify tone-guidance coercion is as clear as `models.py`; expand docstrings. ✅ See `simple-done.md`.
-- [ ] 4.6 Guardrails: `uv run ruff check .`, `uv run ruff format .`, `uv run pyright`, `uv run pytest` (watch `tests/test_agent_gap_analysis.py`, `test_agent_ats_compliance.py`, `test_agent_tone_polishing.py`).
-- [ ] 4.7 Move Phase 4 to `simple-done.md`, mark complete in `simple.md`, commit.
+- [x] 4.6 Guardrails: `uv run ruff check .`, `uv run ruff format .`, `uv run pyright`, `uv run pytest` (watch `tests/test_agent_gap_analysis.py`, `test_agent_ats_compliance.py`, `test_agent_tone_polishing.py`).
+- [x] 4.7 Move Phase 4 to `simple-done.md`, mark complete in `simple.md`, commit.
 
 ### Phase 5 - Resume Rewrite agent + post-validation
 
