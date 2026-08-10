@@ -68,7 +68,6 @@ class ModelClient(ABC):
         Raises:
             NotImplementedError: Always; must be overridden by subclasses.
         """
-        ...
 
 
 def build_task_prompt(
