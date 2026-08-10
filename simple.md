@@ -214,7 +214,10 @@ Holds every agent output model plus the coercion validators (`_coerce_str_list`,
 
 ---
 
-## Phase 3 - Parsing agents & the format detector
+## Phase 3 - Parsing agents & the format detector  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `client/agents/jd_parsing.py`, `client/agents/resume_parsing.py`, `client/format_detector.py`
 

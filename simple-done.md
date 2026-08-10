@@ -33,7 +33,7 @@ This is the shared "plumbing" layer every other module uses. Simplifying here is
 
 **Verify:** ruff + pyright + `uv run pytest` (watch `tests/test_model_clients.py`, `tests/test_json_utils.py`).
 
-### Completion record
+### Phase 1 Completion record
 
 **Changes made:**
 
@@ -84,7 +84,7 @@ Holds every agent output model plus the coercion validators (`_coerce_str_list`,
 
 **Verify:** ruff + pyright + `uv run pytest` (watch `tests/test_cover_letter_validation.py`, `tests/test_resume_rewrite_validation.py`).
 
-### Completion record
+### Phase 2 Completion record
 
 **Changes made:**
 
@@ -111,3 +111,52 @@ Holds every agent output model plus the coercion validators (`_coerce_str_list`,
   - Empty defaults unchanged: `RewriteOutput().summary == ''`, `ATSComplianceOutput().ats_score == 0`
 
 **Commit:** `simplify: phase 2 - pydantic models & coercion (field descriptions + dedupe tone_guidance)`
+
+---
+
+## Phase 3 - Parsing agents & the format detector  ✅ COMPLETED
+
+**Files:** `client/agents/jd_parsing.py`, `client/agents/resume_parsing.py`, `client/format_detector.py`
+
+These three are the "input parsers" shared by the pipeline and the regex fallbacks.
+
+**Inspect for:**
+
+- `jd_parsing.py`: `_extract_company_name` and the three compiled regexes (`_COMPANY_LABEL_RE`, `_COMPANY_FIRST_SENTENCE_RE`, `_COMPANY_AT_RE`) are dense. `_sync_company_name` is a good small pure helper - make sure it has a full docstring.
+- `resume_parsing.py`: same structure (LLM attempt -> retry -> regex fallback). Verify the fallback path mirrors JD parsing and both read cleanly.
+- `format_detector.py` (756 lines): the largest parser. Many private static helpers (`_extract_name`, `_extract_title`, `_extract_section`, `_extract_list_section`, ...). Check the big parse methods for chained one-liners and the LLM fallback for a duplicated retry loop.
+
+**Simplify toward:**
+
+- Introduce (or document) a shared, named "attempt LLM twice, then fall back" loop so each agent reads the same way. Do not abstract the whole agent - just the loop scaffolding.
+- Build regex pattern strings piece by piece with named variables (as `_COMPANY_TOKEN` etc. already do - extend that style to other patterns).
+- Break large helpers into small steps with `# 1. ...`, `# 2. ...` comments.
+- Rename regex variables to state *what they match* (`_heading_pattern`, `_bullet_item_pattern`).
+
+**Documentation:** every private helper gets `Args:`/`Returns:` docstrings. Add a file-top note explaining "regex first, LLM only if sparse" and *why* (deterministic fallback, offline-safe).
+
+**Verify:** watch `tests/test_format_detector.py`, `tests/test_jd_parsing.py`, `tests/test_agent_jd_parsing.py`, `tests/test_agent_resume_parsing.py`.
+
+### Completion record
+
+**Changes made:**
+
+- **New shared retry loop** `client/agents/_retry.py` — `retry_llm_then_fallback[T]()` implements the "try LLM once, retry once with `strict=True`, then fall back to regex" scaffolding that the two parsing agents used to inline identically. The agents keep their own `_try_llm`/`_regex_fallback`; only the loop was extracted (per the "don't abstract the whole agent" rule).
+- `jd_parsing.py` + `resume_parsing.py` — `run()` now calls `retry_llm_then_fallback` instead of the duplicated `for attempt in range(2)` blocks; module docstrings reference `client.agents._retry`. Expanded `_clean_company_name` and `_extract_start_year` from one-liners to full `Args:`/`Returns:` docstrings.
+- `format_detector.py`:
+  - **File-top rationale** added: "Why regex first, LLM only if sparse" (deterministic, dependency-free, offline-safe; the LLM is never required for a successful parse).
+  - **Hoisted `_section_pattern`** out of the class to module level and prefixed the six section regex-union expressions with named constants (`_SUMMARY_SECTION_PATTERN`, `_SKILLS_SECTION_PATTERN`, `_EXPERIENCE_SECTION_PATTERN`, `_PROJECTS_SECTION_PATTERN`, `_EDUCATION_SECTION_PATTERN`, `_CERTIFICATIONS_SECTION_PATTERN`) so `parse_resume` reads as "extract the Summary section" instead of a regex-union.
+  - **Named the shared line patterns** `_HEADING_PATTERN` (MULTILINE, reused by `_extract_section` and `_extract_bullet_points`), `_BULLET_ITEM_PATTERN` (replaces the inline `re.findall` in `_extract_list_section`), and `_BULLET_MARKER_PATTERN` (replaces the inline `re.sub` in `_extract_bullet_points`).
+  - **Deduplicated the "count populated fields" expression** (appeared verbatim in both `parse_resume` and `parse_job_description`) into `_count_populated()`; both parse methods now follow numbered steps (`# 1. Regex pass`, `# 2. Sparse check`, `# 3. Validate`) instead of one chained block.
+  - Full `Args:`/`Returns:` docstrings on `_is_insufficient_resume`, `_is_insufficient_jd`, and `_extract_projects`; stale "Phase 2.1" banner comment replaced with "Extended extraction".
+- No behavior changes — regex patterns and control flow are identical; only naming/structure moved.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format .` — applied (2 files reformatted; no behavior change)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 485 passed in ~7s, including `tests/test_format_detector.py` (46), `tests/test_jd_parsing.py` (19), `tests/test_agent_jd_parsing.py` (7), `tests/test_agent_resume_parsing.py` (9)
+- Regex-path spot-checks unchanged: `_extract_company_name` still extracts "3Pillar"/"Acme Corporation"; `_sync_company_name` still agrees; `FormatDetector._extract_section/list_section/bullet_points` output identical (covered by the 46 format-detector tests).
+
+**Commit:** `simplify: phase 3 - parsing agents & format detector (shared retry loop, named section patterns)`

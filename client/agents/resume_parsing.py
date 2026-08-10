@@ -1,10 +1,11 @@
 """
 resume_parsing.py
-Resume Parsing Agent -- converts resumes into structured JSON.
+Resume Parsing Agent — converts resumes into structured JSON.
 
 Uses an LLM to parse a resume into a ``ResumeParsingOutput`` model.
 Falls back to ``FormatDetector.parse_resume()`` on LLM failure or
-validation errors.
+validation errors.  The "try LLM twice, then fall back" loop comes from
+``client.agents._retry`` — see :func:`retry_llm_then_fallback`.
 """
 
 import logging
@@ -13,6 +14,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from client.agents._retry import retry_llm_then_fallback
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
 from client.format_detector import FormatDetector
 from client.json_utils import model_to_json_schema, parse_json_response
@@ -85,15 +87,12 @@ class ResumeParsingAgent:
 
         logger.debug("Resume parsing: input_len=%d", len(resume_text))
 
-        # Attempt LLM extraction (with one retry)
-        for attempt in range(2):
-            result = await self._try_llm(resume_text, strict=(attempt == 1))
-            if result is not None:
-                return result
-
-        # Fallback to regex
-        logger.info("LLM parsing failed, falling back to regex")
-        return await self._regex_fallback(resume_text)
+        # Attempt LLM extraction (with one retry), then fall back to regex.
+        return await retry_llm_then_fallback(
+            try_llm=lambda strict: self._try_llm(resume_text, strict=strict),
+            fallback=lambda: self._regex_fallback(resume_text),
+            agent_name="Resume parsing",
+        )
 
     async def _try_llm(
         self, resume_text: str, *, strict: bool = False
@@ -225,7 +224,14 @@ def _normalize_extracted_name(name: str) -> str:
 
 
 def _extract_start_year(dates: str) -> int | None:
-    """Return the first 4-digit year in a dates string, or None."""
+    """Return the first 4-digit year in a dates string, or None.
+
+    Args:
+        dates: A dates field such as ``"2020 - Present"``.
+
+    Returns:
+        The first ``\\d{4}`` match as an int, or ``None`` when absent.
+    """
     match = re.search(r"(\d{4})", dates)
     if match is None:
         return None

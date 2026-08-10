@@ -5,6 +5,12 @@ Document parser for job descriptions and resumes.
 Extracts structured fields (skills, experience, requirements, etc.) from
 plain-text or Markdown documents. Uses regex-based detection first; falls
 back to an LLM when regex returns little or no data.
+
+Why "regex first, LLM only if sparse":
+    The regex pass is deterministic, dependency-free, and offline-safe -
+    it can always produce *some* parse without a model running.  The LLM
+    fallback only kicks in when that baseline is too thin and a client was
+    provided; it is never required for a successful parse.
 """
 
 import logging
@@ -18,6 +24,46 @@ from client.model_client import ModelClient
 from client.models import ParsedJobDescription, ParsedResume
 
 logger = logging.getLogger(__name__)
+
+
+def _section_pattern(name: str) -> str:
+    """Build a regex that matches a heading in Markdown or plain-text form.
+
+    Matches ``## Name`` (Markdown) or ``Name:`` (plain text).
+
+    Args:
+        name: The heading label (e.g. ``"Skills"``).
+
+    Returns:
+        Regex pattern string.
+    """
+    escaped = re.escape(name)
+    return rf"(?:##\s*{escaped}|{escaped}\s*:)"
+
+
+# Named section patterns, built from _section_pattern so each parse method
+# reads as "extract the Summary section" instead of a regex-union expression.
+_SUMMARY_SECTION_PATTERN = (
+    _section_pattern("Summary") + r"|" + _section_pattern("Professional Summary")
+)
+_SKILLS_SECTION_PATTERN = _section_pattern("Skills")
+_EXPERIENCE_SECTION_PATTERN = _section_pattern("Experience")
+_PROJECTS_SECTION_PATTERN = _section_pattern("Projects")
+_EDUCATION_SECTION_PATTERN = _section_pattern("Education")
+_CERTIFICATIONS_SECTION_PATTERN = (
+    _section_pattern("Certifications") + r"|" + _section_pattern("Certification")
+)
+
+# A line that starts a new section: ``## Heading`` (Markdown) or a
+# Capitalised label ending in a colon (plain text).  MULTILINE lets ``^``
+# match at the start of every line when searching a document slice.
+_HEADING_PATTERN = re.compile(r"^(?:##\s+|[A-Z][\w\s/]*:\s*$)", re.MULTILINE)
+
+# A bullet item: ``- item`` or ``* item`` (group 1 = the item text).
+_BULLET_ITEM_PATTERN = re.compile(r"^[-*]\s+(.+?)$", re.MULTILINE)
+
+# A bullet marker prefix used to strip ``- `` / ``* `` from a line.
+_BULLET_MARKER_PATTERN = re.compile(r"^[-*]\s+")
 
 
 class FormatDetector:
@@ -35,21 +81,6 @@ class FormatDetector:
     def __init__(self, client: ModelClient | None = None) -> None:
         self.client = client
 
-    @staticmethod
-    def _section_pattern(name: str) -> str:
-        """Build a regex that matches a heading in Markdown or plain-text form.
-
-        Matches ``## Name`` (Markdown) or ``Name:`` (plain text).
-
-        Args:
-            name: The heading label (e.g. ``"Skills"``).
-
-        Returns:
-            Regex pattern string.
-        """
-        escaped = re.escape(name)
-        return rf"(?:##\s*{escaped}|{escaped}\s*:)"
-
     async def parse_resume(self, content: str) -> ParsedResume:
         """Parse a resume into structured fields.
 
@@ -65,30 +96,25 @@ class FormatDetector:
         fmt = self._detect_format(content)
         logger.debug("Resume format detected: %s", fmt)
 
+        # 1. Regex pass: extract every field we can without an LLM.
         data: dict[str, Any] = {
             "name": FormatDetector._extract_name(content),
             "title": FormatDetector._extract_title(content),
             "summary": FormatDetector._extract_section(
-                content,
-                FormatDetector._section_pattern("Summary")
-                + r"|"
-                + FormatDetector._section_pattern("Professional Summary"),
+                content, _SUMMARY_SECTION_PATTERN
             ),
             "skills": FormatDetector._extract_list_section(
-                content, FormatDetector._section_pattern("Skills")
+                content, _SKILLS_SECTION_PATTERN
             ),
             "experience": FormatDetector._extract_list_section(
-                content, FormatDetector._section_pattern("Experience")
+                content, _EXPERIENCE_SECTION_PATTERN
             ),
             "projects": FormatDetector._extract_projects(content),
             "education": FormatDetector._extract_list_section(
-                content, FormatDetector._section_pattern("Education")
+                content, _EDUCATION_SECTION_PATTERN
             ),
             "certifications": FormatDetector._extract_list_section(
-                content,
-                FormatDetector._section_pattern("Certifications")
-                + r"|"
-                + FormatDetector._section_pattern("Certification"),
+                content, _CERTIFICATIONS_SECTION_PATTERN
             ),
             "keywords": FormatDetector.extract_keywords(content),
             "raw": content,
@@ -98,12 +124,8 @@ class FormatDetector:
             "github": FormatDetector._extract_github(content),
         }
 
-        non_empty = sum(
-            1
-            for v in data.values()
-            if (isinstance(v, str) and v not in ("", "Unknown"))
-            or (isinstance(v, list) and len(v) > 0)  # pyright: ignore[reportUnknownArgumentType]
-        )
+        # 2. Only reach for the LLM when the baseline is too sparse.
+        non_empty = self._count_populated(data)
         logger.debug(
             "Resume regex results: %d/%d fields populated",
             non_empty,
@@ -116,6 +138,7 @@ class FormatDetector:
             if llm_result:
                 data.update(llm_result)
 
+        # 3. Validate; every unresolved field defaults via the Pydantic model.
         return ParsedResume(**data)
 
     async def parse_job_description(self, content: str) -> ParsedJobDescription:
@@ -133,6 +156,7 @@ class FormatDetector:
         fmt = self._detect_format(content)
         logger.debug("Job description format detected: %s", fmt)
 
+        # 1. Regex pass: extract every field we can without an LLM.
         data: dict[str, Any] = {
             "title": FormatDetector._extract_job_title(content),
             "responsibilities": FormatDetector._extract_bullet_points(
@@ -153,12 +177,8 @@ class FormatDetector:
             "raw": content,
         }
 
-        non_empty = sum(
-            1
-            for v in data.values()
-            if (isinstance(v, str) and v not in ("", "Unknown"))
-            or (isinstance(v, list) and len(v) > 0)  # pyright: ignore[reportUnknownArgumentType]
-        )
+        # 2. Only reach for the LLM when the baseline is too sparse.
+        non_empty = self._count_populated(data)
         logger.debug(
             "JD regex results: %d/%d fields populated",
             non_empty,
@@ -171,6 +191,7 @@ class FormatDetector:
             if llm_result:
                 data.update(llm_result)
 
+        # 3. Validate; every unresolved field defaults via the Pydantic model.
         return ParsedJobDescription(**data)
 
     @staticmethod
@@ -258,11 +279,7 @@ class FormatDetector:
         start = match.end()
         # Match the next Markdown heading OR the next plain-text heading
         # (a line starting with a Capitalised word/phrase followed by a colon).
-        next_header = re.search(
-            r"^(?:##\s+|[A-Z][\w\s/]*:\s*$)",
-            content[start:],
-            re.MULTILINE,
-        )
+        next_header = _HEADING_PATTERN.search(content[start:])
         end = start + next_header.start() if next_header else len(content)
         return content[start:end].strip()
 
@@ -284,7 +301,7 @@ class FormatDetector:
         if not section:
             return []
 
-        bullets = re.findall(r"^[-*]\s+(.+?)$", section, re.MULTILINE)
+        bullets = _BULLET_ITEM_PATTERN.findall(section)
         return [b.strip() for b in bullets if b.strip()]
 
     @staticmethod
@@ -327,16 +344,16 @@ class FormatDetector:
                     break  # blank line after content = end of section
                 continue
             # Stop if we hit another section heading
-            if re.match(r"^(?:##\s+|[A-Z][\w\s/]*:\s*$)", stripped):
+            if _HEADING_PATTERN.match(stripped):
                 break
             # Strip bullet markers
-            cleaned = re.sub(r"^[-*]\s+", "", stripped)
+            cleaned = _BULLET_MARKER_PATTERN.sub("", stripped)
             if cleaned:
                 items.append(cleaned)
         return items
 
     # ------------------------------------------------------------------
-    # Extended extraction (Phase 2.1)
+    # Extended extraction: keywords, projects, metrics, contact info
     # ------------------------------------------------------------------
 
     _STOPWORDS: set[str] = {
@@ -467,9 +484,7 @@ class FormatDetector:
         Returns:
             List of project description strings.
         """
-        return FormatDetector._extract_list_section(
-            content, FormatDetector._section_pattern("Projects")
-        )
+        return FormatDetector._extract_list_section(content, _PROJECTS_SECTION_PATTERN)
 
     @staticmethod
     def _extract_metrics(text: str) -> list[str]:
@@ -591,8 +606,38 @@ class FormatDetector:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _count_populated(result: dict[str, Any]) -> int:
+        """Count fields holding real data (non-empty strings or lists).
+
+        Args:
+            result: A field-name -> value dict produced by a regex pass.
+
+        Returns:
+            Number of values that are neither empty strings, the
+            ``"Unknown"`` sentinel, nor empty lists.
+        """
+        non_empty = 0
+        for value in result.values():
+            if (isinstance(value, str) and value not in ("", "Unknown")) or (
+                isinstance(value, list) and len(value) > 0  # pyright: ignore[reportUnknownArgumentType]
+            ):
+                non_empty += 1
+        return non_empty
+
+    @staticmethod
     def _is_insufficient_resume(result: dict[str, Any]) -> bool:
-        """Return True if regex parsing returned too little data."""
+        """Return True if regex parsing returned too little data.
+
+        A resume is "insufficient" when several list fields are empty or a
+        mix of list and string fields are missing, meaning the regex pass
+        has little signal to offer the downstream agents.
+
+        Args:
+            result: The dict produced by the resume regex pass.
+
+        Returns:
+            True when the parse is too sparse to trust without an LLM.
+        """
         empty_lists = sum(
             1
             for v in result.values()
@@ -605,7 +650,18 @@ class FormatDetector:
 
     @staticmethod
     def _is_insufficient_jd(result: dict[str, Any]) -> bool:
-        """Return True if regex parsing returned too little data."""
+        """Return True if regex parsing returned too little data.
+
+        A JD is "insufficient" when at least two list fields came back
+        empty, which usually means the responsibilities/requirements
+        sections were not found by the regex.
+
+        Args:
+            result: The dict produced by the JD regex pass.
+
+        Returns:
+            True when the parse is too sparse to trust without an LLM.
+        """
         empty_lists = sum(
             1
             for v in result.values()

@@ -4,7 +4,8 @@ JD Parsing Agent — extracts structured data from job descriptions.
 
 Uses an LLM to parse the JD into a ``JDParsingOutput`` model.  Falls
 back to ``FormatDetector.parse_job_description()`` on LLM failure or
-validation errors.
+validation errors.  The "try LLM twice, then fall back" loop comes from
+``client.agents._retry`` — see :func:`retry_llm_then_fallback`.
 """
 
 import logging
@@ -13,6 +14,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from client.agents._retry import retry_llm_then_fallback
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
 from client.format_detector import FormatDetector
 from client.json_utils import model_to_json_schema, parse_json_response
@@ -91,7 +93,14 @@ def _extract_company_name(jd_text: str) -> str:
 
 
 def _clean_company_name(name: str) -> str:
-    """Strip trailing punctuation and stray whitespace from a company name."""
+    """Strip trailing punctuation and stray whitespace from a company name.
+
+    Args:
+        name: Raw candidate name captured by a regex group.
+
+    Returns:
+        The trimmed name, or an empty string when nothing is left.
+    """
     return name.strip(" \t\r\n,;:!?.").strip()
 
 
@@ -142,15 +151,12 @@ class JDParsingAgent:
 
         logger.debug("JD parsing: input_len=%d", len(jd_text))
 
-        # Attempt LLM extraction (with one retry)
-        for attempt in range(2):
-            result = await self._try_llm(jd_text, strict=(attempt == 1))
-            if result is not None:
-                return result
-
-        # Fallback to regex
-        logger.info("LLM parsing failed, falling back to regex")
-        return await self._regex_fallback(jd_text)
+        # Attempt LLM extraction (with one retry), then fall back to regex.
+        return await retry_llm_then_fallback(
+            try_llm=lambda strict: self._try_llm(jd_text, strict=strict),
+            fallback=lambda: self._regex_fallback(jd_text),
+            agent_name="JD parsing",
+        )
 
     async def _try_llm(
         self, jd_text: str, *, strict: bool = False
