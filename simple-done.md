@@ -680,3 +680,55 @@ reads step-by-step.
   lines changed.
 
 **Commit:** `simplify: phase 5e - model_copy never-mutate docs + tailor_skills step-by-step comments`
+
+---
+
+## Phase 5 - Completed sub-task 5.6: module docstring correctness story
+
+Original instruction: module docstring should explain the full correctness
+story: LLM -> Pydantic -> *deterministic post-validation* -> chronological
+ordering -> skill sanitization -> deterministic fallback.  Cross-check with
+`docs/agents.md`.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/resume_rewrite.py`** — rewrote the module docstring to
+  narrate the full pipeline in six ordered steps, matching the real
+  `_try_llm()`/`run()` flow exactly:
+  1. **LLM** — rewrite against the tailoring strategy, JSON parsed into
+     ``RewriteOutput``.
+  2. **Pydantic** — ``RewriteOutput(**data)`` enforces model shape.
+  3. **Post-validation** — deterministic pure-Python guards reject
+     fabrication (extra experiences, dropped certifications, invented
+     companies); a violation fails the attempt so ``run()`` retries
+     stricter.
+  4. **Chronological order** — fixed (never rejected) via
+     ``_ensure_chronological`` copy sorted most-recent-first.
+  5. **Skill sanitization** — invented skills dropped via
+     ``_sanitize_skills``; mostly-fabricated output rejects the rewrite.
+  6. **Deterministic fallback** — ``_parsed_to_rewrite`` returns the
+     original parsed resume with JD-tailored skills, so the pipeline
+     yields a usable ATS-targeted resume without an LLM.
+  - Kept the existing "File layout" paragraph (banner groups).
+  - Removed the old one-line summary ("Falls back to the original parsed
+    resume on LLM failure") now that step 6 says the same thing fully.
+  - Cross-checked against `docs/agents.md`: the documented flow
+    (LLM -> Pydantic -> post-validation -> chronological -> sanitize ->
+    fallback) matches the code, so no doc drift to fix.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_resume_rewrite_validation.py` (63) and
+  `tests/test_agent_resume_rewrite.py` (8)
+- Read-back check: the six steps match the actual `_try_llm()` guard
+  order (experience count -> certifications -> companies ->
+  `_ensure_chronological` -> `_sanitize_skills`) and the `run()` fallback
+  (`_parsed_to_rewrite`).
+
+**Commit:** `simplify: phase 5f - resume rewrite module docstring (full correctness story)`

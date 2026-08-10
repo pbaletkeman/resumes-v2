@@ -3,8 +3,28 @@ resume_rewrite.py
 Resume Rewrite Agent.
 
 Rewrites a resume using a tailoring strategy from the Gap Analysis Agent.
-Uses an LLM to produce a ``RewriteOutput``.  Falls back to the original
-parsed resume on LLM failure.
+Falls back to the original parsed resume (tailored deterministically) when
+the LLM fails.
+
+Correctness story (in order):
+
+1. **LLM** -- the LLM rewrites the resume against the tailoring strategy,
+   producing JSON that is parsed and validated into ``RewriteOutput``.
+2. **Pydantic** -- ``RewriteOutput(**data)`` enforces the model shape.
+3. **Post-validation** -- deterministic, pure-Python guards reject LLM
+   output that fabricates facts: no extra experience entries, no dropped
+   certifications, no invented companies.  A violation causes the attempt
+   to fail so ``run()`` retries with stricter rules.
+4. **Chronological order** -- if experience is out of order, it is fixed
+   (never rejected): ``_ensure_chronological`` returns a copy sorted
+   most-recent-first.
+5. **Skill sanitization** -- invented skills are dropped
+   (``_sanitize_skills``); if most of the output skills are fabricated the
+   whole rewrite is rejected.
+6. **Deterministic fallback** -- if both LLM attempts fail (or get
+   rejected), ``run()`` returns ``_parsed_to_rewrite``: the original
+   parsed resume with skills tailored toward the JD keywords, so the
+   pipeline still yields a usable, ATS-targeted resume without an LLM.
 
 File layout: the public ``ResumeRewriteAgent`` class comes first, then the
 module-level helpers grouped by purpose with banner comments -- shared

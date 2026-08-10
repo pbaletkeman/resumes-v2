@@ -647,7 +647,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 5.3 Full `Args:`/`Returns:` + one-line "why" on every post-validation helper. ✅ See `simple-done.md`.
 - [x] 5.4 Convert dense `_skill_matches` conditionals into named helpers (`_exact_match`, `_substring_match`, `_token_match`). ✅ See `simple-done.md`.
 - [x] 5.5 Verify `_ensure_chronological` / `_sanitize_skills` docstrings explain the `model_copy` never-mutate contract; `_tailor_skills` reads step-by-step. ✅ See `simple-done.md`.
-- [ ] 5.6 Module docstring: LLM -> Pydantic -> post-validation -> chronological -> sanitize -> fallback story.
+- [x] 5.6 Module docstring: LLM -> Pydantic -> post-validation -> chronological -> sanitize -> fallback story. ✅ See `simple-done.md`.
 - [ ] 5.7 Guardrails (watch `tests/test_resume_rewrite_validation.py` 63 + `test_agent_resume_rewrite.py`), move to `simple-done.md`, commit.
 
 ### Phase 6 - Cover Letter agent (largest file)
