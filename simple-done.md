@@ -199,3 +199,48 @@ blocks through (across `ats_compliance.py`, `resume_rewrite.py`,
   added but not yet wired into agents (that is sub-tasks 4.2-4.6).
 
 **Commit:** `simplify: phase 4a - shared load_json_safe helper in json_utils`
+
+---
+
+## Phase 4 - Completed sub-task 4.2: standardize the multi-exception `except` sites
+
+Original instruction: rewrite `except json.JSONDecodeError, TypeError:` to the
+explicit parenthesized tuple form everywhere it appears (Phases 5-6 too).
+
+### Resolution (toolchain conflict)
+
+The parenthesized form is **not enforceable** in this repo:
+
+- Ruff 0.16 (and every ruff >= 0.15) unconditionally rewrites
+  `except (A, B):` -> `except A, B:` whenever `target-version = "py314"` is
+  configured (PEP 758 support). Verified directly: writing the tuple form and
+  running `uv run ruff format .` reverts it to the comma form; there is no
+  formatter option to preserve the parentheses short of lowering the target
+  version, which this repo cannot do (Python 3.14+ required, AGENTS.md).
+- The comma form is not a Python 2 artifact in this context: PEP 758 explicitly
+  states the unparenthesized form does **not** reintroduce Python 2 semantics
+  and is interchangeable with the parenthesized version on 3.14.
+
+Since the phase-commit guardrails (`ruff format --check .` must stay green) are
+the binding contract, the correct standard is the *formatter-canonical* form.
+
+### Completion record
+
+**Changes made:** none to code — all 13 sites already use the canonical form:
+
+- `client/json_utils.py` (1): `load_json_safe` guard (added in 4.1).
+- `client/agents/ats_compliance.py` (1): `_parse_json` guard.
+- `client/agents/cover_letter.py` (7): `_load_*` guards.
+- `client/agents/resume_rewrite.py` (4): `_load_*` guards.
+
+These are the guards sub-tasks 4.4-4.6 route through `load_json_safe`, which will
+collapse them further.
+
+**Behavior verification:**
+
+- `uv run ruff format --check client/` — 27 files already formatted (pass)
+- `uv run ruff check client/` — all checks passed
+- `git status` — clean (no diff vs. HEAD; tuple-form experiment fully reverted)
+
+**Commit:** (no code commit for this sub-task; recorded in `simple.md` +
+`simple-done.md` only)
