@@ -28,7 +28,7 @@ CALL_SITE_FILES = [
     "pipeline.py",
     "client/agents/jd_parsing.py",
     "client/agents/resume_parsing.py",
-    "client/agents/gap_analysis.py",
+    "client/agents/_validation.py",
     "client/agents/resume_rewrite.py",
     "client/agents/ats_compliance.py",
     "client/agents/tone_polishing.py",

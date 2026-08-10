@@ -2,20 +2,24 @@
 gap_analysis.py
 Gap Analysis Agent.
 
-Compares parsed JD vs parsed resume, produces a tailoring strategy.
-Uses an LLM to compare structured inputs and output a
-``GapAnalysisOutput``.  No regex fallback -- gap analysis requires
+LLM-only agent: compares the parsed JD and parsed resume and produces a
+tailoring strategy.  There is no regex fallback -- gap analysis requires
 LLM reasoning.
+
+Output model: ``GapAnalysisOutput``.  On total LLM failure (both attempts
+fail) the deterministic fallback is an empty ``GapAnalysisOutput``
+(all fields empty), never a partial or fabricated strategy.
+
+The LLM call, JSON parsing, and Pydantic validation scaffolding is shared
+with the other LLM-only agents via ``client.agents._validation``.
 """
 
 import json
 import logging
 from typing import Any
 
-from pydantic import ValidationError
-
-from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
-from client.json_utils import model_to_json_schema, parse_json_response
+from client.agents._validation import chat_and_validate, serialize
+from client.json_utils import model_to_json_schema
 from client.model_client import ModelClient
 from client.models import GapAnalysisOutput
 from client.skills import SkillNormalizer
@@ -75,8 +79,8 @@ class GapAnalysisAgent:
             logger.debug("Gap analysis: empty input, returning defaults")
             return GapAnalysisOutput()
 
-        jd_json = _serialize(jd)
-        resume_json = _serialize(resume)
+        jd_json = serialize(jd)
+        resume_json = serialize(resume)
 
         logger.debug(
             "Gap analysis: jd_len=%d resume_len=%d",
@@ -125,73 +129,21 @@ class GapAnalysisAgent:
             ]
         )
 
-        logger.debug(
-            "LLM gap analysis attempt=%s prompt_len=%d",
-            "strict" if strict else "normal",
-            len(prompt),
+        result = await chat_and_validate(
+            self.client,
+            purpose=_SYSTEM_PROMPT,
+            prompt=prompt,
+            rules=rules,
+            inputs=[jd_json, resume_json],
+            json_schema=model_to_json_schema(GapAnalysisOutput),
+            output_model=GapAnalysisOutput,
+            agent_label="gap analysis",
+            strict=strict,
         )
-
-        try:
-            raw = await self.client.chat(
-                purpose=_SYSTEM_PROMPT,
-                prompt=prompt,
-                output=["json"],
-                rules=rules,
-                inputs=[jd_json, resume_json],
-                response_format="json",
-                json_schema=model_to_json_schema(GapAnalysisOutput),
-            )
-        except (
-            NotImplementedError,
-            LLMConnectionError,
-            LLMResponseError,
-            LLMTimeoutError,
-        ):
-            logger.exception(
-                "LLM gap analysis failed (attempt %s)",
-                "strict" if strict else "normal",
-            )
+        if result is None:
             return None
 
-        logger.debug("LLM gap analysis response: %s", raw[:200] if raw else "<empty>")
-        data = _parse_json(raw)
-        if data is None:
-            return None
-
-        try:
-            return _post_process(GapAnalysisOutput(**data), jd_json, resume_json)
-        except ValidationError as exc:
-            data_keys = list(data.keys()) if hasattr(data, "keys") else str(type(data))
-            data_preview = (
-                json.dumps(data, indent=2, default=str)[:500] if data else "<None>"
-            )
-            logger.warning(
-                "LLM output failed Pydantic validation: %s\n"
-                "  parsed data keys: %s\n"
-                "  parsed data: %s",
-                exc,
-                data_keys,
-                data_preview,
-            )
-            return None
-
-
-def _serialize(value: Any) -> str:
-    """Serialize a Pydantic model or dict to a JSON string."""
-    if hasattr(value, "model_dump"):
-        return json.dumps(value.model_dump(), indent=2, default=str)
-    if isinstance(value, dict):
-        return json.dumps(value, indent=2, default=str)
-    return str(value)
-
-
-def _parse_json(raw: str) -> dict[str, Any] | None:
-    """Best-effort JSON extraction from an LLM response.
-
-    Thin wrapper over :func:`client.json_utils.parse_json_response`.
-    Handles responses wrapped in markdown fences.
-    """
-    return parse_json_response(raw)
+        return _post_process(result, jd_json, resume_json)
 
 
 def _load_str_list(data: dict[str, Any], field: str) -> list[str]:

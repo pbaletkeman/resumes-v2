@@ -244,3 +244,56 @@ collapse them further.
 
 **Commit:** (no code commit for this sub-task; recorded in `simple.md` +
 `simple-done.md` only)
+
+---
+
+## Phase 4 - Completed sub-task 4.3: `gap_analysis.py` `_try_llm` scaffolding dedupe
+
+Original instruction: dedupe `_try_llm` scaffolding and verify the module
+docstring covers "LLM only, deterministic fallback", the output model, and
+failure = empty model.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/_validation.py`** (new) — shared LLM-call + validation
+  scaffolding for the three LLM-only agents (Gap Analysis, ATS Compliance,
+  Tone Polishing):
+  - `serialize(value)` — the identical `_serialize` helper previously
+    duplicated in `gap_analysis.py` (and `ats_compliance.py`,
+    `resume_rewrite.py`, `cover_letter.py`, which can adopt it in later
+    phases).
+  - `chat_and_validate(client, *, purpose, prompt, rules, inputs,
+    json_schema, output_model, agent_label, strict)` — the full
+    chat -> parse -> Pydantic-validate scaffold: attempt/response debug
+    logging, the four-exception provider-error handler
+    (`NotImplementedError`, `LLMConnectionError`, `LLMResponseError`,
+    `LLMTimeoutError`), `parse_json_response`, and the verbose
+    `ValidationError` warning with parsed keys + JSON preview.  Returns
+    the validated ``output_model`` instance or ``None``.
+- **`client/agents/gap_analysis.py`**:
+  - `_try_llm` now calls `chat_and_validate` (prompt/rules stay
+    agent-specific) and only applies the gap-specific `_post_process` on
+    success — removed ~45 lines of duplicated scaffolding.
+  - `_serialize`/`_parse_json` module helpers deleted; `run()` uses the
+    shared `serialize`.
+  - Module docstring expanded: LLM-only (no regex fallback), output model
+    ``GapAnalysisOutput``, deterministic fallback = empty model on total
+    LLM failure.
+- **`tests/test_model_clients.py`** — `CALL_SITE_FILES` updated:
+  `client/agents/gap_analysis.py` -> `client/agents/_validation.py`
+  (the only `client.chat(...)` site in gap_analysis moved into the shared
+  helper, so the response_format-call-site guard now tracks that file;
+  total call-site count unchanged at 11).
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_gap_analysis.py` (7), `tests/test_model_clients.py`
+  (11), `tests/test_json_utils.py` (23)
+
+**Commit:** `simplify: phase 4c - gap analysis _try_llm scaffolding dedupe (shared _validation module)`

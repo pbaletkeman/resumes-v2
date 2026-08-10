@@ -628,7 +628,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 - [x] 4.1 Add `load_json_safe(text) -> dict | None` shared helper in `client/json_utils.py` with docstring explaining fence-stripping + guard. ✅ See `simple-done.md`.
 - [x] 4.2 Standardize the `except json.JSONDecodeError, TypeError:` sites. Resolution: ruff 0.16 + `target-version = "py314"` auto-canonicalizes the parenthesized form to the PEP 758 comma form (`except A, B:`) with no formatter opt-out, so the tuple form is not enforceable in this repo's toolchain. All 13 sites across `json_utils.py`, `ats_compliance.py`, `cover_letter.py`, `resume_rewrite.py` already use the canonical form (verified via `ruff format --check` + git-clean diff). These guards get routed through `load_json_safe` in 4.4-4.6 anyway. ✅ See `simple-done.md`.
-- [ ] 4.3 `gap_analysis.py`: dedupe `_try_llm` scaffolding, verify module docstring ("LLM only, deterministic fallback", output model, failure = empty model).
+- [x] 4.3 `gap_analysis.py`: dedupe `_try_llm` scaffolding, verify module docstring ("LLM only, deterministic fallback", output model, failure = empty model). ✅ See `simple-done.md`.
 - [ ] 4.4 `ats_compliance.py`: route its `_validate_*` helpers through `load_json_safe`, expand `Returns True when ...` docstrings.
 - [ ] 4.5 `tone_polishing.py`: verify tone-guidance coercion is as clear as `models.py`; expand docstrings.
 - [ ] 4.6 Guardrails: `uv run ruff check .`, `uv run ruff format .`, `uv run pyright`, `uv run pytest` (watch `tests/test_agent_gap_analysis.py`, `test_agent_ats_compliance.py`, `test_agent_tone_polishing.py`).
