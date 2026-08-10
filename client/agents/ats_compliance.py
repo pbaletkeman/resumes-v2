@@ -2,19 +2,24 @@
 ats_compliance.py
 ATS Compliance Agent.
 
-Evaluates a rewritten resume for ATS compatibility and fixes issues.
-Uses an LLM to produce an ``ATSComplianceOutput``.  Falls back to a
-default low-score result on LLM failure.
+LLM-only agent: evaluates a rewritten resume for ATS compatibility and
+fixes issues.  There is no regex fallback -- ATS evaluation requires LLM
+reasoning.
+
+Output model: ``ATSComplianceOutput``.  On total LLM failure (both
+attempts fail) the deterministic fallback is a default low-score result
+(``ats_score=30``) with the input resume text unchanged, so the pipeline
+still yields a usable resume.
+
+The LLM call, JSON parsing, and Pydantic validation scaffolding is shared
+with the other LLM-only agents via ``client.agents._validation``.
 """
 
-import json
 import logging
 from typing import Any
 
-from pydantic import ValidationError
-
-from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
-from client.json_utils import model_to_json_schema, parse_json_response
+from client.agents._validation import chat_and_validate, serialize
+from client.json_utils import load_json_safe, model_to_json_schema
 from client.model_client import ModelClient
 from client.models import ATSComplianceOutput
 
@@ -86,7 +91,7 @@ class ATSComplianceAgent:
             logger.debug("ATS compliance: empty input, returning defaults")
             return ATSComplianceOutput()
 
-        resume_json = _serialize(rewritten)
+        resume_json = serialize(rewritten)
 
         logger.debug("ATS compliance: resume_len=%d", len(resume_json))
 
@@ -134,54 +139,18 @@ class ATSComplianceAgent:
             ]
         )
 
-        logger.debug(
-            "LLM ATS attempt=%s prompt_len=%d",
-            "strict" if strict else "normal",
-            len(prompt),
+        result = await chat_and_validate(
+            self.client,
+            purpose=_SYSTEM_PROMPT,
+            prompt=prompt,
+            rules=rules,
+            inputs=[resume_json],
+            json_schema=model_to_json_schema(ATSComplianceOutput),
+            output_model=ATSComplianceOutput,
+            agent_label="ATS compliance",
+            strict=strict,
         )
-
-        try:
-            raw = await self.client.chat(
-                purpose=_SYSTEM_PROMPT,
-                prompt=prompt,
-                output=["json"],
-                rules=rules,
-                inputs=[resume_json],
-                response_format="json",
-                json_schema=model_to_json_schema(ATSComplianceOutput),
-            )
-        except (
-            NotImplementedError,
-            LLMConnectionError,
-            LLMResponseError,
-            LLMTimeoutError,
-        ):
-            logger.exception(
-                "LLM ATS compliance failed (attempt %s)",
-                "strict" if strict else "normal",
-            )
-            return None
-
-        logger.debug("LLM ATS response: %s", raw[:200] if raw else "<empty>")
-        data = _parse_json(raw)
-        if data is None:
-            return None
-
-        try:
-            result = ATSComplianceOutput(**data)
-        except ValidationError as exc:
-            data_keys = list(data.keys()) if hasattr(data, "keys") else str(type(data))
-            data_preview = (
-                json.dumps(data, indent=2, default=str)[:500] if data else "<None>"
-            )
-            logger.warning(
-                "LLM output failed Pydantic validation: %s\n"
-                "  parsed data keys: %s\n"
-                "  parsed data: %s",
-                exc,
-                data_keys,
-                data_preview,
-            )
+        if result is None:
             return None
 
         # Post-validation: ensure ats_score is in range
@@ -197,29 +166,22 @@ class ATSComplianceAgent:
         return result
 
 
-def _serialize(value: Any) -> str:
-    """Serialize a Pydantic model or dict to a JSON string."""
-    if hasattr(value, "model_dump"):
-        return json.dumps(value.model_dump(), indent=2, default=str)
-    if isinstance(value, dict):
-        return json.dumps(value, indent=2, default=str)
-    return str(value)
-
-
-def _parse_json(raw: str) -> dict[str, Any] | None:
-    """Best-effort JSON extraction from an LLM response.
-
-    Thin wrapper over :func:`client.json_utils.parse_json_response`.
-    Handles responses wrapped in markdown fences.
-    """
-    return parse_json_response(raw)
-
-
 def _extract_resume_text(resume_json: str) -> str:
-    """Extract a plain-text resume from the serialized JSON."""
-    try:
-        data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    """Extract a plain-text resume from the serialized JSON.
+
+    Rebuilds a readable resume from the parsed ``RewriteOutput`` fields:
+    summary, skills, experience (title/company/dates/responsibilities),
+    certifications, and education.  Returns the raw ``resume_json``
+    unchanged when the JSON cannot be parsed.
+
+    Args:
+        resume_json: Serialized resume data (from ``serialize``).
+
+    Returns:
+        The plain-text resume, or ``resume_json`` when parsing fails.
+    """
+    data = load_json_safe(resume_json)
+    if data is None:
         return resume_json
 
     parts: list[str] = []
@@ -260,8 +222,19 @@ def _extract_resume_text(resume_json: str) -> str:
 
 
 def _default_result(rewritten: Any) -> ATSComplianceOutput:
-    """Return a default low-score result with the resume text unchanged."""
-    resume_text = _extract_resume_text(_serialize(rewritten))
+    """Return a default low-score result with the resume text unchanged.
+
+    Deterministic fallback used when both LLM attempts fail: scores 30,
+    reports that evaluation was impossible, and keeps the input resume as
+    ``final_resume`` so the downstream pipeline still has a usable resume.
+
+    Args:
+        rewritten: The rewritten resume (``RewriteOutput`` or dict).
+
+    Returns:
+        An ``ATSComplianceOutput`` with ``ats_score=30``.
+    """
+    resume_text = _extract_resume_text(serialize(rewritten))
     return ATSComplianceOutput(
         ats_score=30,
         missing_keywords=[],

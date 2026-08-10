@@ -30,7 +30,6 @@ CALL_SITE_FILES = [
     "client/agents/resume_parsing.py",
     "client/agents/_validation.py",
     "client/agents/resume_rewrite.py",
-    "client/agents/ats_compliance.py",
     "client/agents/tone_polishing.py",
     "client/agents/cover_letter.py",
     "client/format_detector.py",
@@ -280,4 +279,4 @@ class TestEveryCallSitePassesResponseFormat:
         for rel in CALL_SITE_FILES:
             source = (REPO_ROOT / rel).read_text(encoding="utf-8")
             total += len(_chat_call_blocks(source))
-        assert total == 11
+        assert total == 10

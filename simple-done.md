@@ -297,3 +297,52 @@ failure = empty model.
   (11), `tests/test_json_utils.py` (23)
 
 **Commit:** `simplify: phase 4c - gap analysis _try_llm scaffolding dedupe (shared _validation module)`
+
+---
+
+## Phase 4 - Completed sub-task 4.4: `ats_compliance.py` shared scaffolding + `load_json_safe` routing
+
+Original instruction: route its `_validate_*` helpers through
+`load_json_safe` and expand `Returns True when ...` docstrings.  Note:
+`ats_compliance.py` has no `_validate_*` boolean predicates (those live in
+the Phase 5-6 files); its guarded JSON re-parse site is
+`_extract_resume_text`, which is the helper routed through the shared
+loader here.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/ats_compliance.py`**:
+  - Adopted the shared `_validation` scaffold created in 4.3:
+    `_try_llm` now calls `chat_and_validate` (prompt/rules/schema stay
+    agent-specific) and only keeps the agent-specific post-validation
+    (ATS score clamping, `final_resume` fill from input); `run()` uses the
+    shared `serialize`.  Removed ~45 lines of duplicated scaffolding.
+  - Deleted the duplicated `_serialize` and `_parse_json` module helpers.
+  - **4.4 core:** `_extract_resume_text`'s guarded `json.loads` block now
+    routes through `load_json_safe` (from `client/json_utils.py`), the
+    single shared replacement for the `try: json.loads / except
+    (json.JSONDecodeError, TypeError)` pattern.  Docstring expanded with
+    Args/Returns and a "why" (rebuilds readable plain-text resume; returns
+    raw JSON on parse failure).
+  - `_default_result` docstring expanded with Args/Returns and the
+    "deterministic fallback" story (default low-score + resume unchanged).
+  - Module docstring expanded: LLM-only (no regex fallback), output model
+    ``ATSComplianceOutput``, deterministic fallback = default low-score
+    result on total LLM failure.
+- **`tests/test_model_clients.py`** — `CALL_SITE_FILES` updated:
+  `client/agents/ats_compliance.py` removed (its only `client.chat(...)`
+  site moved into the already-tracked shared `_validation.py`); stable
+  call-site count updated 11 -> 10.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_ats_compliance.py` (8 contract tests), and the updated
+  call-site guard in `tests/test_model_clients.py`
+
+**Commit:** `simplify: phase 4d - ats compliance shared scaffolding + load_json_safe routing`
