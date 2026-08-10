@@ -489,6 +489,10 @@ def _ensure_chronological(result: RewriteOutput) -> RewriteOutput:
     the tail in their original relative order.  The input list length is
     always preserved (no entries are dropped).
 
+    This function never mutates ``result`` in place: it returns a new
+    ``RewriteOutput`` via ``model_copy(update=...)``, so the validated
+    LLM result handed in by ``_try_llm`` stays untouched.
+
     If no entry has a parseable start year, the list is returned unchanged.
 
     Args:
@@ -522,6 +526,11 @@ def _sanitize_skills(result: RewriteOutput, resume_json: str) -> RewriteOutput |
     Returns a copy of ``result`` with fabricated skills removed, or
     ``None`` when more than half of the output skills are fabricated
     (the caller should fall back to ``_parsed_to_rewrite``).
+
+    This function never mutates ``result`` in place: when skills are
+    dropped it returns a new ``RewriteOutput`` via
+    ``model_copy(update=...)``.  Returning ``result`` itself (when there
+    is nothing to drop) is a no-op, not a mutation.
 
     Args:
         result: A validated ``RewriteOutput`` from the LLM.
@@ -614,7 +623,16 @@ def _tailor_skills(
        ``keyword_strategy``) move to the front, preserving relative order.
     2. Up to 5 JD ``keywords`` (or strategy keywords) not already present
        in the resume skills are prepended.
+
+    Args:
+        skills: The skills from the parsed resume.
+        jd: A parsed job description (``JDParsingOutput`` or dict).
+        strategy: A tailoring strategy (``GapAnalysisOutput`` or dict).
+
+    Returns:
+        The reordered and augmented skill list.
     """
+    # Sources: the JD is the primary source, the strategy fills it in.
     jd_data = _as_dict(jd)
     strategy_data = _as_dict(strategy)
 
@@ -625,6 +643,8 @@ def _tailor_skills(
         strategy_data, "keyword_strategy"
     )
 
+    # Step 1. Reorder: skills matching the priority keywords move to the
+    # front; the rest keep their original relative order behind them.
     priority_norm = _NORMALIZER.normalize_list(priority)
     matched: list[str] = []
     unmatched: list[str] = []
@@ -635,6 +655,9 @@ def _tailor_skills(
             unmatched.append(skill)
     reordered = matched + unmatched
 
+    # Step 2. Augment: prepend up to 5 JD keywords that are not already
+    # represented in the resume (exact, canonical, or fuzzy) so the
+    # fallback resume still surfaces the JD's keywords for ATS parsing.
     present = _NORMALIZER.normalize_list(reordered)
     additions: list[str] = []
     additions_norm: list[str] = []

@@ -636,3 +636,47 @@ with a one-line docstring.
   -> False, `'cobol'` vs `['python','rust']` -> False.
 
 **Commit:** `simplify: phase 5d - skill matching named helpers (_exact_match/_substring_match/_token_match)`
+
+---
+
+## Phase 5 - Completed sub-task 5.5: `model_copy` never-mutate contract + `_tailor_skills` step-by-step
+
+Original instruction: verify `_ensure_chronological` / `_sanitize_skills`
+docstrings explain the `model_copy` never-mutate contract; `_tailor_skills`
+reads step-by-step.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/resume_rewrite.py`** — docstrings/comments only, no
+  code changes:
+  - `_ensure_chronological` docstring now has an explicit
+    "never mutates ``result`` in place" paragraph: it returns a new
+    ``RewriteOutput`` via ``model_copy(update=...)`` so the validated LLM
+    result handed in by ``_try_llm`` stays untouched (was only implied by
+    "Returns a copy" and the banner comment).
+  - `_sanitize_skills` docstring now has the same contract paragraph: it
+    never mutates in place; dropping skills returns
+    ``model_copy(update=...)``, and returning ``result`` itself when there
+    is nothing to drop is explicitly a no-op, not a mutation.
+  - `_tailor_skills` now reads step-by-step: numbered in-code comments
+    (`# Step 1. Reorder:` and `# Step 2. Augment:`) at the two
+    deterministic transformations, a short "Sources:" comment for the
+    JD-primary/strategy-fallback reads, and full `Args:`/`Returns:`
+    docstring.  The Step-2 comment explains *why* the keywords are
+    prepended (so the fallback resume still surfaces the JD keywords for
+    ATS parsing).
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_resume_rewrite_validation.py` (63) and
+  `tests/test_agent_resume_rewrite.py` (8)
+- `git diff` reviewed: all additions are docstring/comment lines; no code
+  lines changed.
+
+**Commit:** `simplify: phase 5e - model_copy never-mutate docs + tailor_skills step-by-step comments`
