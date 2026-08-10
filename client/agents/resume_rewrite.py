@@ -5,6 +5,11 @@ Resume Rewrite Agent.
 Rewrites a resume using a tailoring strategy from the Gap Analysis Agent.
 Uses an LLM to produce a ``RewriteOutput``.  Falls back to the original
 parsed resume on LLM failure.
+
+File layout: the public ``ResumeRewriteAgent`` class comes first, then the
+module-level helpers grouped by purpose with banner comments -- shared
+serialization/parsing utilities, validation guards, deterministic
+post-processors, deterministic fallback tailoring, and skill matching.
 """
 
 import json
@@ -241,6 +246,11 @@ class ResumeRewriteAgent:
         return result
 
 
+# ---------------------------------------------------------------------------
+# Shared serialization / parsing utilities
+# ---------------------------------------------------------------------------
+
+
 def _serialize(value: Any) -> str:
     """Serialize a Pydantic model or dict to a JSON string."""
     if hasattr(value, "model_dump"):
@@ -248,6 +258,15 @@ def _serialize(value: Any) -> str:
     if isinstance(value, dict):
         return json.dumps(value, indent=2, default=str)
     return str(value)
+
+
+def _parse_json(raw: str) -> dict[str, Any] | None:
+    """Best-effort JSON extraction from an LLM response.
+
+    Thin wrapper over :func:`client.json_utils.parse_json_response`.
+    Handles responses wrapped in markdown fences.
+    """
+    return parse_json_response(raw)
 
 
 def _count_words(result: RewriteOutput) -> int:
@@ -265,13 +284,218 @@ def _count_words(result: RewriteOutput) -> int:
     return sum(len(text.split()) for text in fields)
 
 
-def _parse_json(raw: str) -> dict[str, Any] | None:
-    """Best-effort JSON extraction from an LLM response.
+def _load_str_list(resume_json: str, field: str) -> list[str]:
+    """Load a list-of-strings field from a serialized resume."""
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return []
+    value = resume_data.get(field, [])
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]
 
-    Thin wrapper over :func:`client.json_utils.parse_json_response`.
-    Handles responses wrapped in markdown fences.
+
+def _extract_start_year(dates: str) -> int | None:
+    """Return the first 4-digit year in a dates string, or None."""
+    match = re.search(r"(\d{4})", dates)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+# ---------------------------------------------------------------------------
+# Validation -- guards against LLM fabrication (reject on violation)
+# ---------------------------------------------------------------------------
+
+
+def _validate_experience_count(result: RewriteOutput, resume_json: str) -> bool:
+    """Return True if the output does not have more experiences than input."""
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return True  # can't validate, pass
+    input_exp: list[Any] = resume_data.get("experience", [])
+    if not input_exp:
+        return True
+    if len(result.experience) > len(input_exp):
+        logger.debug(
+            "Experience count mismatch: output=%d input=%d",
+            len(result.experience),
+            len(input_exp),
+        )
+        return False
+    return True
+
+
+def _validate_certifications(result: RewriteOutput, resume_json: str) -> bool:
+    """Return True if all input certifications appear in the output."""
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return True  # can't validate, pass
+    input_certs: list[Any] = resume_data.get("certifications", [])
+    if not input_certs:
+        return True
+    output_certs_lower = {c.lower() for c in result.certifications}
+    for cert in input_certs:
+        if not isinstance(cert, str):
+            continue
+        if cert.lower() not in output_certs_lower:
+            logger.debug("Missing certification: %s", cert)
+            return False
+    return True
+
+
+def _validate_companies(result: RewriteOutput, resume_json: str) -> bool:
+    """Return True if every output company matches an input employer.
+
+    Companies are matched case-insensitively by substring against the set
+    of input company names (the LLM may reorder entries, so match by name
+    rather than by position).  Empty output companies are skipped.
     """
-    return parse_json_response(raw)
+    try:
+        resume_data: dict[str, Any] = json.loads(resume_json)
+    except json.JSONDecodeError, TypeError:
+        return True  # can't validate, pass
+    input_companies = _extract_companies(resume_data.get("experience", []))
+    if not input_companies:
+        return True
+    for entry in result.experience:
+        company = entry.company.strip()
+        if not company:
+            continue
+        if not any(_company_matches(company, inp) for inp in input_companies):
+            logger.debug("Fabricated company not in input resume: %s", company)
+            return False
+    return True
+
+
+def _extract_companies(experiences: list[Any]) -> list[str]:
+    """Extract non-empty company names from a list of experience entries."""
+    companies: list[str] = []
+    for exp in experiences:
+        if isinstance(exp, dict):
+            company = exp.get("company", "")  # type: ignore[reportUnknownMemberType]
+        else:
+            company = getattr(exp, "company", "")
+        if isinstance(company, str) and company.strip():
+            companies.append(company.strip())
+    return companies
+
+
+def _company_matches(output: str, input_: str) -> bool:
+    """Case-insensitive substring match between two company names."""
+    out = output.lower()
+    inp = input_.lower()
+    return out in inp or inp in out
+
+
+def _validate_chronological(result: RewriteOutput) -> bool:
+    """Return True if experiences are listed most-recent-first.
+
+    Entries without a parseable start year are skipped.  A result with
+    fewer than two parseable years is accepted (cannot be validated).
+    """
+    years: list[int] = []
+    for entry in result.experience:
+        year = _extract_start_year(entry.dates)
+        if year is not None:
+            years.append(year)
+    if len(years) < 2:
+        return True
+    for current, following in zip(years, years[1:], strict=False):
+        if current < following:
+            logger.debug(
+                "Experience out of chronological order: %d before %d",
+                current,
+                following,
+            )
+            return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Deterministic post-processors -- fix instead of reject (never mutate in place)
+# ---------------------------------------------------------------------------
+
+
+def _ensure_chronological(result: RewriteOutput) -> RewriteOutput:
+    """Return a copy of ``result`` with experiences sorted most-recent-first.
+
+    A pure-Python post-processor (no LLM call) that fixes the ordering of
+    ``result.experience`` instead of rejecting.  Entries whose start year is
+    unparseable (``_extract_start_year`` returns ``None``) are preserved at
+    the tail in their original relative order.  The input list length is
+    always preserved (no entries are dropped).
+
+    If no entry has a parseable start year, the list is returned unchanged.
+
+    Args:
+        result: A validated ``RewriteOutput``.
+
+    Returns:
+        A ``RewriteOutput`` with ``experience`` sorted most-recent-first.
+    """
+    entries = result.experience
+    if not entries:
+        return result
+    if not any(_extract_start_year(entry.dates) is not None for entry in entries):
+        return result  # nothing to sort
+
+    def _sort_key(item: tuple[int, Any]) -> tuple[int, int]:
+        _, entry = item
+        year = _extract_start_year(entry.dates)
+        if year is None:
+            return (1, 0)  # no year: sink to the tail, stable keeps relative order
+        return (0, -year)  # most-recent-first
+
+    ordered = [entry for _, entry in sorted(enumerate(entries), key=_sort_key)]
+    return result.model_copy(update={"experience": ordered})
+
+
+def _sanitize_skills(result: RewriteOutput, resume_json: str) -> RewriteOutput | None:
+    """Filter output skills to those present in the input resume.
+
+    Returns a copy of ``result`` with fabricated skills removed, or
+    ``None`` when more than half of the output skills are fabricated
+    (the caller should fall back to ``_parsed_to_rewrite``).
+    """
+    input_skills = _load_str_list(resume_json, "skills")
+    if not input_skills or not result.skills:
+        return result
+    input_normalized = _NORMALIZER.normalize_list(input_skills)
+    canonical_matched = set(
+        _NORMALIZER.match_skills(result.skills, input_skills)["matched"]
+    )
+    kept: list[str] = []
+    dropped: list[str] = []
+    for skill in result.skills:
+        if _skill_matches(skill, input_normalized) or skill in canonical_matched:
+            kept.append(skill)
+        else:
+            dropped.append(skill)
+    if not dropped:
+        return result
+    drop_ratio = len(dropped) / len(result.skills)
+    if drop_ratio > 0.5:
+        logger.warning(
+            "Rejecting rewrite: %d/%d output skills not in input resume",
+            len(dropped),
+            len(result.skills),
+        )
+        return None
+    logger.warning(
+        "Dropped %d skills not present in input resume: %s",
+        len(dropped),
+        ", ".join(dropped),
+    )
+    return result.model_copy(update={"skills": kept})
+
+
+# ---------------------------------------------------------------------------
+# Tailoring -- deterministic ATS fallback used when the LLM fails
+# ---------------------------------------------------------------------------
 
 
 def _parsed_to_rewrite(
@@ -388,191 +612,9 @@ def _is_ascii(text: str) -> bool:
     return all(ord(char) < 128 for char in text)
 
 
-def _validate_experience_count(result: RewriteOutput, resume_json: str) -> bool:
-    """Return True if the output does not have more experiences than input."""
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
-        return True  # can't validate, pass
-    input_exp: list[Any] = resume_data.get("experience", [])
-    if not input_exp:
-        return True
-    if len(result.experience) > len(input_exp):
-        logger.debug(
-            "Experience count mismatch: output=%d input=%d",
-            len(result.experience),
-            len(input_exp),
-        )
-        return False
-    return True
-
-
-def _validate_certifications(result: RewriteOutput, resume_json: str) -> bool:
-    """Return True if all input certifications appear in the output."""
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
-        return True  # can't validate, pass
-    input_certs: list[Any] = resume_data.get("certifications", [])
-    if not input_certs:
-        return True
-    output_certs_lower = {c.lower() for c in result.certifications}
-    for cert in input_certs:
-        if not isinstance(cert, str):
-            continue
-        if cert.lower() not in output_certs_lower:
-            logger.debug("Missing certification: %s", cert)
-            return False
-    return True
-
-
-def _validate_companies(result: RewriteOutput, resume_json: str) -> bool:
-    """Return True if every output company matches an input employer.
-
-    Companies are matched case-insensitively by substring against the set
-    of input company names (the LLM may reorder entries, so match by name
-    rather than by position).  Empty output companies are skipped.
-    """
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
-        return True  # can't validate, pass
-    input_companies = _extract_companies(resume_data.get("experience", []))
-    if not input_companies:
-        return True
-    for entry in result.experience:
-        company = entry.company.strip()
-        if not company:
-            continue
-        if not any(_company_matches(company, inp) for inp in input_companies):
-            logger.debug("Fabricated company not in input resume: %s", company)
-            return False
-    return True
-
-
-def _extract_companies(experiences: list[Any]) -> list[str]:
-    """Extract non-empty company names from a list of experience entries."""
-    companies: list[str] = []
-    for exp in experiences:
-        if isinstance(exp, dict):
-            company = exp.get("company", "")  # type: ignore[reportUnknownMemberType]
-        else:
-            company = getattr(exp, "company", "")
-        if isinstance(company, str) and company.strip():
-            companies.append(company.strip())
-    return companies
-
-
-def _company_matches(output: str, input_: str) -> bool:
-    """Case-insensitive substring match between two company names."""
-    out = output.lower()
-    inp = input_.lower()
-    return out in inp or inp in out
-
-
-def _validate_chronological(result: RewriteOutput) -> bool:
-    """Return True if experiences are listed most-recent-first.
-
-    Entries without a parseable start year are skipped.  A result with
-    fewer than two parseable years is accepted (cannot be validated).
-    """
-    years: list[int] = []
-    for entry in result.experience:
-        year = _extract_start_year(entry.dates)
-        if year is not None:
-            years.append(year)
-    if len(years) < 2:
-        return True
-    for current, following in zip(years, years[1:], strict=False):
-        if current < following:
-            logger.debug(
-                "Experience out of chronological order: %d before %d",
-                current,
-                following,
-            )
-            return False
-    return True
-
-
-def _ensure_chronological(result: RewriteOutput) -> RewriteOutput:
-    """Return a copy of ``result`` with experiences sorted most-recent-first.
-
-    A pure-Python post-processor (no LLM call) that fixes the ordering of
-    ``result.experience`` instead of rejecting.  Entries whose start year is
-    unparseable (``_extract_start_year`` returns ``None``) are preserved at
-    the tail in their original relative order.  The input list length is
-    always preserved (no entries are dropped).
-
-    If no entry has a parseable start year, the list is returned unchanged.
-
-    Args:
-        result: A validated ``RewriteOutput``.
-
-    Returns:
-        A ``RewriteOutput`` with ``experience`` sorted most-recent-first.
-    """
-    entries = result.experience
-    if not entries:
-        return result
-    if not any(_extract_start_year(entry.dates) is not None for entry in entries):
-        return result  # nothing to sort
-
-    def _sort_key(item: tuple[int, Any]) -> tuple[int, int]:
-        _, entry = item
-        year = _extract_start_year(entry.dates)
-        if year is None:
-            return (1, 0)  # no year: sink to the tail, stable keeps relative order
-        return (0, -year)  # most-recent-first
-
-    ordered = [entry for _, entry in sorted(enumerate(entries), key=_sort_key)]
-    return result.model_copy(update={"experience": ordered})
-
-
-def _extract_start_year(dates: str) -> int | None:
-    """Return the first 4-digit year in a dates string, or None."""
-    match = re.search(r"(\d{4})", dates)
-    if match is None:
-        return None
-    return int(match.group(1))
-
-
-def _sanitize_skills(result: RewriteOutput, resume_json: str) -> RewriteOutput | None:
-    """Filter output skills to those present in the input resume.
-
-    Returns a copy of ``result`` with fabricated skills removed, or
-    ``None`` when more than half of the output skills are fabricated
-    (the caller should fall back to ``_parsed_to_rewrite``).
-    """
-    input_skills = _load_str_list(resume_json, "skills")
-    if not input_skills or not result.skills:
-        return result
-    input_normalized = _NORMALIZER.normalize_list(input_skills)
-    canonical_matched = set(
-        _NORMALIZER.match_skills(result.skills, input_skills)["matched"]
-    )
-    kept: list[str] = []
-    dropped: list[str] = []
-    for skill in result.skills:
-        if _skill_matches(skill, input_normalized) or skill in canonical_matched:
-            kept.append(skill)
-        else:
-            dropped.append(skill)
-    if not dropped:
-        return result
-    drop_ratio = len(dropped) / len(result.skills)
-    if drop_ratio > 0.5:
-        logger.warning(
-            "Rejecting rewrite: %d/%d output skills not in input resume",
-            len(dropped),
-            len(result.skills),
-        )
-        return None
-    logger.warning(
-        "Dropped %d skills not present in input resume: %s",
-        len(dropped),
-        ", ".join(dropped),
-    )
-    return result.model_copy(update={"skills": kept})
+# ---------------------------------------------------------------------------
+# Skill matching -- fuzzy matching against normalized input skills
+# ---------------------------------------------------------------------------
 
 
 def _skill_matches(skill: str, input_skills: list[str]) -> bool:
@@ -607,15 +649,3 @@ def _skill_matches(skill: str, input_skills: list[str]) -> bool:
 def _normalize_skill(skill: str) -> str:
     """Lowercase a skill and reduce it to whitespace-separated tokens."""
     return " ".join(re.findall(r"[a-z0-9]+", skill.lower()))
-
-
-def _load_str_list(resume_json: str, field: str) -> list[str]:
-    """Load a list-of-strings field from a serialized resume."""
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
-        return []
-    value = resume_data.get(field, [])
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, str)]  # type: ignore[reportUnknownVariableType]

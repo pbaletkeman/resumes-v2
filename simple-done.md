@@ -442,3 +442,52 @@ LLM-only agents (gap analysis, ATS compliance) that shared the duplicated
   call-site guard in `tests/test_model_clients.py`
 
 **Commit:** `simplify: phase 4e - tone polishing shared scaffolding + coercion docstrings`
+
+---
+
+## Phase 5 - Completed sub-task 5.1: re-order `resume_rewrite.py` (class first, helpers grouped)
+
+Original instruction: re-order the file so the public class comes first, then
+module helpers grouped by purpose (validation -> tailoring -> skill matching)
+with banner comments.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/resume_rewrite.py`** — re-ordered the module into five
+  banner-commented sections after the public `ResumeRewriteAgent` class.
+  The class already came first; the change moved the 20 module helpers into
+  purpose-grouped sections:
+  1. `# ---- Shared serialization / parsing utilities ----` —
+     `_serialize`, `_parse_json`, `_count_words`, `_load_str_list`,
+     `_extract_start_year`.
+  2. `# ---- Validation -- guards against LLM fabrication (reject on violation) ----` —
+     `_validate_experience_count`, `_validate_certifications`,
+     `_validate_companies`, `_extract_companies`, `_company_matches`,
+     `_validate_chronological`.
+  3. `# ---- Deterministic post-processors -- fix instead of reject (never mutate in place) ----` —
+     `_ensure_chronological`, `_sanitize_skills`.
+  4. `# ---- Tailoring -- deterministic ATS fallback used when the LLM fails ----` —
+     `_parsed_to_rewrite`, `_tailor_skills`, `_as_dict`, `_read_str_list`,
+     `_is_ascii`.
+  5. `# ---- Skill matching -- fuzzy matching against normalized input skills ----` —
+     `_skill_matches`, `_normalize_skill`.
+  - Module docstring updated with a short "File layout" paragraph pointing at
+    the banner grouping.
+  - **Every function/class body is byte-for-byte identical** — pure re-ordering.
+
+**Behavior verification:**
+
+- Structural compare via AST (`ast.dump`) against `HEAD`:
+  - function set identical, class set identical
+  - no function body changed, no class body changed
+  - old order vs new order confirmed as the only difference
+- `uv run ruff check .` — pass
+- `uv run ruff format .` — applied (banner block placement only)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_resume_rewrite.py` (8) and
+  `tests/test_resume_rewrite_validation.py` (63)
+
+**Commit:** `simplify: phase 5a - resume rewrite re-order (class first, helpers grouped with banners)`
