@@ -4,6 +4,23 @@ Abstract base class defining the interface for LLM model clients.
 
 Provides a unified API for sending structured prompts to different
 model providers (Ollama, OpenAI, etc.) and receiving responses.
+
+How agents use this file
+------------------------
+Every agent calls ``ModelClient.chat(...)`` through the registry
+(``client/model_registry.py``).  The contract is:
+
+- ``purpose``  -> system message (role/persona)
+- ``prompt``   -> user message (task)
+- ``output``   -> expected output field names or labels
+- ``rules``    -> constraints the model must follow
+- ``inputs``   -> raw data/context for the model
+- ``response_format`` -> always ``"json"`` (see ``chat`` docstring)
+- ``json_schema``     -> optional strict-mode schema for Structured Outputs
+
+The provider-specific prompt text is built by the shared
+``build_task_prompt()`` helper at the bottom of this module, so agents
+receive identical instructions no matter which provider answers.
 """
 
 from abc import ABC, abstractmethod
@@ -52,3 +69,40 @@ class ModelClient(ABC):
             NotImplementedError: Always; must be overridden by subclasses.
         """
         ...
+
+
+def build_task_prompt(
+    prompt: str,
+    output: list[str],
+    rules: list[str],
+    inputs: list[str],
+) -> str:
+    """Build the compact, newline-delimited user prompt for a chat call.
+
+    This is the *single* prompt builder shared by every ``ModelClient``
+    implementation (Ollama and OpenAI both call it), so the exact text a
+    provider receives is identical regardless of which backend is used.
+
+    Sections are only included when the corresponding list is non-empty;
+    the ``prompt`` task line is always present.
+
+    Returns:
+        A formatted prompt string with labelled sections, one per line::
+
+            Task: <prompt>
+            Output format: <output>
+            Rules: <rule1> | <rule2>
+            Input: <input1> | <input2>
+    """
+    parts = [f"Task: {prompt}"]
+
+    if output:
+        parts.append(f"Output format: {', '.join(output)}")
+
+    if rules:
+        parts.append(f"Rules: {' | '.join(rules)}")
+
+    if inputs:
+        parts.append(f"Input: {' | '.join(inputs)}")
+
+    return "\n".join(parts)

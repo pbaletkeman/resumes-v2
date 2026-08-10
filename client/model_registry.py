@@ -123,7 +123,7 @@ class ModelClientRegistry:
         if agent_name in self._agent_clients:
             name = self._agent_clients[agent_name]
             logger.debug("Resolved agent client: %s -> %s (override)", agent_name, name)
-            return self.get(self._agent_clients[agent_name])
+            return self.get(name)
 
         # Fall back to default
         if self._default_client_name is not None:
@@ -158,7 +158,8 @@ class ModelClientRegistry:
     def from_config(self, config: dict[str, Any]) -> None:
         """Load client registrations from a configuration dictionary.
 
-        Expected format::
+        Expected format (the dict returned by
+        ``config.agents.get_agent_config()``)::
 
             {
                 "clients": {

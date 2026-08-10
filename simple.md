@@ -155,7 +155,10 @@ These rules apply to every phase. Read them once here; each phase references the
 
 ## Part A - Backend (Python)
 
-## Phase 1 - Foundation: config, logging, errors, LLM clients, JSON utils
+## Phase 1 - Foundation: config, logging, errors, LLM clients, JSON utils  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `config/agents.py`, `logging_config.py`, `client/errors.py`, `client/model_client.py`, `client/json_utils.py`, `client/ollama_client.py`, `client/open_ai_client.py`, `client/model_registry.py`
 

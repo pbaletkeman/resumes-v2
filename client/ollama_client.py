@@ -2,9 +2,12 @@
 ollama_client.py
 Concrete ModelClient implementation for the Ollama API.
 
-    Sends structured prompts to a locally-running Ollama model and
-    returns the response. Supports any model available in the user's
-    Ollama installation (e.g. qwen2.5:7b-instruct, llama3, mistral).
+Sends structured prompts to a locally-running Ollama model and returns
+the response. Supports any model available in the user's Ollama
+installation (e.g. qwen2.5:7b-instruct, llama3, mistral).
+
+The user prompt is built by the shared ``client.model_client.build_task_prompt``
+helper, so both providers send identical instructions.
 """
 
 import asyncio
@@ -15,7 +18,7 @@ from typing import Any
 import ollama
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
-from client.model_client import ModelClient
+from client.model_client import ModelClient, build_task_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +83,10 @@ class OllamaClient(ModelClient):
         Raises:
             LLMConnectionError: If the Ollama server cannot be reached.
             LLMResponseError: If Ollama returns an error response.
-            LLMTimeoutError: If the model does not respond within 90 seconds.
+            LLMTimeoutError: If the model does not respond within the
+                configured ``self.timeout`` (default 300 seconds).
         """
-        task = self._build_compact_prompt(purpose, prompt, output, rules, inputs)
+        task = build_task_prompt(prompt, output, rules, inputs)
         actual_format: Any = json_schema if json_schema is not None else "json"
 
         logger.debug(
@@ -144,36 +148,3 @@ class OllamaClient(ModelClient):
             elapsed,
         )
         return content
-
-    def _build_compact_prompt(
-        self,
-        purpose: str,
-        prompt: str,
-        output: list[str],
-        rules: list[str],
-        inputs: list[str],
-    ) -> str:
-        """Build a compact, newline-delimited prompt string.
-
-        Args:
-            purpose: System-level role (used for context, not included in output).
-            prompt: The primary task description.
-            output: Expected output field names.
-            rules: Constraints or guidelines.
-            inputs: Additional context data.
-
-        Returns:
-            A formatted prompt string with labelled sections.
-        """
-        parts = [f"Task: {prompt}"]
-
-        if output:
-            parts.append(f"Output format: {', '.join(output)}")
-
-        if rules:
-            parts.append(f"Rules: {' | '.join(rules)}")
-
-        if inputs:
-            parts.append(f"Input: {' | '.join(inputs)}")
-
-        return "\n".join(parts)

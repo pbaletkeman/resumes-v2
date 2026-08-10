@@ -2,9 +2,17 @@
 json_utils.py
 Shared JSON helpers for LLM responses and provider JSON schemas.
 
-Consolidates the per-agent ``_parse_json`` / ``_safe_json`` helpers into a
-single ``parse_json_response`` and provides ``model_to_json_schema`` for
-provider-native Structured Outputs (see resume-done.md §8.7 / §8.8).
+Two functions every agent relies on:
+
+- ``parse_json_response``: best-effort conversion of a raw LLM response
+  string into a dict.  This is the single replacement for the per-agent
+  ``_parse_json`` / ``_safe_json`` helpers, so all agents parse LLM
+  output the same way (fence stripping, JSON decode, cover-letter
+  fallback, logging).
+- ``model_to_json_schema``: builds a strict-mode, provider-ready JSON
+  Schema from a Pydantic output model.  Each agent passes the result to
+  ``ModelClient.chat(json_schema=...)`` so providers can run Structured
+  Outputs instead of plain JSON mode.
 """
 
 import json
@@ -16,7 +24,7 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
 
 
 def parse_json_response(
@@ -42,7 +50,7 @@ def parse_json_response(
     """
     text = raw.strip()
     logger.debug("JSON parse input: %s", text[:300] if text else "<empty>")
-    fence_match = _FENCE_RE.search(text)
+    fence_match = _JSON_FENCE_RE.search(text)
     if fence_match:
         text = fence_match.group(1).strip()
     try:

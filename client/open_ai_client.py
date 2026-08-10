@@ -4,6 +4,9 @@ Concrete ModelClient implementation for the OpenAI API.
 
 Sends structured prompts to any OpenAI-compatible model (GPT-4o, GPT-4o-mini, etc.)
 via the official openai Python SDK.
+
+The user prompt is built by the shared ``client.model_client.build_task_prompt``
+helper, so both providers send identical instructions.
 """
 
 import asyncio
@@ -25,7 +28,7 @@ from client.errors import (
     LLMResponseError,
     LLMTimeoutError,
 )
-from client.model_client import ModelClient
+from client.model_client import ModelClient, build_task_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +53,32 @@ def _schema_name(json_schema: dict[str, Any]) -> str:
     if isinstance(title, str) and title.replace("_", "a").replace("-", "a").isalnum():
         return title[:64]
     return _DEFAULT_SCHEMA_NAME
+
+
+def _response_format_value(json_schema: dict[str, Any] | None) -> dict[str, Any]:
+    """Build the ``response_format`` value to pass to the OpenAI SDK.
+
+    With no schema the provider runs in plain JSON mode
+    (``{"type": "json_object"}``).  With a JSON Schema dict the provider
+    enters OpenAI Structured Outputs via the ``json_schema`` envelope,
+    which requires a name, the schema itself, and ``strict: True``.
+
+    Args:
+        json_schema: Optional JSON Schema dict from ``model_to_json_schema``.
+
+    Returns:
+        The ``response_format`` dict for the OpenAI SDK.
+    """
+    if json_schema is not None:
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": _schema_name(json_schema),
+                "schema": json_schema,
+                "strict": True,
+            },
+        }
+    return {"type": "json_object"}
 
 
 class OpenAIClient(ModelClient):
@@ -115,32 +144,11 @@ class OpenAIClient(ModelClient):
                 or the API returns an error.
             LLMTimeoutError: If the model does not respond within 90 seconds.
         """
-        parts = [f"Task: {prompt}"]
-
-        if output:
-            parts.append(f"Output format: {', '.join(output)}")
-
-        if rules:
-            parts.append(f"Rules: {' | '.join(rules)}")
-
-        if inputs:
-            parts.append(f"Input: {' | '.join(inputs)}")
-
-        task = "\n".join(parts)
+        task = build_task_prompt(prompt, output, rules, inputs)
 
         # response_format="json" is the only supported mode; a JSON Schema
         # dict opts in to OpenAI Structured Outputs (json_schema mode).
-        if json_schema is not None:
-            response_format_value: dict[str, Any] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": _schema_name(json_schema),
-                    "schema": json_schema,
-                    "strict": True,
-                },
-            }
-        else:
-            response_format_value = {"type": "json_object"}
+        response_format_value = _response_format_value(json_schema)
 
         logger.debug(
             "OpenAI request: model=%s format=%s prompt_len=%d messages=2",
