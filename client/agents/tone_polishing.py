@@ -2,19 +2,25 @@
 tone_polishing.py
 Tone Polishing Agent.
 
-Improves the tone and professionalism of the ATS-optimized resume
-without changing facts.  Uses an LLM to produce a ``TonePolishingOutput``.
-Falls back to returning the input unchanged on LLM failure.
+LLM-only agent: improves the tone and professionalism of the
+ATS-optimized resume without changing facts.  There is no regex fallback
+-- tone rewriting requires LLM reasoning.
+
+Output model: ``TonePolishingOutput``.  On total LLM failure (both
+attempts fail) the deterministic fallback returns the input resume
+unchanged, so the pipeline never loses the ATS-optimized text.
+
+The LLM call, JSON parsing, and Pydantic validation scaffolding is shared
+with the other LLM-only agents via ``client.agents._validation``.
+The empty-output fill used for ``polished_resume`` is agent-specific and
+stays here.
 """
 
-import json
 import logging
 from typing import Any
 
-from pydantic import ValidationError
-
-from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
-from client.json_utils import model_to_json_schema, parse_json_response
+from client.agents._validation import chat_and_validate
+from client.json_utils import model_to_json_schema
 from client.model_client import ModelClient
 from client.models import TonePolishingOutput
 
@@ -69,7 +75,8 @@ class TonePolishingAgent:
                 with the full resume text).
 
         Returns:
-            A validated ``TonePolishingOutput``.
+            A validated ``TonePolishingOutput``.  On total LLM failure
+            the input resume text is returned unchanged.
         """
         resume_text = inputs.get("ats_optimized_resume", "")
 
@@ -122,68 +129,23 @@ class TonePolishingAgent:
             ]
         )
 
-        logger.debug(
-            "LLM tone attempt=%s prompt_len=%d",
-            "strict" if strict else "normal",
-            len(prompt),
+        result = await chat_and_validate(
+            self.client,
+            purpose=_SYSTEM_PROMPT,
+            prompt=prompt,
+            rules=rules,
+            inputs=[resume_text],
+            json_schema=model_to_json_schema(TonePolishingOutput),
+            output_model=TonePolishingOutput,
+            agent_label="tone polishing",
+            strict=strict,
         )
-
-        try:
-            raw = await self.client.chat(
-                purpose=_SYSTEM_PROMPT,
-                prompt=prompt,
-                output=["json"],
-                rules=rules,
-                inputs=[resume_text],
-                response_format="json",
-                json_schema=model_to_json_schema(TonePolishingOutput),
-            )
-        except (
-            NotImplementedError,
-            LLMConnectionError,
-            LLMResponseError,
-            LLMTimeoutError,
-        ):
-            logger.exception(
-                "LLM tone polishing failed (attempt %s)",
-                "strict" if strict else "normal",
-            )
+        if result is None:
             return None
 
-        logger.debug("LLM tone response: %s", raw[:200] if raw else "<empty>")
-        data = _parse_json(raw)
-        if data is None:
-            return None
-
-        try:
-            result = TonePolishingOutput(**data)
-        except ValidationError as exc:
-            data_keys = list(data.keys()) if hasattr(data, "keys") else str(type(data))
-            data_preview = (
-                json.dumps(data, indent=2, default=str)[:500] if data else "<None>"
-            )
-            logger.warning(
-                "LLM output failed Pydantic validation: %s\n"
-                "  parsed data keys: %s\n"
-                "  parsed data: %s",
-                exc,
-                data_keys,
-                data_preview,
-            )
-            return None
-
-        # If polished_resume is empty, use the input
+        # Post-validation: if polished_resume is empty, use the input
         if not result.polished_resume.strip():
             logger.warning("polished_resume is empty, using input resume text")
             result.polished_resume = resume_text
 
         return result
-
-
-def _parse_json(raw: str) -> dict[str, Any] | None:
-    """Best-effort JSON extraction from an LLM response.
-
-    Thin wrapper over :func:`client.json_utils.parse_json_response`.
-    Handles responses wrapped in markdown fences.
-    """
-    return parse_json_response(raw)

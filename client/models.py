@@ -369,7 +369,13 @@ class GapAnalysisOutput(BaseModel):
     @field_validator("tone_guidance", mode="before")
     @classmethod
     def _coerce_tone_guidance(cls, v: Any) -> str:
-        """Coerce ``tone_guidance`` to a string (dict/list tolerant)."""
+        """Coerce ``tone_guidance`` to a string.
+
+        Delegates to the shared :func:`_coerce_str` helper: the LLM
+        sometimes returns the tone guidance as a dict or list structure;
+        flatten it, keep a plain string as-is, and map falsy values to
+        ``""``.
+        """
         return _coerce_str(v)
 
 

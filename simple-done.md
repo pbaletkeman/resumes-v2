@@ -346,3 +346,53 @@ loader here.
   call-site guard in `tests/test_model_clients.py`
 
 **Commit:** `simplify: phase 4d - ats compliance shared scaffolding + load_json_safe routing`
+
+---
+
+## Phase 4 - Completed sub-task 4.5: `tone_polishing.py` shared scaffolding + coercion/docstring clarity
+
+Original instruction: verify tone-guidance coercion is as clear as
+`models.py`; expand docstrings.  Tone polishing is the last of the three
+LLM-only agents (gap analysis, ATS compliance) that shared the duplicated
+``_try_llm`` scaffolding, so it was brought onto the same shared
+`_validation` path in the same phase.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/tone_polishing.py`**:
+  - Adopted the shared `_validation` scaffold (created in 4.3): `_try_llm`
+    now calls `chat_and_validate` and only keeps the agent-specific
+    post-validation -- the empty-`polished_resume` fill from the input
+    resume.  `run()` keeps its two-attempt retry + pass-through fallback
+    (the deterministic fallback differs per agent, per the `_validation`
+    design).  Removed ~45 lines of duplicated scaffolding (module
+    `_parse_json`, inline chat/parse/validate/error-handling block).
+  - Expanded docstrings: module docstring now explains LLM-only nature,
+    output model ``TonePolishingOutput``, pass-through fallback, and that
+    the empty-output fill is agent-specific; `run()` and `_try_llm`
+    docstrings state the fallback/Args/Returns.
+  - **Coercion note (4.5 core):** tone-guidance coercion lives in
+    `client/models.py` (`GapAnalysisOutput._coerce_tone_guidance`), not in
+    the agent.  `_coerce_str` was already as clear as `models.py`'s other
+    coercers; its validator docstring was expanded to point at the shared
+    helper and the "why" (LLM returns dict/list structures).
+- **`client/models.py`** -- expanded `_coerce_tone_guidance` docstring:
+  delegates to shared `_coerce_str`, flattens dict/list, keeps strings,
+  maps falsy to `""`.
+- **`tests/test_model_clients.py`** -- `CALL_SITE_FILES` updated:
+  `client/agents/tone_polishing.py` removed (its only `client.chat(...)`
+  site moved into the already-tracked shared `_validation.py`); stable
+  call-site count updated 10 -> 9.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format .` — pass (tone_polishing.py auto-formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_tone_polishing.py` (6 contract tests) and the updated
+  call-site guard in `tests/test_model_clients.py`
+
+**Commit:** `simplify: phase 4e - tone polishing shared scaffolding + coercion docstrings`
