@@ -160,3 +160,42 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 - Regex-path spot-checks unchanged: `_extract_company_name` still extracts "3Pillar"/"Acme Corporation"; `_sync_company_name` still agrees; `FormatDetector._extract_section/list_section/bullet_points` output identical (covered by the 46 format-detector tests).
 
 **Commit:** `simplify: phase 3 - parsing agents & format detector (shared retry loop, named section patterns)`
+
+---
+
+## Phase 4 - Completed sub-task 4.1: shared `load_json_safe` helper
+
+Added the guarded JSON-object parser that Phases 4.2-4.6 will route the
+repeated `try: json.loads(...) except (json.JSONDecodeError, TypeError):`
+blocks through (across `ats_compliance.py`, `resume_rewrite.py`,
+`cover_letter.py`).
+
+### Completion record
+
+**Changes made:**
+
+- **`client/json_utils.py`** — added `load_json_safe(text) -> dict[str, Any] | None`:
+  - Never raises. Returns `None` for empty input, invalid JSON, fenced
+    non-object JSON, and parsed non-object values (arrays/scalars).
+  - Strips a surrounding markdown fence (`` ```json ... ``` ``) when
+    present, mirroring `parse_json_response` so nested LLM blobs parse
+    the same way as top-level responses.
+  - Guards `TypeError` too (defensive against non-string inputs).
+  - Module docstring updated: now lists three helpers (added
+    `load_json_safe` to the intro).
+- **`tests/test_json_utils.py`** — added `TestLoadJsonSafe` (8 tests):
+  plain object, fenced object, fenced with surrounding text, invalid
+  JSON, malformed nested blob, empty/whitespace input, non-object JSON
+  (`[1, 2, 3]` / string), and fenced non-object JSON.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format .` — applied (1 file reformatted; no behavior change)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed (485 baseline + 8 new), including
+  `tests/test_json_utils.py` (23: 11 parse + 8 load_json_safe + 4 schema)
+- No existing callers changed in this sub-task — `load_json_safe` is
+  added but not yet wired into agents (that is sub-tasks 4.2-4.6).
+
+**Commit:** `simplify: phase 4a - shared load_json_safe helper in json_utils`

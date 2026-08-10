@@ -2,13 +2,17 @@
 json_utils.py
 Shared JSON helpers for LLM responses and provider JSON schemas.
 
-Two functions every agent relies on:
+Three functions every agent relies on:
 
 - ``parse_json_response``: best-effort conversion of a raw LLM response
   string into a dict.  This is the single replacement for the per-agent
   ``_parse_json`` / ``_safe_json`` helpers, so all agents parse LLM
   output the same way (fence stripping, JSON decode, cover-letter
   fallback, logging).
+- ``load_json_safe``: the guarded ``json.loads`` used by the agent
+  post-validation helpers when they re-parse a JSON blob that an earlier
+  agent embedded in a string field.  Returns ``None`` instead of raising,
+  so every validation site shares one obvious "parse or fail" path.
 - ``model_to_json_schema``: builds a strict-mode, provider-ready JSON
   Schema from a Pydantic output model.  Each agent passes the result to
   ``ModelClient.chat(json_schema=...)`` so providers can run Structured
@@ -65,6 +69,46 @@ def parse_json_response(
             return {plain_text_fallback: text}
         logger.warning("Failed to parse LLM response as JSON")
         return None
+
+
+@staticmethod
+def load_json_safe(text: str) -> dict[str, Any] | None:
+    """Parse a JSON object from a string, returning None on any failure.
+
+    This is the single shared replacement for the repeated guarded
+    ``try: json.loads(...) / except (json.JSONDecodeError, TypeError)``
+    blocks in the agent post-validation helpers.  It never raises.
+
+    Behavior:
+    - Strips a surrounding markdown fence (`` ```json ... ``` ``) when
+      present, mirroring ``parse_json_response``.
+    - Returns ``None`` when the text is not valid JSON, when the parsed
+      value is not a JSON object (e.g. a list or scalar), or when
+      ``text`` is empty.
+    - Returns the parsed dict otherwise.
+
+    ``TypeError`` is also guarded because ``json.loads`` raises it for
+    non-string inputs (defensive: callers pass LLM-produced values).
+
+    Args:
+        text: Raw text expected to contain a JSON object.
+
+    Returns:
+        The parsed dict, or ``None`` when parsing fails.
+    """
+    if not text.strip():
+        return None
+    candidate = text.strip()
+    fence_match = _JSON_FENCE_RE.search(candidate)
+    if fence_match:
+        candidate = fence_match.group(1).strip()
+    try:
+        parsed: Any = json.loads(candidate)
+    except json.JSONDecodeError, TypeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return cast(dict[str, Any], parsed)
 
 
 def model_to_json_schema(model: type[BaseModel]) -> dict[str, Any]:

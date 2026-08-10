@@ -626,7 +626,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 4 - LLM-only agents + shared validation cleanup
 
-- [ ] 4.1 Add `load_json_safe(text) -> dict | None` shared helper (in `client/json_utils.py` or new `client/agents/_validation.py`) with docstring explaining fence-stripping + guard.
+- [x] 4.1 Add `load_json_safe(text) -> dict | None` shared helper in `client/json_utils.py` with docstring explaining fence-stripping + guard. ✅ See `simple-done.md`.
 - [ ] 4.2 Standardize `except json.JSONDecodeError, TypeError:` to `except (json.JSONDecodeError, TypeError):` everywhere it appears (visible in Phases 5-6 too).
 - [ ] 4.3 `gap_analysis.py`: dedupe `_try_llm` scaffolding, verify module docstring ("LLM only, deterministic fallback", output model, failure = empty model).
 - [ ] 4.4 `ats_compliance.py`: route its `_validate_*` helpers through `load_json_safe`, expand `Returns True when ...` docstrings.

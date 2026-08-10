@@ -4,6 +4,8 @@ Covers:
 
 - ``parse_json_response``: plain JSON, markdown-fenced JSON, invalid
   input, and the plain-text cover letter fallback.
+- ``load_json_safe``: the guarded JSON-object parser used by agent
+  post-validation helpers (fence stripping, failure => None).
 - ``model_to_json_schema``: builds a strict-mode provider-ready schema
   from a Pydantic model (``additionalProperties: false``, all properties
   required, nested ``$defs`` handled).
@@ -11,7 +13,11 @@ Covers:
 
 from pydantic import BaseModel
 
-from client.json_utils import model_to_json_schema, parse_json_response
+from client.json_utils import (
+    load_json_safe,
+    model_to_json_schema,
+    parse_json_response,
+)
 
 
 class TestParseJsonResponse:
@@ -58,6 +64,40 @@ class TestParseJsonResponse:
     async def test_plain_text_fallback_not_used_without_option(self) -> None:
         raw = "Dear hiring manager, " + ("thank you for your time. " * 4)
         assert parse_json_response(raw) is None
+
+
+class TestLoadJsonSafe:
+    async def test_plain_object(self) -> None:
+        assert load_json_safe('{"key": "value"}') == {"key": "value"}
+
+    async def test_fenced_object(self) -> None:
+        raw = '```json\n{"key": "value"}\n```'
+        assert load_json_safe(raw) == {"key": "value"}
+
+    async def test_fenced_object_with_surrounding_text(self) -> None:
+        raw = 'Result:\n```json\n{"key": "value"}\n```\nDone.'
+        assert load_json_safe(raw) == {"key": "value"}
+
+    async def test_invalid_json_returns_none(self) -> None:
+        assert load_json_safe("not json at all") is None
+
+    async def test_malformed_nested_blob_returns_none(self) -> None:
+        raw = '{"summary": "x", "experience": '
+        assert load_json_safe(raw) is None
+
+    async def test_empty_input_returns_none(self) -> None:
+        assert load_json_safe("") is None
+        assert load_json_safe("   \t\n  ") is None
+
+    async def test_non_object_json_returns_none(self) -> None:
+        # Arrays and scalars are valid JSON but not the objects the
+        # post-validation helpers expect.
+        assert load_json_safe("[1, 2, 3]") is None
+        assert load_json_safe('"just a string"') is None
+
+    async def test_fenced_non_object_returns_none(self) -> None:
+        raw = '```json\n["a", "b"]\n```'
+        assert load_json_safe(raw) is None
 
 
 class _SimpleOutput(BaseModel):
