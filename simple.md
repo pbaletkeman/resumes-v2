@@ -615,3 +615,154 @@ Tests are not "code to ship", but they are part of the repo and this plan review
 4. Diff review: `git diff` across all phases = documentation + readability only, no behavior change (spot-check output of rendered files before/after if desired).
 
 **Exit criteria:** all suites green, manual smoke passes, `git status` clean after final commit, `simple.md` updated with a short "progress log" section listing which phases are done.
+
+---
+
+## Remaining Work Breakdown (Phases 4-20)
+
+Phases 1-3 are complete (records in `simple-done.md`). The remaining work is
+split into sub-tasks below. Work one phase at a time; commit per phase with a
+phase-tagged message. Check each sub-task off in place as it is completed.
+
+### Phase 4 - LLM-only agents + shared validation cleanup
+
+- [ ] 4.1 Add `load_json_safe(text) -> dict | None` shared helper (in `client/json_utils.py` or new `client/agents/_validation.py`) with docstring explaining fence-stripping + guard.
+- [ ] 4.2 Standardize `except json.JSONDecodeError, TypeError:` to `except (json.JSONDecodeError, TypeError):` everywhere it appears (visible in Phases 5-6 too).
+- [ ] 4.3 `gap_analysis.py`: dedupe `_try_llm` scaffolding, verify module docstring ("LLM only, deterministic fallback", output model, failure = empty model).
+- [ ] 4.4 `ats_compliance.py`: route its `_validate_*` helpers through `load_json_safe`, expand `Returns True when ...` docstrings.
+- [ ] 4.5 `tone_polishing.py`: verify tone-guidance coercion is as clear as `models.py`; expand docstrings.
+- [ ] 4.6 Guardrails: `uv run ruff check .`, `uv run ruff format .`, `uv run pyright`, `uv run pytest` (watch `tests/test_agent_gap_analysis.py`, `test_agent_ats_compliance.py`, `test_agent_tone_polishing.py`).
+- [ ] 4.7 Move Phase 4 to `simple-done.md`, mark complete in `simple.md`, commit.
+
+### Phase 5 - Resume Rewrite agent + post-validation
+
+- [ ] 5.1 Re-order file: public class first, then module helpers grouped (validation -> tailoring -> skill matching) with banner comments.
+- [ ] 5.2 Route `_validate_experience_count`, `_validate_certifications`, `_validate_companies` guards through `load_json_safe`.
+- [ ] 5.3 Full `Args:`/`Returns:` + one-line "why" on every post-validation helper.
+- [ ] 5.4 Convert dense `_skill_matches` conditionals into named helpers (`_exact_match`, `_substring_match`, `_token_match`).
+- [ ] 5.5 Verify `_ensure_chronological` / `_sanitize_skills` docstrings explain the `model_copy` never-mutate contract; `_tailor_skills` reads step-by-step.
+- [ ] 5.6 Module docstring: LLM -> Pydantic -> post-validation -> chronological -> sanitize -> fallback story.
+- [ ] 5.7 Guardrails (watch `tests/test_resume_rewrite_validation.py` 63 + `test_agent_resume_rewrite.py`), move to `simple-done.md`, commit.
+
+### Phase 6 - Cover Letter agent (largest file)
+
+- [ ] 6.1 Split helpers into banner sections: `# --- validation ---`, `# --- deterministic post-processors ---`, `# --- rendering/formatting ---`.
+- [ ] 6.2 Replace all seven `json.loads` guards with `load_json_safe`.
+- [ ] 6.3 Break any method over ~50 lines into named steps with `# 1.`/`# 2.` comments.
+- [ ] 6.4 Standardize placeholder-token handling (`[Company Name]`, `[Your Name]`) - every substitution one obvious path with comment.
+- [ ] 6.5 Module docstring covering agent contract (inputs, output model, fallback, two deterministic post-processors).
+- [ ] 6.6 Guardrails (watch `tests/test_agent_cover_letter.py` + `test_cover_letter_validation.py` 109), move to `simple-done.md`, commit.
+
+### Phase 7 - Renderer, templates, formatter
+
+- [ ] 7.1 Fix stale renderer.py header ("DOCX/PDF will be added in subsequent phases" -> they already exist).
+- [ ] 7.2 Document the two rendering paths (template-based `ResumeRenderer` vs `formatter.py` helpers) at top of each module.
+- [ ] 7.3 Extract one private `_render(template_key, context)` helper for the repeated "build context -> render -> clean output" sequence.
+- [ ] 7.4 Docstring per template dict (modern/classic/minimal/cover_letter) naming its style and which outputs it drives.
+- [ ] 7.5 Full class/method docstrings + `Args:`/`Returns:`/`Raises:` on `render_all`.
+- [ ] 7.6 Guardrails (keep output byte-identical; watch `tests/test_renderer.py` 43 + `test_formatter.py` 41), move to `simple-done.md`, commit.
+
+### Phase 8 - Skill taxonomy & normalization
+
+- [ ] 8.1 Make internal lookup read step-by-step (`# 1. exact canonical match`, `# 2. variant lookup`, ...).
+- [ ] 8.2 Rename single-letter/ambiguous locals; every method docstring covers unknown-skill + case handling.
+- [ ] 8.3 Module docstring: canonical taxonomy -> normalized forms; when to prefer `normalize_list` vs `match_skills`; cross-check `docs/skill-taxonomy.md`.
+- [ ] 8.4 Guardrails (watch `tests/test_skill_normalizer.py` 15), move to `simple-done.md`, commit.
+
+### Phase 9 - Pipeline orchestration + CLI
+
+- [ ] 9.1 Extract `_run_stage(runner, agent_name, *, prompt, output, rules, **context)` helper returning the resolved field.
+- [ ] 9.2 Convert the seven near-identical blocks in `_run_pipeline_core` to one-line `_run_stage` calls with `# 1. JD Parsing` ... `# 7. Cover Letter` comments.
+- [ ] 9.3 Verify `run_agent_async` instantiate-on-first-use comments + shared-event-loop rationale; `PipelineAgent` backward-compat docstring.
+- [ ] 9.4 Pipeline module docstring: stage table (agent -> output key -> consumed by); CLI `main()` plain sequential steps.
+- [ ] 9.5 Guardrails (watch `tests/test_pipeline.py` 17) + CLI smoke: `uv run python pipeline.py` (sample + with `--resume`/`--job-description`).
+
+### Phase 10 - Web API layer
+
+- [ ] 10.1 `main.py` module docstring listing every route + purpose; decide/document `list_generated` vs `list_uploaded` parallel.
+- [ ] 10.2 Remove redundant size double-check in `_read_text_input` (already in `_persist_upload`) with comment; expand `_read_text_input`/`_to_response`/`_require_runner` `Args`/`Returns`/`Raises`.
+- [ ] 10.3 `files.py`: verify `safe_dir_path`/`safe_delete_path` docstrings explain traversal defense.
+- [ ] 10.4 `upload.py`: document each extraction path (.txt/.docx/.pdf).
+- [ ] 10.5 `tasks.py`: thread/loop-safety notes; `schemas.py`: field descriptions.
+- [ ] 10.6 Guardrails (watch all `test_web_*.py`), move to `simple-done.md`, commit.
+
+### Phase 11 - Backend tests & scratch scripts
+
+- [ ] 11.1 `tests/conftest.py` (190): fixture names read clearly, documented.
+- [ ] 11.2 Audit per-agent contract tests assert behavior over implementation.
+- [ ] 11.3 `wip_testing/*.py`: header comment per file (which agents, how to run).
+- [ ] 11.4 `test_real_files.py`: document `RUN_LIVE_PIPELINE` guard.
+- [ ] 11.5 File-top comment per test file (what it covers, key fixture/hook).
+- [ ] 11.6 Guardrails: full `uv run pytest` green + `uv run ruff check .`, move to `simple-done.md`, commit.
+
+### Phase 12 - Frontend API layer
+
+- [ ] 12.1 `client.ts`: extract `_detailString(detail)` / `_detailArray(detail)` from `parseErrorDetail` with JSDoc.
+- [ ] 12.2 `hooks.ts`: document polling lifecycle, why files query invalidates, when `onDone` fires, `refetchInterval` predicate.
+- [ ] 12.3 `types.ts`: comment mapping each type to its FastAPI schema (e.g. `PipelineRunResponse` -> `app.schemas.PipelineRunResponse`).
+- [ ] 12.4 `download.ts`: document the URL it builds.
+- [ ] 12.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `api/client.test.ts`, `api/hooks.test.ts`).
+
+### Phase 13 - Result data coercion + shared result parts
+
+- [ ] 13.1 `coerce.ts`: one-line JSDoc on every export (what it tolerates/returns); expand dense `pick*` one-liners.
+- [ ] 13.2 `parts.tsx`: document props/behavior of each shared renderer.
+- [ ] 13.3 Module header: "backend result dicts are loosely typed; these helpers coerce unknown shapes safely".
+- [ ] 13.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
+
+### Phase 14 - Results tabs (8 components)
+
+- [ ] 14.1 `ResultsTabView.tsx`: comment tying `TAB_KEYS` to the 7-agent output keys/order.
+- [ ] 14.2 Each tab: one-line header (what it shows + which pipeline field); consistent use of `coerce.ts` helpers.
+- [ ] 14.3 HTML-string tabs (polished/cover letter): document trust boundary (content from our own pipeline).
+- [ ] 14.4 Extract repeated row/label markup into `parts.tsx` when it appears in 2+ tabs.
+- [ ] 14.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `ATSTab.test.tsx`, `DownloadsRow.test.tsx`).
+
+### Phase 15 - Run page & form helpers
+
+- [ ] 15.1 Extract `isTaskActive(status)` and reuse in button `disabled`/`label`, status panel, etc.
+- [ ] 15.2 Extract `taskStatusLabel` + status-severity map next to `STATUS_SEVERITY`.
+- [ ] 15.3 Expand `handleSubmit` into 2-3 obvious steps with comments (validate -> toast -> mutate -> capture task id).
+- [ ] 15.4 `FileChosen`: document `customUpload` behavior; header comments for the page flow (submit -> poll -> results + downloads).
+- [ ] 15.5 `runForm.ts`: JSDoc on `validateRunInputs`/`buildRunFormData`; document "text wins over file" matches backend `_read_text_input`.
+- [ ] 15.6 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `RunPage.test.tsx`).
+
+### Phase 16 - Files page
+
+- [ ] 16.1 Split into named sections (file-table config, filter bar, delete selection, toolbar) via banner comments or a `FileTable` component.
+- [ ] 16.2 Name state by intent (`selectedKeys`, `fileTypeFilter`, `searchQuery`, `page`).
+- [ ] 16.3 Header comment: generated-vs-uploaded toggle; how downloads/delete map to the two listing kinds.
+- [ ] 16.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `FilesPage.test.tsx`).
+
+### Phase 17 - Models page, App shell, theme, toast, entry
+
+- [ ] 17.1 `App.tsx`: header comment walking the routing tree (Shell + nav + routes).
+- [ ] 17.2 `ModelsPage.tsx`: header comment.
+- [ ] 17.3 `theme/useTheme.ts` + `ThemeToggle.tsx`: document storage key + initial-state fallback.
+- [ ] 17.4 `toast/ToastProvider.tsx` + `ToastContext.ts`: document the `show` contract.
+- [ ] 17.5 `main.tsx`: document PrimeReact theme import + stylesheet dependency.
+- [ ] 17.6 `test/setup.ts` + `test/utils.tsx`: document the shared render helper (router/provider wrappers).
+- [ ] 17.7 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
+
+### Phase 18 - Frontend tests
+
+- [ ] 18.1 File-top comment per test file stating the unit under test.
+- [ ] 18.2 Extract repeated setup (mocked fetch, wrapped renders) into `test/utils.tsx` where it appears in 2+ files.
+- [ ] 18.3 Add focused tests for newly extracted helpers (e.g. `isTaskActive`) from Phase 15.
+- [ ] 18.4 Guardrails: `npm test -- --run` green (45 passed).
+
+### Phase 19 - Repo-wide documentation consolidation
+
+- [ ] 19.1 `AGENTS.md`: verify file/architecture map after Phases 1-11 (new helpers `load_json_safe`, `_run_stage`); update quick-command table + conventions.
+- [ ] 19.2 `README.md` / `ui/README.md`: quickstart accuracy.
+- [ ] 19.3 Cross-check `docs/*.md` (8 guides) against code; fix drift found during Phases 1-18.
+- [ ] 19.4 Root scratch notes: classify archive vs actionable; recommend `scratch/` move or "completed" note (no deletion without user OK).
+- [ ] 19.5 Remove outdated "TODO/Phase X remains" lines for completed work.
+
+### Phase 20 - Final verification & regression
+
+- [ ] 20.1 Backend: `uv run pytest` (>=485), `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`.
+- [ ] 20.2 Frontend: `npm test -- --run` (>=45), `npm run lint`, `npx tsc -b`.
+- [ ] 20.3 Manual smoke: `basic.py`, `pipeline.py` sample mode, web API health/models/pipeline/tasks, live E2E (`test_real_files.py` with Ollama), `npm run dev` UI run.
+- [ ] 20.4 Diff review spot-check rendered output before/after; `git status` clean after final commit.
+- [ ] 20.5 Add a short "progress log" section to `simple.md` listing completed phases (archive the full plan in `simple-done.md`).
