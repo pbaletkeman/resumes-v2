@@ -772,7 +772,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 15 - Run page & form helpers
 
-- [ ] 15.1 Extract `isTaskActive(status)` and reuse in button `disabled`/`label`, status panel, etc.
+- [x] 15.1 Extract `isTaskActive(status)` and reuse in button `disabled`/`label`, status panel, etc.
 - [ ] 15.2 Extract `taskStatusLabel` + status-severity map next to `STATUS_SEVERITY`.
 - [ ] 15.3 Expand `handleSubmit` into 2-3 obvious steps with comments (validate -> toast -> mutate -> capture task id).
 - [ ] 15.4 `FileChosen`: document `customUpload` behavior; header comments for the page flow (submit -> poll -> results + downloads).

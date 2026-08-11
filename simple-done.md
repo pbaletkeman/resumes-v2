@@ -2580,3 +2580,43 @@ header marked `✅ COMPLETED`.
 - 14.3 HTML-string trust boundary docs — commit `8d51fdf`
 - 14.4 extract repeated markup into `parts.tsx` — commit `e1c5a5d`
 - 14.5 guardrails + move + commit — this close record
+
+---
+
+## Phase 15 - Completed sub-task 15.1: extract `isTaskActive(status)`
+
+Original instruction: extract `isTaskActive(status)` and reuse it in the
+button `disabled`/`label`, the status panel, and any other spot.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/RunPage.tsx`** — the "active" status expression
+  (`status === undefined || status === 'pending' || status === 'running'`)
+  appeared twice: in the `active` derived boolean (drives the Run/Reset
+  button `disabled` and label) and in the status-panel ternary.  Added a
+  documented `isTaskActive(status)` helper next to `STATUS_SEVERITY`
+  (per the phase's "Simplify toward"), accepting `TaskStatusName | undefined`
+  because the status is unknown until the first poll.  Both call sites now
+  use it:
+  - `const active = invokePipeline.isPending || (taskId !== null && isTaskActive(status))`
+  - `{isTaskActive(status) ? (spinner + pending tag) : (terminal tag)}`
+- Imported `TaskStatusName` from `../api/types` for the helper signature.
+
+**Deliberately untouched:** `api/hooks.ts` `usePollTask` has a similar
+`status === undefined || (status !== 'completed' && status !== 'failed')`
+guard, but it serves a different purpose (fire `onDone` only after a task
+settles) and lives in the API layer — importing a page helper there would
+invert the dependency direction.  Out of scope for 15.1.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files
+- `npx vitest run src/pages/RunPage.test.tsx` — 3 passed (button
+  disabled-while-active test still green)
+- Refactor-only; identical behavior (same boolean logic, single source of truth).
+
+**Commit:** `simplify: phase 15 - extract isTaskActive helper in RunPage (15.1)`
