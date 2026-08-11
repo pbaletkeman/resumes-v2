@@ -6,7 +6,7 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Tag } from 'primereact/tag'
 import { useInvokePipeline, usePollTask } from '../api/hooks'
-import type { TaskStatus } from '../api/types'
+import type { TaskStatus, TaskStatusName } from '../api/types'
 import { useToast } from '../toast/ToastContext'
 import { buildRunFormData, validateRunInputs } from './runForm'
 import { asStringMap } from './results/coerce'
@@ -64,6 +64,14 @@ const STATUS_SEVERITY: Record<TaskStatus['status'], 'info' | 'success' | 'danger
   failed: 'danger',
 }
 
+/**
+ * True while a task has not yet reached a terminal state: no status is known
+ * yet (task created but not polled), pending, or running.
+ */
+function isTaskActive(status: TaskStatusName | undefined): boolean {
+  return status === undefined || status === 'pending' || status === 'running'
+}
+
 function RunPage() {
   const [jobDescription, setJobDescription] = useState('')
   const [resume, setResume] = useState('')
@@ -92,10 +100,7 @@ function RunPage() {
   const status = taskQuery.data?.status
   const taskError = taskQuery.data?.error
 
-  const active =
-    invokePipeline.isPending ||
-    (taskId !== null &&
-      (status === undefined || status === 'pending' || status === 'running'))
+  const active = invokePipeline.isPending || (taskId !== null && isTaskActive(status))
 
   function resetTask() {
     setTaskId(null)
@@ -196,7 +201,7 @@ function RunPage() {
             <span className="p-text-secondary">Task</span>
             <code>{taskId}</code>
           </div>
-          {status === undefined || status === 'pending' || status === 'running' ? (
+          {isTaskActive(status) ? (
             <div className="run-status-active">
               <ProgressSpinner style={{ width: '2rem', height: '2rem' }} strokeWidth="4" />
               <Tag value={status ?? 'pending'} severity="info" />
