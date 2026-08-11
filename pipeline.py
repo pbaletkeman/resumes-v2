@@ -6,6 +6,26 @@ Defines ``AgentRunner`` (agent orchestration) and ``run_resume_pipeline``,
 which chains 7 specialized agents to transform a raw job description and
 resume into an ATS-optimized resume and tailored cover letter.
 
+Stage table (agent -> output key -> consumed by):
+
+====================  ======================  ================================
+Step  Agent name       Output key              Consumed by
+====================  ======================  ================================
+1     jd_parsing       parsed_job_description  gap_analysis, cover_letter
+2     resume_parsing   parsed_resume           gap_analysis, resume_rewrite,
+                                               cover_letter, rendering
+3     gap_analysis     tailoring_strategy      resume_rewrite, cover_letter
+4     resume_rewrite   rewritten_resume        ats_compliance
+5     ats_compliance   ats_optimized_resume    tone_polishing
+6     tone_polishing   polished_resume         final result
+7     cover_letter     cover_letter            final result
+====================  ======================  ================================
+
+The output keys are the ``dict`` keys returned by :func:`run_resume_pipeline`.
+Note the resume parser's model is also the final ``RewriteOutput`` basis for
+rendering (see ``_to_rewrite_output``); ``_run_pipeline_core`` runs the chain
+via ``_run_stage`` calls, one per row above.
+
 All 7 stages run as dedicated classes (``JDParsingAgent`` through
 ``CoverLetterAgent``); generic ``PipelineAgent`` wrappers remain supported
 for compatibility.  Per-agent model assignment is provided via
@@ -77,7 +97,13 @@ class Agent(Protocol):
 class PipelineAgent:
     """Agent that delegates to a ``ModelClient`` with a fixed purpose.
 
-    Conforms to the ``Agent`` Protocol so it can be used with ``AgentRunner``.
+    This is the generic wrapper that exists for backward compatibility with
+    the dedicated per-agent classes (``JDParsingAgent`` through
+    ``CoverLetterAgent``).  The dedicated classes add Pydantic validation
+    and deterministic fallbacks; ``PipelineAgent`` keeps working for callers
+    that pass raw ``prompt``/``output``/``rules`` inputs and expect a raw
+    chat response.  Conforms to the ``Agent`` Protocol so it can be used
+    with ``AgentRunner``.
 
     Args:
         client: An LLM client implementing ``ModelClient.chat``.
@@ -201,11 +227,14 @@ class AgentRunner:
         logger.info("Running agent: %s", name)
         start = time.monotonic()
 
-        # If agent is a class (not instantiated), instantiate with registry client
+        # Instantiate-on-first-use: when the registry is present, a class
+        # value (as opposed to an instance) is lazily built with the
+        # per-agent client on first dispatch, then cached so later runs
+        # reuse the same instance (and the same bound event loop).
         if isinstance(agent, type) and self.registry is not None:
             client = self.registry.get_client_for_agent(name)
             agent = agent(client)
-            self.agents[name] = agent  # Cache the instance
+            self.agents[name] = agent  # Cache the instance for reuse
 
         try:
             result: Any = await agent.run(inputs)
@@ -322,6 +351,56 @@ def run_resume_pipeline(
     )
 
 
+async def _run_stage(
+    runner: AgentRunner,
+    agent_name: str,
+    *,
+    prompt: str = "",
+    output: list[str] | None = None,
+    rules: list[str] | None = None,
+    fields: tuple[str, ...] = (),
+    **context: Any,
+) -> Any:
+    """Run one agent stage and return its resolved output field.
+
+    Assembles the stage inputs: ``prompt``/``output``/``rules`` (the
+    generic-agent contract keys, omitted when empty) plus any keyword
+    ``context`` entries, runs the named agent via
+    ``runner.run_agent_async``, then resolves the result through
+    ``_extract_field``.  Parsing agents (stages 1-2) pass no
+    ``prompt``/``output``/``rules`` and often no ``fields``; the raw result
+    is then returned unchanged.
+
+    Args:
+        runner: The ``AgentRunner`` dispatching the named agent.
+        agent_name: The registered agent name to invoke.
+        prompt: Prompt text for chat-style agents (omitted when empty).
+        output: Expected output field names for chat-style agents (omitted
+            when empty).
+        rules: Constraint list for chat-style agents (omitted when empty).
+        fields: Candidate field names to resolve from the result via
+            ``_extract_field``.  The first present field wins; when empty,
+            the raw result is returned unchanged.
+        **context: Additional keyword inputs forwarded verbatim into the
+            agent's input dict.
+
+    Returns:
+        The resolved stage output: the requested field value when found,
+        otherwise the raw agent result.
+    """
+    inputs: dict[str, Any] = {}
+    if prompt:
+        inputs["prompt"] = prompt
+    if output:
+        inputs["output"] = output
+    if rules:
+        inputs["rules"] = rules
+    inputs.update(context)
+
+    result = await runner.run_agent_async(agent_name, inputs)
+    return _extract_field(result, *fields)
+
+
 async def _run_pipeline_core(
     runner: AgentRunner,
     job_description: str,
@@ -339,93 +418,75 @@ async def _run_pipeline_core(
     agent_names = list(runner.agents.keys())
     logger.info("Agents configured: %s", ", ".join(agent_names))
 
-    # 1. JD Parsing Agent
-    jd_result = await runner.run_agent_async(
+    # 1. JD Parsing
+    parsed_job_description: Any = await _run_stage(
+        runner,
         "jd_parsing_agent",
-        {
-            "job_description": job_description,
-        },
+        fields=("parsed_job_description",),
+        job_description=job_description,
     )
-    parsed_job_description: Any = _extract_field(jd_result, "parsed_job_description")
 
-    # 2. Resume Parsing Agent
-    resume_result = await runner.run_agent_async(
-        "resume_parsing_agent",
-        {
-            "resume": resume,
-        },
-    )
-    parsed_resume: Any = resume_result
+    # 2. Resume Parsing
+    parsed_resume: Any = await _run_stage(runner, "resume_parsing_agent", resume=resume)
 
-    # 3. Gap Analysis Agent
-    gap_result = await runner.run_agent_async(
+    # 3. Gap Analysis
+    tailoring_strategy: Any = await _run_stage(
+        runner,
         "gap_analysis_agent",
-        {
-            "prompt": (
-                "Compare the job description and resume. Produce a tailoring strategy."
-            ),
-            "output": ["tailoring_strategy"],
-            "rules": ["Be specific and actionable"],
-            "parsed_job_description": parsed_job_description,
-            "parsed_resume": parsed_resume,
-        },
+        prompt="Compare the job description and resume. Produce a tailoring strategy.",
+        output=["tailoring_strategy"],
+        rules=["Be specific and actionable"],
+        fields=("tailoring_strategy",),
+        parsed_job_description=parsed_job_description,
+        parsed_resume=parsed_resume,
     )
-    tailoring_strategy: Any = _extract_field(gap_result, "tailoring_strategy")
 
-    # 4. Resume Rewrite Agent
-    rewrite_result = await runner.run_agent_async(
+    # 4. Resume Rewrite
+    rewritten_resume: Any = await _run_stage(
+        runner,
         "resume_rewrite_agent",
-        {
-            "prompt": (
-                "Rewrite the resume to match the job requirements using this strategy."
-            ),
-            "output": ["rewritten_resume"],
-            "rules": ["Keep formatting", "Use strong action verbs"],
-            "parsed_resume": parsed_resume,
-            "tailoring_strategy": tailoring_strategy,
-        },
+        prompt="Rewrite the resume to match the job requirements using this strategy.",
+        output=["rewritten_resume"],
+        rules=["Keep formatting", "Use strong action verbs"],
+        fields=("rewritten_resume",),
+        parsed_resume=parsed_resume,
+        tailoring_strategy=tailoring_strategy,
     )
-    rewritten_resume: Any = _extract_field(rewrite_result, "rewritten_resume")
 
-    # 5. ATS Compliance Agent
-    ats_result = await runner.run_agent_async(
+    # 5. ATS Compliance
+    ats_optimized_resume: Any = await _run_stage(
+        runner,
         "ats_compliance_agent",
-        {
-            "prompt": "Check and optimize this resume for ATS systems.",
-            "output": ["ats_optimized_resume"],
-            "rules": ["Maintain content accuracy", "Optimize keywords"],
-            "rewritten_resume": rewritten_resume,
-        },
-    )
-    ats_optimized_resume: Any = _extract_field(
-        ats_result, "ats_optimized_resume", "final_resume"
+        prompt="Check and optimize this resume for ATS systems.",
+        output=["ats_optimized_resume"],
+        rules=["Maintain content accuracy", "Optimize keywords"],
+        fields=("ats_optimized_resume", "final_resume"),
+        rewritten_resume=rewritten_resume,
     )
 
-    # 6. Tone Polishing Agent
-    tone_result = await runner.run_agent_async(
+    # 6. Tone Polishing
+    polished_resume: Any = await _run_stage(
+        runner,
         "tone_polishing_agent",
-        {
-            "prompt": "Polish the tone and clarity of this resume.",
-            "output": ["polished_resume"],
-            "rules": ["Maintain professional tone", "Be concise"],
-            "ats_optimized_resume": ats_optimized_resume,
-        },
+        prompt="Polish the tone and clarity of this resume.",
+        output=["polished_resume"],
+        rules=["Maintain professional tone", "Be concise"],
+        fields=("polished_resume",),
+        ats_optimized_resume=ats_optimized_resume,
     )
-    polished_resume: Any = _extract_field(tone_result, "polished_resume")
 
-    # 7. Cover Letter Agent
-    cover_result = await runner.run_agent_async(
+    # 7. Cover Letter
+    cover_letter: Any = await _run_stage(
+        runner,
         "cover_letter_agent",
-        {
-            "prompt": "Generate a tailored cover letter for this job application.",
-            "output": ["cover_letter"],
-            "rules": ["Match the resume tone", "Address key requirements"],
-            "parsed_job_description": parsed_job_description,
-            "parsed_resume": parsed_resume,
-            "tailoring_strategy": tailoring_strategy,
-        },
+        prompt="Generate a tailored cover letter for this job application.",
+        output=["cover_letter"],
+        rules=["Match the resume tone", "Address key requirements"],
+        fields=("cover_letter",),
+        parsed_job_description=parsed_job_description,
+        parsed_resume=parsed_resume,
+        tailoring_strategy=tailoring_strategy,
     )
-    cover_letter: Any = _extract_field(cover_result, "cover_letter")
 
     # Optional file output via ResumeRenderer.  Skipped when no candidate
     # name was provided (candidate_name is the gate for rendering).
@@ -571,12 +632,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    # No file arguments -> backward-compatible demo run with placeholders.
+    # Step 1: no file arguments -> backward-compatible demo run (placeholders).
     if not args.resume and not args.job_description:
         sample_run()
         return 0
 
-    # File mode requires both inputs.
+    # Step 2: file mode requires both inputs; report any missing flags.
     missing: list[str] = []
     if not args.resume:
         missing.append("--resume")
@@ -585,6 +646,7 @@ def main(argv: list[str] | None = None) -> int:
     if missing:
         parser.error(f"missing required argument(s): {', '.join(missing)}")
 
+    # Step 3: validate both paths exist before reading them.
     resume_path = Path(args.resume)
     jd_path = Path(args.job_description)
 
@@ -593,6 +655,7 @@ def main(argv: list[str] | None = None) -> int:
     if not jd_path.is_file():
         parser.error(f"job description file not found: {jd_path}")
 
+    # Step 4: read inputs and run the full pipeline.
     resume_text = resume_path.read_text(encoding="utf-8")
     jd_text = jd_path.read_text(encoding="utf-8")
 
@@ -610,6 +673,7 @@ def main(argv: list[str] | None = None) -> int:
     print("\n=== Cover Letter ===")
     print(results["cover_letter"])
 
+    # Step 5: print results and any rendered output files.
     output_files: dict[str, Path] = results.get("output_files") or {}
     if output_files:
         print("\n=== Rendered Files ===")
