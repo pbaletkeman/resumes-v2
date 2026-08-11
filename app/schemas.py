@@ -42,43 +42,53 @@ class PipelineRunResponse(BaseModel):
 class TaskCreated(BaseModel):
     """Response to a background pipeline launch."""
 
-    task_id: str
+    task_id: str = Field(description="Unique id used to poll task status.")
 
 
 class TaskStatus(BaseModel):
     """Status of an async pipeline task."""
 
-    status: Literal["pending", "running", "completed", "failed"]
-    result: dict[str, Any] | None = None
-    error: str | None = None
-    created_at: float | None = None
-    completed_at: float | None = None
+    status: Literal["pending", "running", "completed", "failed"] = Field(
+        description="Lifecycle state of the task."
+    )
+    result: dict[str, Any] | None = Field(
+        default=None, description="Serialized pipeline result when completed."
+    )
+    error: str | None = Field(
+        default=None, description="Error message when the task failed."
+    )
+    created_at: float | None = Field(
+        default=None, description="Monotonic timestamp when the task was created."
+    )
+    completed_at: float | None = Field(
+        default=None, description="Monotonic timestamp when the task finished."
+    )
 
 
 class FileMeta(BaseModel):
     """Metadata for a single generated or uploaded file."""
 
-    name: str
-    size: int
-    modified: datetime
-    type: str
-    path: str
+    name: str = Field(description="Filename without the directory prefix.")
+    size: int = Field(description="File size in bytes.")
+    modified: datetime = Field(description="Last modification time (UTC).")
+    type: str = Field(description="Lowercase extension without the dot (e.g. pdf).")
+    path: str = Field(description="Dir-qualified key, e.g. uploads/resume.pdf.")
 
 
 class PagedFile(BaseModel):
     """A filtered + paginated page of file metadata."""
 
-    items: list[FileMeta]
-    page: int
-    page_size: int
-    total: int
-    total_pages: int
+    items: list[FileMeta] = Field(description="Metadata for files on this page.")
+    page: int = Field(description="1-based page number.")
+    page_size: int = Field(description="Requested page size.")
+    total: int = Field(description="Total matching files across all pages.")
+    total_pages: int = Field(description="Total number of pages.")
 
 
 class DeleteFilesRequest(BaseModel):
     """Body for batch-deleting files by their ``path`` keys."""
 
-    files: list[str]
+    files: list[str] = Field(description="Dir-qualified path keys to delete.")
 
 
 class DeleteFilesResponse(BaseModel):

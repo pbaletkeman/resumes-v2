@@ -23,7 +23,24 @@ _VALID_MIMES = frozenset({_TXT_MIME, _DOCX_MIME, _PDF_MIME})
 def extract_text(file: UploadFile, *, mime: str) -> str:
     """Extract plain text from a pasted file.
 
-    ``mime`` is matched against known types; unsupported types raise ``400``.
+    Dispatches on ``mime``:
+
+    - ``text/plain`` (``.txt``): bytes are decoded as UTF-8 (with a
+      ``utf-8-sig`` BOM-tolerant pass and a ``latin-1`` fallback).
+    - ``application/vnd...wordprocessingml.document`` (``.docx``): parsed
+      via ``python-docx``; returns the joined paragraph texts.
+    - ``application/pdf`` (``.pdf``): parsed via ``pypdf``; returns each
+      page's extracted text joined by newlines.
+
+    Args:
+        file: The uploaded file whose stream is read from the current pos.
+        mime: MIME type of the upload; determines the extraction path.
+
+    Returns:
+        The extracted plain text (may be empty for blank documents).
+
+    Raises:
+        HTTPException(400): for unsupported MIME types or parse failures.
     """
     if mime not in _VALID_MIMES:
         raise HTTPException(

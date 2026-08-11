@@ -1,4 +1,22 @@
-"""FastAPI application exposing the 7-agent resume pipeline as an API."""
+"""FastAPI application exposing the 7-agent resume pipeline as an API.
+
+Routes:
+    GET  /health                       service liveness probe
+    GET  /api/models                   per-agent model summary
+    POST /api/pipeline                 run the pipeline synchronously (multipart)
+    POST /api/pipeline/async           launch a background pipeline run
+    GET  /api/tasks/{task_id}          poll a background task
+    GET  /api/outputs/{filename}       download a rendered output file
+    GET  /api/files/generated          list files in ``output/``
+    GET  /api/files/uploaded           list files in ``uploads/``
+    DELETE /api/files                  batch-delete files by path key
+    GET  /{full_path:path}             SPA fallback (serves ``ui/dist`` when built)
+
+``/api/files/generated`` and ``/api/files/uploaded`` are intentionally
+parallel: identical query params (``file_type``, ``q``, ``page``,
+``page_size``, ``sort``), differing only in the directory they list
+(``OUTPUT_DIR`` vs ``UPLOADS_DIR``).  Both delegate to ``app.files.list_files``.
+"""
 
 from __future__ import annotations
 
@@ -89,6 +107,17 @@ registry = TaskRegistry()
 
 
 def _require_runner() -> Any:
+    """Return the lifespan-built ``AgentRunner`` for dependency injection.
+
+    The runner is created once in :func:`lifespan` and stored on
+    ``app.state.runner``; this dependency fetches it for route handlers.
+
+    Returns:
+        The shared ``AgentRunner`` instance.
+
+    Raises:
+        HTTPException(503): when the app is not fully started (no runner).
+    """
     runner = getattr(app.state, "runner", None)
     if runner is None:
         raise HTTPException(status_code=503, detail="Pipeline runner not initialized")
@@ -133,15 +162,22 @@ def _read_text_input(text: str | None, file: UploadFile | None, name: str) -> st
     Uploaded files are persisted to ``UPLOADS_DIR`` regardless of whether
     text extraction succeeds, so they can be listed/deleted later.
 
+    Args:
+        text: Pasted text from the multipart form, or ``None``.
+        file: Uploaded file from the multipart form, or ``None``.
+        name: Human-readable input name used in error messages
+            (e.g. ``"resume"``).
+
+    Returns:
+        Non-empty text ready for the pipeline.
+
     Raises:
-        HTTPException(400) when neither resolves to non-empty text.
+        HTTPException(400): when neither input yields non-empty text.
     """
     if text and text.strip():
         return text
     if file is not None:
-        _persist_upload(file, name)
-        if file.size is not None and file.size > MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=400, detail=f"{name} file is too large.")
+        _persist_upload(file, name)  # also enforces MAX_UPLOAD_BYTES
         extracted = extract_text(file, mime=_mime_for(file.filename or ""))
         if extracted.strip():
             return extracted
@@ -156,7 +192,15 @@ def _read_text_input(text: str | None, file: UploadFile | None, name: str) -> st
 
 
 def _to_response(result: dict[str, Any]) -> PipelineRunResponse:
-    """Serialize the pipeline core result into the response model."""
+    """Serialize the pipeline core result into the response model.
+
+    Args:
+        result: The dict returned by ``_run_pipeline_core`` (7 stage keys
+            plus ``output_files`` mapping format names to ``Path`` values).
+
+    Returns:
+        A ``PipelineRunResponse`` with stringified output file paths.
+    """
     raw_files = result.get("output_files", {})
     raw_dict = cast(dict[str, Any], raw_files) if isinstance(raw_files, dict) else {}
     files = {str(k): str(v) for k, v in raw_dict.items()}
@@ -192,7 +236,11 @@ async def run_pipeline(
     company_name: Annotated[str, Form()] = "",
     runner: Annotated[Any, Depends(_require_runner)] = None,
 ) -> PipelineRunResponse:
-    """Run the full pipeline synchronously (multipart form inputs)."""
+    """Run the full pipeline synchronously (multipart form inputs).
+
+    Mirrors the multipart signature of ``run_pipeline_async``; this route
+    blocks until the pipeline finishes and returns the full result.
+    """
     jd = _read_text_input(job_description, job_file, "job description")
     rsv = _read_text_input(resume, resume_file, "resume")
     result = await _run_pipeline_core(
@@ -215,7 +263,11 @@ async def run_pipeline_async(
     company_name: Annotated[str, Form()] = "",
     runner: Annotated[Any, Depends(_require_runner)] = None,
 ) -> TaskCreated:
-    """Launch a background pipeline run; returns a task id."""
+    """Launch a background pipeline run; returns a task id.
+
+    Mirrors the multipart signature of ``run_pipeline``; the pipeline runs
+    in a background task and progress is polled via ``GET /api/tasks/{id}``.
+    """
     jd = _read_text_input(job_description, job_file, "job_description")
     rsv = _read_text_input(resume, resume_file, "resume")
     task_id = registry.create()
@@ -264,7 +316,11 @@ async def list_generated(
     page_size: Annotated[int, Query()] = 20,
     sort: Annotated[str, Query()] = "newest",
 ) -> PagedFile:
-    """List generated files from the ``output/`` dir."""
+    """List generated files from the ``output/`` dir.
+
+    Parallel of ``list_uploaded_files``: same query params (``file_type``,
+    ``q``, ``page``, ``page_size``, ``sort``), only the directory differs.
+    """
     return list_files(
         OUTPUT_DIR,
         file_type=file_type,
@@ -283,7 +339,11 @@ async def list_uploaded_files(
     page_size: Annotated[int, Query()] = 20,
     sort: Annotated[str, Query()] = "newest",
 ) -> PagedFile:
-    """List uploaded files from the ``uploads/`` dir."""
+    """List uploaded files from the ``uploads/`` dir.
+
+    Parallel of ``list_generated``: same query params (``file_type``, ``q``,
+    ``page``, ``page_size``, ``sort``), only the directory differs.
+    """
     return list_files(
         UPLOADS_DIR,
         file_type=file_type,

@@ -12,7 +12,16 @@ logger = logging.getLogger(__name__)
 
 
 class TaskRegistry:
-    """Thread-safe, in-memory store of background pipeline task state."""
+    """Thread-safe, in-memory store of background pipeline task state.
+
+    All records live in a plain ``dict`` guarded by a single
+    ``threading.Lock``.  ``create``/``update``/``get``/``set_result``/
+    ``set_error`` are safe to call from the async task coroutine (which
+    runs on the event loop) and from sync route handlers (which run in the
+    thread pool) at the same time.  Because state is purely in-memory and
+    keyed by ``uuid`` hex ids, nothing is persisted across restarts and no
+    global state is shared between app instances.
+    """
 
     def __init__(self) -> None:
         self._store: dict[str, dict[str, Any]] = {}

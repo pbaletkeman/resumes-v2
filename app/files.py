@@ -31,6 +31,18 @@ def _file_type(suffix: str) -> str:
 def safe_dir_path(base: Path, name: str) -> Path:
     """Resolve ``base/name`` and guard against path traversal.
 
+    Both ``base`` and the candidate ``base/name`` are resolved to absolute
+    paths (following symlinks), then the candidate must be equal to the base
+    or live strictly inside it.  This blocks ``..`` traversal and symlink
+    escapes from escaping the allowed directory.
+
+    Args:
+        base: The allowed directory (must exist for ``resolve()`` to work).
+        name: The filename or relative path to resolve inside ``base``.
+
+    Returns:
+        The resolved in-bounds target path.
+
     Raises:
         ValueError: when ``name`` escapes ``base``.
     """
@@ -42,7 +54,22 @@ def safe_dir_path(base: Path, name: str) -> Path:
 
 
 def safe_delete_path(base: Path, name: str) -> Path:
-    """Resolve ``base/name``, guarding against traversal and directory targets."""
+    """Resolve ``base/name``, guarding against traversal and directory targets.
+
+    Reuses :func:`safe_dir_path` for the traversal defense, then requires
+    the target to be a regular file (not a directory, and present) so delete
+    callers can never remove a directory or a path outside ``base``.
+
+    Args:
+        base: The allowed directory.
+        name: The filename or relative path to resolve inside ``base``.
+
+    Returns:
+        The resolved in-bounds regular-file path.
+
+    Raises:
+        ValueError: when ``name`` escapes ``base`` or is not a regular file.
+    """
     target = safe_dir_path(base, name)
     if not target.is_file():
         raise ValueError(f"Not a regular file: {name!r}")
