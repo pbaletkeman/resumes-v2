@@ -2409,3 +2409,44 @@ keys/order.
 - Comment-only; no runtime change.
 
 **Commit:** `simplify: phase 14 - results tab view comments tying TAB_KEYS to 7-agent outputs (14.1)`
+
+---
+
+## Phase 14 - Completed sub-task 14.2: per-tab headers + consistent `coerce.ts` use
+
+Original instruction: give every tab a one-line header (what it shows + which
+pipeline field it renders) and make the tab components use the `coerce.ts`
+helpers consistently.
+
+### Completion record
+
+**Changes made:**
+
+- **One-line header comment** at the top of all seven tab components, each
+  stating what it shows and which pipeline field it renders:
+  - `ParsedJDTab.tsx` — Agent 1 output (`parsed_job_description`)
+  - `ParsedResumeTab.tsx` — Agent 2 output (`parsed_resume`)
+  - `GapAnalysisTab.tsx` — Agent 3 output (`tailoring_strategy`)
+  - `RewrittenResumeTab.tsx` — Agent 4 output (`rewritten_resume`)
+  - `ATSTab.tsx` — Agent 5 output (`ats_optimized_resume`)
+  - `PolishedTab.tsx` — Agent 6 output (`polished_resume`)
+  - `CoverLetterTab.tsx` — Agent 7 output (`cover_letter`)
+- **Consistent `coerce.ts` use**: the five record-based tabs
+  (`ParsedJDTab`, `ParsedResumeTab`, `GapAnalysisTab`, `RewrittenResumeTab`,
+  `ATSTab`) each duplicated the manual guard
+  `value !== null && typeof value === 'object' ? value as Record<string, unknown> : null`
+  (some inline, some multi-line).  Replaced every copy with the shared
+  `asRecord(value)` helper from `coerce.ts`, so the coercion path is uniform
+  across tabs.  `PolishedTab` / `CoverLetterTab` already used
+  `textFromValue` and needed no change.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed (tab tests `ATSTab.test.tsx` /
+  `DownloadsRow.test.tsx` green; `asRecord` is behavior-identical to the
+  replaced inline guard)
+- Comment + equivalent-refactor only; no runtime change.
+
+**Commit:** `simplify: phase 14 - per-tab headers + asRecord coercion consistency (14.2)`
