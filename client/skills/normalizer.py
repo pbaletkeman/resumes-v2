@@ -3,6 +3,28 @@
 Provides :class:`SkillNormalizer`, a deterministic mapping from raw skill
 names (synonyms, abbreviations, variations) to canonical skill names, backed by
 the ``taxonomy.json`` resource. No LLM calls.
+
+Canonical taxonomy -> normalized forms
+-------------------------------------
+The taxonomy (``client/skills/taxonomy.json``, documented in
+``docs/skill-taxonomy.md``) is a ``category -> {canonical name -> [variants]}``
+mapping.  ``SkillNormalizer`` reduces each raw skill to three comparable forms
+-- lowercase, squashed (non-alphanumeric stripped), and tokenized -- and looks
+them up in order, so ``"js"``, ``"JS"``, ``"react.js"``, and ``"react js"`` all
+resolve to their canonical names.  Unknown skills fall back to the normalized
+lowercase tokenized form so every skill maps to a stable, comparable string.
+
+Choosing an entry point
+-----------------------
+- Use :meth:`SkillNormalizer.normalize_list` when you need a canonical,
+  de-duplicated, order-preserving list of skills (e.g. to compare JD and
+  resume skill sets, or to feed canonical forms into an LLM prompt).
+- Use :meth:`SkillNormalizer.match_skills` when you need the three-way
+  classification of one list against another (``missing`` / ``matched`` /
+  ``extra``); it normalizes both inputs with ``normalize_list`` internally.
+- Use :meth:`SkillNormalizer.normalize` (or its alias ``canonicalize``) for a
+  single-skill lookup, and :meth:`SkillNormalizer.get_variants` to inspect
+  the known aliases of a canonical name.
 """
 
 from __future__ import annotations
@@ -67,21 +89,50 @@ class SkillNormalizer:
     def normalize(self, skill: str) -> str:
         """Map *skill* to its canonical form.
 
-        Returns the canonical name when a taxonomy match is found, otherwise
-        the normalized lowercase tokenized form.
+        Matching is case-insensitive and punctuation-insensitive: the raw
+        skill is reduced to three comparable forms (lowercase, squashed,
+        tokenized) which are looked up in that order.  Returns the
+        canonical name when a taxonomy match is found; unknown skills fall
+        back to the normalized lowercase tokenized form.
         """
-        for key in _match_keys(skill):
-            canonical = _CANONICAL_BY_KEY.get(key)
-            if canonical is not None:
-                return canonical
-        return _match_keys(skill)[2]
+        low, squashed, tokenized = _match_keys(skill)
+
+        # 1. exact canonical/variant match (case-insensitive), e.g. "mysql"
+        canonical = _CANONICAL_BY_KEY.get(low)
+        if canonical is not None:
+            return canonical
+
+        # 2. squashed lookup (punctuation stripped), e.g. "react.js"
+        canonical = _CANONICAL_BY_KEY.get(squashed)
+        if canonical is not None:
+            return canonical
+
+        # 3. tokenized lookup, e.g. "react js"
+        canonical = _CANONICAL_BY_KEY.get(tokenized)
+        if canonical is not None:
+            return canonical
+
+        # Unknown skill: fall back to the normalized lowercase tokenized form.
+        return tokenized
 
     def canonicalize(self, skill: str) -> str:
-        """Alias for :meth:`normalize` — explicit canonicalization."""
+        """Alias for :meth:`normalize` — explicit canonicalization.
+
+        Same behavior: case-insensitive taxonomy lookup with a lowercase
+        tokenized fallback for unknown skills.
+        """
         return self.normalize(skill)
 
     def normalize_list(self, skills: list[str]) -> list[str]:
-        """Normalize, canonicalize, and de-duplicate a skill list."""
+        """Normalize, canonicalize, and de-duplicate a skill list.
+
+        Each skill goes through :meth:`normalize` (canonical form when
+        known, lowercase tokenized fallback when unknown; case- and
+        punctuation-insensitive).  Empty results are dropped and order is
+        preserved with duplicates removed.  Prefer this when you need a
+        clean, comparable canonical list (e.g. to compare two lists or
+        feed a prompt).
+        """
         result: list[str] = []
         for skill in skills:
             norm = self.normalize(skill)
@@ -90,7 +141,12 @@ class SkillNormalizer:
         return result
 
     def get_variants(self, canonical: str) -> list[str]:
-        """Return the known variants for a canonical skill (excluding aliases)."""
+        """Return the known variants for a canonical skill (excluding aliases).
+
+        The lookup is case-insensitive: *canonical* is compared to the
+        stored canonical names after lowercasing.  Unknown canonical names
+        return an empty list.
+        """
         target = canonical.strip().lower()
         for name, variants in _VARIANTS.items():
             if name.strip().lower() == target:
@@ -100,11 +156,20 @@ class SkillNormalizer:
     def match_skills(
         self, jd_skills: list[str], resume_skills: list[str]
     ) -> dict[str, list[str]]:
-        """Classify canonical resume skills against canonical JD skills."""
+        """Classify canonical resume skills against canonical JD skills.
+
+        Both lists are normalized and canonicalized first (see
+        :meth:`normalize_list`; case- and punctuation-insensitive, unknown
+        skills become their lowercase tokenized form).  The result reports
+        the JD skills missing from the resume, the resume skills that match
+        the JD, and the resume skills the JD does not request.  Prefer this
+        when you need the three-way comparison; use :meth:`normalize_list`
+        alone when you only need canonical lists.
+        """
         jd_norm = self.normalize_list(jd_skills)
         resume_norm = self.normalize_list(resume_skills)
         return {
-            "missing": [s for s in jd_norm if s not in resume_norm],
-            "matched": [s for s in resume_norm if s in jd_norm],
-            "extra": [s for s in resume_norm if s not in jd_norm],
+            "missing": [skill for skill in jd_norm if skill not in resume_norm],
+            "matched": [skill for skill in resume_norm if skill in jd_norm],
+            "extra": [skill for skill in resume_norm if skill not in jd_norm],
         }

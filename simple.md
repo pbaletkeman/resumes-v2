@@ -688,9 +688,9 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 8 - Skill taxonomy & normalization
 
-- [ ] 8.1 Make internal lookup read step-by-step (`# 1. exact canonical match`, `# 2. variant lookup`, ...).
-- [ ] 8.2 Rename single-letter/ambiguous locals; every method docstring covers unknown-skill + case handling.
-- [ ] 8.3 Module docstring: canonical taxonomy -> normalized forms; when to prefer `normalize_list` vs `match_skills`; cross-check `docs/skill-taxonomy.md`.
+- [x] 8.1 Make internal lookup read step-by-step (`# 1. exact canonical match`, `# 2. variant lookup`, ...). ✅ See `simple-done.md`.
+- [x] 8.2 Rename single-letter/ambiguous locals; every method docstring covers unknown-skill + case handling. ✅ See `simple-done.md`.
+- [x] 8.3 Module docstring: canonical taxonomy -> normalized forms; when to prefer `normalize_list` vs `match_skills`; cross-check `docs/skill-taxonomy.md`. ✅ See `simple-done.md`.
 - [ ] 8.4 Guardrails (watch `tests/test_skill_normalizer.py` 15), move to `simple-done.md`, commit.
 
 ### Phase 9 - Pipeline orchestration + CLI

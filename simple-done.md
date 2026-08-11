@@ -1403,3 +1403,119 @@ green.
   docstrings, comments, and the one extracted `_render` helper changed.
 
 **Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`
+
+---
+
+## Phase 8 - Completed sub-task 8.1: step-by-step internal lookup
+
+Original instruction: make the internal lookup read step-by-step
+(`# 1. exact canonical match`, `# 2. variant lookup`, ...).
+
+### Completion record
+
+**Changes made:**
+
+- **`client/skills/normalizer.py`** — `normalize()` previously looped
+  ``for key in _match_keys(skill)`` (a 3-tuple) and returned the first
+  hit; the ordering was implicit.  It now unpacks the three forms
+  (`low`, `squashed`, `tokenized`) and walks them as three explicit,
+  numbered lookup steps:
+  - `# 1. exact canonical/variant match (case-insensitive), e.g. "mysql"`
+  - `# 2. squashed lookup (punctuation stripped), e.g. "react.js"`
+  - `# 3. tokenized lookup, e.g. "react js"`
+  - `# Unknown skill: fall back to the normalized lowercase tokenized form.`
+- Behavior identical: same key order (low -> squashed -> tokenized), same
+  fallback (`tokenized`).
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_skill_normalizer.py` — 15 passed
+- `uv run ruff check client/skills/` — pass; `ruff format --check` — pass
+- `uv run pyright client/skills/` — 0 errors, 0 warnings
+- Spot-check via REPL: `normalize("js")` -> `JavaScript`,
+  `normalize("react.js")` -> `React`, `normalize("Data Engineering")` ->
+  `data engineering` (fallback).
+
+**Commit:** `simplify: phase 8 - skill normalizer step-by-step lookup + docs (8.1-8.3)`
+
+---
+
+## Phase 8 - Completed sub-task 8.2: rename ambiguous locals + docstring coverage
+
+Original instruction: rename single-letter/ambiguous locals; every method
+docstring covers unknown-skill + case handling.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/skills/normalizer.py`**:
+  - `match_skills()` list comprehensions used single-letter `s`; renamed
+    to `skill` in all three comprehensions (`missing` / `matched` / `extra`).
+  - `normalize()` dropped the implicit `for key in ...` tuple iteration
+    (the `key` name implied a single comparable form when it was actually
+    three) in favor of explicit `low` / `squashed` / `tokenized` locals.
+  - Every method docstring now explicitly covers both the unknown-skill
+    behavior and the case handling:
+    - `normalize` — states matching is case- and punctuation-insensitive
+      and that unknown skills fall back to the lowercase tokenized form.
+    - `canonicalize` — notes identical behavior (case-insensitive lookup,
+      lowercase tokenized fallback).
+    - `normalize_list` — documents per-item behavior (canonical when known,
+      tokenized fallback when unknown; case/punctuation insensitive;
+      empties dropped; order preserved).
+    - `get_variants` — documents case-insensitive lookup and empty list
+      for unknown canonical names.
+    - `match_skills` — documents that both inputs are normalized first
+      (unknown skills become lowercase tokenized forms).
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_skill_normalizer.py` — 15 passed
+- `uv run ruff check client/skills/` — pass; `ruff format --check` — pass
+- `uv run pyright client/skills/` — 0 errors, 0 warnings
+- No public API changed; renames are local to comprehension/loop scopes.
+
+**Commit:** `simplify: phase 8 - skill normalizer step-by-step lookup + docs (8.1-8.3)`
+
+---
+
+## Phase 8 - Completed sub-task 8.3: module docstring + taxonomy doc cross-check
+
+Original instruction: module docstring explains "canonical skill taxonomy
+-> normalized forms" and when to prefer `normalize_list` vs
+`match_skills`; verify `docs/skill-taxonomy.md` matches code.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/skills/normalizer.py`** — module docstring rewritten with two
+  sections:
+  - *Canonical taxonomy -> normalized forms*: describes the
+    `category -> {canonical name -> [variants]}` taxonomy, the three
+    comparable forms, and the stable lowercase tokenized fallback for
+    unknown skills.
+  - *Choosing an entry point*: explicit guidance that `normalize_list`
+    is for canonical de-duplicated lists, `match_skills` is for the
+    three-way `missing` / `matched` / `extra` classification (it
+    normalizes both inputs internally), and `normalize`/`canonicalize` /
+    `get_variants` cover single-skill and variant-inspection needs.
+- **`client/skills/__init__.py`** — package docstring expanded to point
+  at `SkillNormalizer` and `docs/skill-taxonomy.md`.
+- **Cross-check** — `docs/skill-taxonomy.md` (95 lines) verified against
+  code: it already documents the six categories, the three comparable
+  match forms, the import-time index build (`_CANONICAL_BY_KEY`,
+  `_VARIANTS`, `_CATEGORY_BY_CANONICAL`), the five-method API table, and
+  the 5 agents wired to normalization.  No drift found; no doc edits
+  needed.  REPL check confirmed 6 categories and 52 canonical names as
+  the doc implies.
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_skill_normalizer.py` — 15 passed
+- `uv run ruff check client/skills/` — pass; `ruff format --check` — pass
+- `uv run pyright client/skills/` — 0 errors, 0 warnings
+- Docstring/comment-only plus comprehension renames; no behavior change.
+
+**Commit:** `simplify: phase 8 - skill normalizer step-by-step lookup + docs (8.1-8.3)`
