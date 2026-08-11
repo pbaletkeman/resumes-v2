@@ -3,10 +3,11 @@
  *
  * The tab components read their (already coerced) data and describe it
  * declaratively with these parts: a `Section` wrapper with a heading, tag /
- * bullet / key-value content blocks, an `ExperienceEntryView` for work
- * history rows, and a `NoData` placeholder.  Every list-style renderer
- * accepts an `emptyText`; when set it renders the placeholder, otherwise it
- * renders nothing (so tabs can silently skip empty sections).
+ * bullet / key-value content blocks, `ExperienceSection` for work history,
+ * `ParagraphSection` / `PreSection` for single blocks of text, and a
+ * `NoData` placeholder.  Every list-style renderer accepts an `emptyText`;
+ * when set it renders the placeholder, otherwise it renders nothing (so tabs
+ * can silently skip empty sections).
  */
 import type { ReactNode } from 'react'
 import { Tag } from 'primereact/tag'
@@ -35,6 +36,38 @@ export function Section({
       <h3>{label}</h3>
       {hasContent ? children : <NoData />}
     </section>
+  )
+}
+
+/**
+ * A titled section rendering a single paragraph of text.  Renders `NoData`
+ * when `text` is null (e.g. the Summary and Contact blocks on the parsed /
+ * rewritten resume tabs).
+ */
+export function ParagraphSection({
+  label,
+  text,
+}: {
+  label: string
+  text: string | null
+}) {
+  return (
+    <Section label={label} hasContent={text !== null}>
+      <p>{text}</p>
+    </Section>
+  )
+}
+
+/**
+ * A titled section rendering pre-formatted text in a `<pre>` block.  Renders
+ * `NoData` when `text` is null (e.g. the polished resume, cover letter, and
+ * ATS final resume).
+ */
+export function PreSection({ label, text }: { label: string; text: string | null }) {
+  return (
+    <Section label={label} hasContent={text !== null}>
+      {text !== null && <pre className="results-pre">{text}</pre>}
+    </Section>
   )
 }
 
@@ -73,6 +106,26 @@ export function ExperienceEntryView({ entry }: { entry: Record<string, unknown> 
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * A titled "Experience" section rendering each work-history entry via
+ * `ExperienceEntryView`.  Renders `NoData` when there are no entries.
+ */
+export function ExperienceSection({
+  entries,
+}: {
+  entries: Record<string, unknown>[]
+}) {
+  return (
+    <Section label="Experience" hasContent={entries.length > 0}>
+      <div className="results-experiences">
+        {entries.map((entry, index) => (
+          <ExperienceEntryView key={index} entry={entry} />
+        ))}
+      </div>
+    </Section>
   )
 }
 

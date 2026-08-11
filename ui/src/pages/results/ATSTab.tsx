@@ -1,7 +1,7 @@
 // ATS tab — renders the Agent 5 output (ats_optimized_resume).
 import { Tag } from 'primereact/tag'
 import { asRecord, pickList, pickNumber, pickText } from './coerce'
-import { BulletSection, NoData, Section, TagSection } from './parts'
+import { BulletSection, NoData, PreSection, Section, TagSection } from './parts'
 
 interface ATSTabProps {
   value: unknown
@@ -41,11 +41,9 @@ function ATSTab({ value }: ATSTabProps) {
       <BulletSection label="Clarity issues" items={clarityIssues} emptyText="No data" />
       <BulletSection label="Recommended fixes" items={fixes} emptyText="No data" />
       <BulletSection label="Auto-fixes applied" items={autoFixes} emptyText="No data" />
-      <Section label="Final resume" hasContent={finalResume !== null}>
-        {/* Trust boundary: `final_resume` is plain text from our own pipeline
-            (LLM output, not user-supplied HTML); React escapes it in <pre>. */}
-        <pre className="results-pre">{finalResume}</pre>
-      </Section>
+      {/* Trust boundary: `final_resume` is plain text from our own pipeline
+          (LLM output, not user-supplied HTML); PreSection renders it escaped. */}
+      <PreSection label="Final resume" text={finalResume} />
     </div>
   )
 }

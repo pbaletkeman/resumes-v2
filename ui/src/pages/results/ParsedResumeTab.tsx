@@ -2,9 +2,9 @@
 import { asRecord, pickList, pickObjectList, pickString } from './coerce'
 import {
   BulletSection,
-  ExperienceEntryView,
+  ExperienceSection,
   NoData,
-  Section,
+  ParagraphSection,
   TagSection,
 } from './parts'
 
@@ -36,17 +36,9 @@ function ParsedResumeTab({ value }: ParsedResumeTabProps) {
 
   return (
     <div className="results-panel">
-      <Section label="Summary" hasContent={summary !== null}>
-        <p>{summary}</p>
-      </Section>
+      <ParagraphSection label="Summary" text={summary} />
       <TagSection label="Skills" items={skills} emptyText="No data" />
-      <Section label="Experience" hasContent={experience.length > 0}>
-        <div className="results-experiences">
-          {experience.map((entry, index) => (
-            <ExperienceEntryView key={index} entry={entry} />
-          ))}
-        </div>
-      </Section>
+      <ExperienceSection entries={experience} />
       <BulletSection label="Projects" items={projects} emptyText="No data" />
       <BulletSection
         label="Certifications"
@@ -54,9 +46,7 @@ function ParsedResumeTab({ value }: ParsedResumeTabProps) {
         emptyText="No data"
       />
       <BulletSection label="Education" items={education} emptyText="No data" />
-      <Section label="Contact" hasContent={contactText !== null}>
-        <p>{contactText}</p>
-      </Section>
+      <ParagraphSection label="Contact" text={contactText} />
     </div>
   )
 }
