@@ -2254,3 +2254,120 @@ here above. `simple.md` checklist rows 12.1-12.5 checked and the Phase 12
 header marked `✅ COMPLETED`.
 
 **Commit:** `simplify: phase 12 - api client error helpers + hooks/types/download docs (12.1-12.4)`
+
+---
+
+## Phase 13 - Completed sub-task 13.1: `coerce.ts` JSDoc + expanded one-liners
+
+Original instruction: add one-line JSDoc to every exported helper in
+`coerce.ts` stating exactly what it tolerates and returns; expand any dense
+`pick*` one-liner that composes two helpers.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/results/coerce.ts`** — added JSDoc to all 13 exports
+  (`asRecord`, `asString`, `asStringList`, `asStringMap`, `asObjectList`,
+  `pickString`, `pickNumber`, `pickList`, `pickObjectList`, `pickText`,
+  `textFromValue`, `pickMap`).  Each line states the tolerated input shapes,
+  the edge-case handling (e.g. `asString` drops blank strings, `pickNumber`
+  parses numeric strings and rejects non-finite values, `pickText` accepts
+  string / array / nested-object and joins accordingly), and the exact
+  default returned (`null` for singletons, `[]` / `{}` for collections).
+- Expanded the dense `pick*` one-liners (`pickString`, `pickList`,
+  `pickObjectList`, `pickMap`) from `return record === null ? ... :
+  ...(record[key])` into an early-`return null`/`return []` guard followed by
+  the single composed call — behaviour identical, reads as two obvious steps.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass; `npm run lint` — pass
+- `npm test -- --run` — 45 passed (the results tabs that consume these
+  helpers are covered by `ATSTab.test.tsx` / `DownloadsRow.test.tsx`).
+- Refactor + JSDoc only; no runtime change.
+
+**Commit:** `simplify: phase 13 - result coercion + parts renderer docs (13.1-13.3)`
+
+---
+
+## Phase 13 - Completed sub-task 13.2: `parts.tsx` renderer docs
+
+Original instruction: document the props and behavior of each shared
+renderer so the tab components read as declarative data.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/results/parts.tsx`** — added a module header describing
+  the role of the parts (tabs describe their coerced data declaratively) and
+  the `emptyText` convention shared by the list renderers (when set, render a
+  `NoData` placeholder; when unset, render nothing so empty sections are
+  silently skipped).
+- JSDoc on every exported component:
+  - `NoData`: centered placeholder shown for empty sections.
+  - `Section`: titled wrapper; renders `children` when `hasContent`, else
+    `NoData`.
+  - `ExperienceEntryView`: reads `title`/`company`/`dates` plus the three
+    bullet lists off a loose entry dict and renders the header + non-empty
+    lists.
+  - `TagSection` / `BulletSection` / `KeyValueTable`: each documents the
+    items/entries it renders, the placeholder behaviour, and that it renders
+    nothing when empty and `emptyText` is unset.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass; `npm run lint` — pass
+- `npm test -- --run` — 45 passed (tab components render through these
+  parts in `ATSTab.test.tsx` and `DownloadsRow.test.tsx`).
+- Docstring-only; no runtime change.
+
+**Commit:** `simplify: phase 13 - result coercion + parts renderer docs (13.1-13.3)`
+
+---
+
+## Phase 13 - Completed sub-task 13.3: `coerce.ts` module header
+
+Original instruction: module header explaining "the backend result dicts are
+loosely typed; these helpers coerce unknown shapes safely".
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/results/coerce.ts`** — added a module header stating that
+  the backend result dicts (`StageResult<T>` values in
+  `PipelineRunResponse`) are loosely typed — a field may be missing, null,
+  the wrong type, or a string where a list is expected — and that these
+  helpers coerce unknown shapes safely, never throw, and return predictable
+  defaults (`null` / `[]` / `{}`) so tabs render without defensive checks.
+
+**Behavior verification:**
+
+- Comment-only. `npx tsc -b` — pass; `npm run lint` — pass;
+  `npm test -- --run` — 45 passed.
+
+**Commit:** `simplify: phase 13 - result coercion + parts renderer docs (13.1-13.3)`
+
+---
+
+## Phase 13 - Completed sub-task 13.4: guardrails + move + commit
+
+Original instruction: `npx tsc -b`, `npm run lint`, `npm test -- --run`,
+move to `simple-done.md`, commit.
+
+### Completion record
+
+**Guardrails (all green):**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files
+
+**Moved to `simple-done.md`:** the Phase 13 narrative stub stays in
+`simple.md`; all 4 sub-task completion records (13.1-13.4) are recorded
+here above. `simple.md` checklist rows 13.1-13.4 checked and the Phase 13
+header marked `✅ COMPLETED`.
+
+**Commit:** `simplify: phase 13 - result coercion + parts renderer docs (13.1-13.3)`

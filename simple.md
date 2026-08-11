@@ -472,7 +472,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 13 - Result data coercion + shared result parts
+## Phase 13 - Result data coercion + shared result parts  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `ui/src/pages/results/coerce.ts`, `ui/src/pages/results/parts.tsx`
 
@@ -751,10 +754,10 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 13 - Result data coercion + shared result parts
 
-- [ ] 13.1 `coerce.ts`: one-line JSDoc on every export (what it tolerates/returns); expand dense `pick*` one-liners.
-- [ ] 13.2 `parts.tsx`: document props/behavior of each shared renderer.
-- [ ] 13.3 Module header: "backend result dicts are loosely typed; these helpers coerce unknown shapes safely".
-- [ ] 13.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
+- [x] 13.1 `coerce.ts`: one-line JSDoc on every export (what it tolerates/returns); expand dense `pick*` one-liners.
+- [x] 13.2 `parts.tsx`: document props/behavior of each shared renderer.
+- [x] 13.3 Module header: "backend result dicts are loosely typed; these helpers coerce unknown shapes safely".
+- [x] 13.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
 
 ### Phase 14 - Results tabs (8 components)
 
