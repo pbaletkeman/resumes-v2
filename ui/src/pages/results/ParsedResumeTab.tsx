@@ -1,4 +1,5 @@
-import { pickList, pickObjectList, pickString } from './coerce'
+// Parsed Resume tab — renders the Agent 2 output (parsed_resume).
+import { asRecord, pickList, pickObjectList, pickString } from './coerce'
 import {
   BulletSection,
   ExperienceEntryView,
@@ -12,10 +13,7 @@ interface ParsedResumeTabProps {
 }
 
 function ParsedResumeTab({ value }: ParsedResumeTabProps) {
-  const record =
-    value !== null && typeof value === 'object'
-      ? (value as Record<string, unknown>)
-      : null
+  const record = asRecord(value)
   if (record === null) {
     return <NoData />
   }

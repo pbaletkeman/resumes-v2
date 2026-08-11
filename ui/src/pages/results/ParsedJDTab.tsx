@@ -1,4 +1,5 @@
-import { pickList, pickString, pickMap } from './coerce'
+// Parsed JD tab — renders the Agent 1 output (parsed_job_description).
+import { asRecord, pickList, pickString, pickMap } from './coerce'
 import { BulletSection, KeyValueTable, NoData, TagSection } from './parts'
 
 interface ParsedJDTabProps {
@@ -6,7 +7,7 @@ interface ParsedJDTabProps {
 }
 
 function ParsedJDTab({ value }: ParsedJDTabProps) {
-  const record = value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null
+  const record = asRecord(value)
   if (record === null) {
     return <NoData />
   }

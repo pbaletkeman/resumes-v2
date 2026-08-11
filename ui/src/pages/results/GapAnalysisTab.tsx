@@ -1,4 +1,5 @@
-import { pickList, pickText } from './coerce'
+// Gap Analysis tab — renders the Agent 3 output (tailoring_strategy).
+import { asRecord, pickList, pickText } from './coerce'
 import { NoData, TagSection } from './parts'
 
 interface GapAnalysisTabProps {
@@ -6,10 +7,7 @@ interface GapAnalysisTabProps {
 }
 
 function GapAnalysisTab({ value }: GapAnalysisTabProps) {
-  const record =
-    value !== null && typeof value === 'object'
-      ? (value as Record<string, unknown>)
-      : null
+  const record = asRecord(value)
   if (record === null) {
     return <NoData />
   }

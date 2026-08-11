@@ -1,3 +1,4 @@
+// Cover Letter tab — renders the Agent 7 output (cover_letter).
 import { textFromValue } from './coerce'
 import { NoData, Section } from './parts'
 

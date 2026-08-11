@@ -1,4 +1,5 @@
-import { pickList, pickObjectList, pickString } from './coerce'
+// Rewritten Resume tab — renders the Agent 4 output (rewritten_resume).
+import { asRecord, pickList, pickObjectList, pickString } from './coerce'
 import {
   BulletSection,
   ExperienceEntryView,
@@ -12,10 +13,7 @@ interface RewrittenResumeTabProps {
 }
 
 function RewrittenResumeTab({ value }: RewrittenResumeTabProps) {
-  const record =
-    value !== null && typeof value === 'object'
-      ? (value as Record<string, unknown>)
-      : null
+  const record = asRecord(value)
   if (record === null) {
     return <NoData />
   }

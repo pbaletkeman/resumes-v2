@@ -1,3 +1,4 @@
+// Polished tab — renders the Agent 6 output (polished_resume).
 import { textFromValue } from './coerce'
 import { NoData, Section } from './parts'
 

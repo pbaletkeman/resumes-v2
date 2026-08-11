@@ -1,5 +1,6 @@
+// ATS tab — renders the Agent 5 output (ats_optimized_resume).
 import { Tag } from 'primereact/tag'
-import { pickList, pickNumber, pickText } from './coerce'
+import { asRecord, pickList, pickNumber, pickText } from './coerce'
 import { BulletSection, NoData, Section, TagSection } from './parts'
 
 interface ATSTabProps {
@@ -17,10 +18,7 @@ function scoreSeverity(score: number): 'success' | 'warning' | 'danger' {
 }
 
 function ATSTab({ value }: ATSTabProps) {
-  const record =
-    value !== null && typeof value === 'object'
-      ? (value as Record<string, unknown>)
-      : null
+  const record = asRecord(value)
   if (record === null) {
     return <NoData />
   }
