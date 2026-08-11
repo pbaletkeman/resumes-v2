@@ -106,10 +106,12 @@ class CoverLetterAgent:
         Returns:
             A validated ``CoverLetterOutput``.
         """
+        # Step 1. Collect the parsed inputs (JD, resume, tailoring strategy)
         jd = inputs.get("parsed_job_description", {})
         resume = inputs.get("parsed_resume", {})
         strategy = inputs.get("tailoring_strategy", {})
 
+        # Step 2. Short-circuit to the data-driven fallback on empty input
         if not jd or not resume:
             logger.debug("Cover letter: empty input, returning fallback cover letter")
             logger.info(
@@ -119,6 +121,7 @@ class CoverLetterAgent:
                 cover_letter=_build_fallback_cover_letter(jd, resume, strategy)
             )
 
+        # Step 3. Serialize the parsed models for the LLM prompt
         jd_json = _serialize(jd)
         resume_json = _serialize(resume)
         strategy_json = _serialize(strategy)
@@ -130,7 +133,7 @@ class CoverLetterAgent:
             len(strategy_json),
         )
 
-        # Attempt LLM extraction (with one retry)
+        # Step 4. Attempt LLM extraction (with one retry, stricter second pass)
         for attempt in range(2):
             result = await self._try_llm(
                 jd_json, resume_json, strategy_json, strict=(attempt == 1)
@@ -142,7 +145,7 @@ class CoverLetterAgent:
                 )
                 return result
 
-        # Fallback: return data-driven fallback cover letter
+        # Step 5. Both attempts failed: return the data-driven fallback letter
         logger.warning(
             "LLM cover letter failed on both attempts, returning fallback cover letter"
         )
@@ -173,6 +176,7 @@ class CoverLetterAgent:
         Returns:
             A validated ``CoverLetterOutput``, or ``None`` on failure.
         """
+        # Step 1. Compose the prompt (directives + serialized inputs)
         prompt = (
             "Write a cover letter for this SPECIFIC job application. "
             "You MUST use the company name and role title from the job description. "
@@ -212,6 +216,7 @@ class CoverLetterAgent:
             f"{strategy_json}\n\n"
             'Return ONLY: {"cover_letter": "your tailored letter here"}'
         )
+        # Step 2. Pick the rule set (stricter on the retry pass)
         rules = (
             _STRICT_RULES + [_SCHEMA_HINT]
             if strict
@@ -228,6 +233,7 @@ class CoverLetterAgent:
             len(prompt),
         )
 
+        # Step 3. Call the LLM (client errors become None, never raised)
         try:
             raw = await self.client.chat(
                 purpose=_SYSTEM_PROMPT,
@@ -251,9 +257,14 @@ class CoverLetterAgent:
             return None
 
         logger.debug("LLM cover letter response: %s", raw[:200] if raw else "<empty>")
+
+        # Step 4. Parse the JSON response (None when not valid JSON)
+
         data = _parse_json(raw)
         if data is None:
             return None
+
+        # Step 5. Validate the parsed data into the output model
 
         try:
             result = CoverLetterOutput(**data)
@@ -272,19 +283,19 @@ class CoverLetterAgent:
             )
             return None
 
-        # If cover_letter is empty, reject so run() falls back to the
-        # data-driven fallback letter
+        # Step 6. Reject an empty letter so run() uses the fallback
         if not result.cover_letter.strip():
             logger.warning("cover_letter is empty, rejecting so run() falls back")
             return None
 
-        # Post-validation checks
+        # Step 7. Post-validation checks (advisory + hard-reject guards)
         if not _validate_role(result, jd_json):
             logger.warning("Cover letter does not name the JD role title -- rejecting")
             return None
 
         _check_company(result, jd_json)
 
+        # Step 8. Deterministic post-processors (never mutate in place)
         result = _apply_company_name(result, jd_json, resume_json)
 
         result = _apply_candidate_name(result, resume_json)

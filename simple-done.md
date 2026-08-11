@@ -905,3 +905,49 @@ Phase 5 validation guards).
   input `load_json_safe` returns `None` instead of raising.
 
 **Commit:** `simplify: phase 6b - cover letter json.loads guards via load_json_safe`
+
+---
+
+## Phase 6 - Completed sub-task 6.3: named-step comments inside the long `run`/`_try_llm` methods
+
+Original instruction: break any method over ~50 lines into named steps with
+`# 1.`/`# 2.` comments.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/cover_letter.py`** — measured body lengths with an AST
+  script: the only functions over the ~45-line bar were `run` (60 lines)
+  and `_try_llm` (142 lines).  Both are now broken into named steps with
+  `# Step N.` comments (the same readability pattern used for Phase 5's
+  long helpers -- no extraction, no behavior change):
+  - `run` — Step 1. collect parsed inputs; Step 2. short-circuit to the
+    data-driven fallback on empty input; Step 3. serialize the parsed
+    models for the LLM prompt; Step 4. attempt LLM extraction (one retry,
+    stricter second pass); Step 5. both attempts failed -> fallback letter.
+  - `_try_llm` — Step 1. compose the prompt (directives + serialized
+    inputs); Step 2. pick the rule set (stricter on retry); Step 3. call
+    the LLM (client errors become None, never raised); Step 4. parse the
+    JSON response; Step 5. validate into the output model; Step 6. reject
+    an empty letter so `run()` uses the fallback; Step 7. post-validation
+    checks (advisory + hard-reject guards); Step 8. deterministic
+    post-processors (never mutate in place).
+  - The existing inline comments ("empty input", "Attempt LLM extraction
+    with one retry", "Post-validation checks", the empty-letter comment)
+    were folded into the numbered steps rather than duplicated.
+  - Comment-only change: the AST body diffs are empty (verified during
+    guardrails), so behavior is identical.
+
+**Behavior verification:**
+
+- AST compare vs `HEAD` (statement-level, docstrings stripped):
+  0 body diffs across all functions/classes.
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_cover_letter.py` (10) and
+  `tests/test_cover_letter_validation.py` (109)
+
+**Commit:** `simplify: phase 6c - cover letter long method step comments (run/_try_llm)`
