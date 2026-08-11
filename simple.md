@@ -346,7 +346,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 8 - Skill taxonomy & normalization
+## Phase 8 - Skill taxonomy & normalization  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `client/skills/normalizer.py`, `client/skills/__init__.py`, `docs/skill-taxonomy.md` (read-only reference for this phase)
 
@@ -686,12 +689,15 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 7.5 Full class/method docstrings + `Args:`/`Returns:`/`Raises:` on `render_all`. ✅ See `simple-done.md`.
 - [x] 7.6 Guardrails (keep output byte-identical; watch `tests/test_renderer.py` 43 + `test_formatter.py` 41), move to `simple-done.md`, commit.
 
-### Phase 8 - Skill taxonomy & normalization
+### Phase 8 - Skill taxonomy & normalization ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here so the working checklist stays intact.
 
 - [x] 8.1 Make internal lookup read step-by-step (`# 1. exact canonical match`, `# 2. variant lookup`, ...). ✅ See `simple-done.md`.
 - [x] 8.2 Rename single-letter/ambiguous locals; every method docstring covers unknown-skill + case handling. ✅ See `simple-done.md`.
 - [x] 8.3 Module docstring: canonical taxonomy -> normalized forms; when to prefer `normalize_list` vs `match_skills`; cross-check `docs/skill-taxonomy.md`. ✅ See `simple-done.md`.
-- [ ] 8.4 Guardrails (watch `tests/test_skill_normalizer.py` 15), move to `simple-done.md`, commit.
+- [x] 8.4 Guardrails (watch `tests/test_skill_normalizer.py` 15), move to `simple-done.md`, commit.
 
 ### Phase 9 - Pipeline orchestration + CLI
 

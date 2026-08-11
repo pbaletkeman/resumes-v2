@@ -1519,3 +1519,77 @@ Original instruction: module docstring explains "canonical skill taxonomy
 - Docstring/comment-only plus comprehension renames; no behavior change.
 
 **Commit:** `simplify: phase 8 - skill normalizer step-by-step lookup + docs (8.1-8.3)`
+
+---
+
+## Phase 8 - Skill taxonomy & normalization  ✅ COMPLETED
+
+**Files:** `client/skills/normalizer.py`, `client/skills/__init__.py`, `docs/skill-taxonomy.md` (read-only reference for this phase)
+
+**Inspect for:**
+
+- `SkillNormalizer` public surface (`normalize`, `normalize_list`, `match_skills`, ...), the canonical taxonomy loading, localization, and the `match_skills` return dict.
+- Every method docstring should reference how it treats unknown skills and case.
+
+**Simplify toward:**
+
+- Make the internal lookup logic read step-by-step (`# 1. exact canonical match, # 2. variant lookup ...`).
+- Rename any single-letter or ambiguous locals.
+
+**Documentation:** module docstring explaining "canonical skill taxonomy -> normalized forms" and when to prefer `normalize_list` vs `match_skills`. Verify `docs/skill-taxonomy.md` matches code (consolidate in Phase 19 if it drifts).
+
+**Verify:** watch `tests/test_skill_normalizer.py` (15 tests).
+
+### Phase 8 Completion record
+
+**Overview:** Phase 8 made the `SkillNormalizer` internals and
+documentation read step-by-step.  `normalize()` now walks three explicit,
+numbered lookup steps (exact lowercase -> squashed/punctuation-stripped ->
+tokenized) instead of looping an implicit 3-tuple.  Ambiguous
+single-letter locals were renamed (`s` -> `skill` in the `match_skills`
+comprehensions; the tuple iteration became explicit `low`/`squashed`/
+`tokenized`).  Every method docstring now states both the unknown-skill
+behavior and the case/punctuation handling, and the module docstring
+explains the canonical-taxonomy -> normalized-forms story plus when to
+prefer `normalize_list` vs `match_skills`.  `docs/skill-taxonomy.md` was
+cross-checked against the code -- no drift.  All changes were
+docs/comments/renames; the 15-test `test_skill_normalizer.py` suite and
+the full 493-test suite stayed green.
+
+**Changes made (by sub-task):**
+
+- **8.1** — `normalize()` unpacked `low`/`squashed`/`tokenized` and now
+  walks three numbered lookup steps (`# 1. exact canonical/variant match`,
+  `# 2. squashed lookup`, `# 3. tokenized lookup`, fallback comment).
+  Same key order and fallback; behavior identical.  (`simplify: phase 8 ...`)
+- **8.2** — Renamed single-letter `s` to `skill` in the `match_skills`
+  comprehensions; replaced the implicit tuple iteration in `normalize()`
+  with explicit named locals; every method docstring now covers
+  unknown-skill + case handling (`normalize`, `canonicalize`,
+  `normalize_list`, `get_variants`, `match_skills`).  No public API
+  change.  (`simplify: phase 8 ...`)
+- **8.3** — Module docstring rewritten with *Canonical taxonomy ->
+  normalized forms* and *Choosing an entry point* sections;
+  `client/skills/__init__.py` package docstring expanded.  Cross-checked
+  `docs/skill-taxonomy.md` (six categories, three match forms, index
+  build, API table, 5 wired agents) -- no drift found; no doc edits
+  needed.  REPL confirmed 6 categories / 52 canonical names.  (`simplify:
+  phase 8 ...`)
+- **8.4** — Guardrails run across the phase (below); phase moved here.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings (full run)
+- `uv run pytest` — 493 passed, including
+  `tests/test_skill_normalizer.py` (15)
+- REPL spot-check: `normalize("js")` -> `JavaScript`,
+  `normalize("react.js")` -> `React`, `normalize("Data Engineering")` ->
+  `data engineering` (fallback); `match_skills` on the test sample
+  returns `missing: [Python, React]`, `matched: [JavaScript, Amazon Web
+  Services]`, `extra: [Go]` exactly as the tests assert.
+- No behavior change: renames are local, lookup order preserved, fallback
+  unchanged.
+
+**Commit:** `simplify: phase 8 - skill normalizer step-by-step lookup + docs (8.1-8.3)`
