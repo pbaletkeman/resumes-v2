@@ -1,11 +1,26 @@
+/**
+ * Shared renderers for the results tabs.
+ *
+ * The tab components read their (already coerced) data and describe it
+ * declaratively with these parts: a `Section` wrapper with a heading, tag /
+ * bullet / key-value content blocks, an `ExperienceEntryView` for work
+ * history rows, and a `NoData` placeholder.  Every list-style renderer
+ * accepts an `emptyText`; when set it renders the placeholder, otherwise it
+ * renders nothing (so tabs can silently skip empty sections).
+ */
 import type { ReactNode } from 'react'
 import { Tag } from 'primereact/tag'
 import { pickList, pickString } from './coerce'
 
+/** A small centered placeholder shown when a section has no content. */
 export function NoData({ label = 'No data' }: { label?: string }) {
   return <p className="results-no-data">{label}</p>
 }
 
+/**
+ * A titled section.  Renders `children` when `hasContent` is true, otherwise
+ * a `NoData` placeholder.
+ */
 export function Section({
   label,
   hasContent,
@@ -23,6 +38,12 @@ export function Section({
   )
 }
 
+/**
+ * One work-history row.  Reads `title` / `company` / `dates` and the
+ * `responsibilities` / `achievements` / `metrics` lists off a loose entry
+ * dict, renders the header line, and each non-empty list as a
+ * `BulletSection`.
+ */
 export function ExperienceEntryView({ entry }: { entry: Record<string, unknown> }) {
   const title = pickString(entry, 'title')
   const company = pickString(entry, 'company')
@@ -61,6 +82,11 @@ interface SectionProps {
   emptyText?: string
 }
 
+/**
+ * A titled section rendering `items` as PrimeReact `Tag`s.  With `emptyText`
+ * set, renders a `NoData` placeholder when there are no items; otherwise
+ * renders nothing.
+ */
 export function TagSection({ label, items, emptyText }: SectionProps) {
   if (items.length === 0) {
     return emptyText === undefined ? null : (
@@ -82,6 +108,11 @@ export function TagSection({ label, items, emptyText }: SectionProps) {
   )
 }
 
+/**
+ * A titled section rendering `items` as a bulleted list.  With `emptyText`
+ * set, renders a `NoData` placeholder when there are no items; otherwise
+ * renders nothing.
+ */
 export function BulletSection({ label, items, emptyText }: SectionProps) {
   if (items.length === 0) {
     return emptyText === undefined ? null : (
@@ -109,6 +140,11 @@ interface TableProps {
   emptyText?: string
 }
 
+/**
+ * A titled section rendering `entries` as a two-column key/value table.
+ * With `emptyText` set, renders a `NoData` placeholder when there are no
+ * entries; otherwise renders nothing.
+ */
 export function KeyValueTable({ label, entries, emptyText }: TableProps) {
   const keys = Object.keys(entries)
   if (keys.length === 0) {
