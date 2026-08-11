@@ -2,10 +2,27 @@
 cover_letter.py
 Cover Letter Agent.
 
-Generates a tailored cover letter using the parsed job description,
-parsed resume, and tailoring strategy.  Uses an LLM to produce a
-``CoverLetterOutput``.  Falls back to a minimal generic cover letter
-on LLM failure.
+Generates a tailored cover letter from the parsed job description,
+parsed resume, and tailoring strategy.  An LLM produces the letter as a
+``CoverLetterOutput``; when the LLM fails (or the inputs are empty) the
+agent falls back to a data-driven letter built from the same inputs.
+
+Agent contract:
+- Inputs (``run(inputs)``): ``parsed_job_description``
+  (``JDParsingOutput`` or serializable dict), ``parsed_resume``
+  (``ResumeParsingOutput`` or serializable dict), and
+  ``tailoring_strategy`` (``GapAnalysisOutput`` or serializable dict).
+- Output model: ``CoverLetterOutput`` (single ``cover_letter`` string).
+- LLM attempt: one normal pass then one strict retry; any failure of the
+  LLM call, JSON parse, Pydantic validation, or hard-reject validation
+  guard fails that attempt.
+- Deterministic post-processors (never mutate in place; ``model_copy``):
+  ``_apply_company_name`` fixes the JD company (placeholder tokens first,
+  then a wrong resume company name) and ``_apply_candidate_name``
+  replaces ``[Your Name]`` placeholders with the candidate's name;
+  ``_apply_contact_info`` appends the resume contact line.
+- Fallback: ``_build_fallback_cover_letter`` renders a data-driven letter
+  (role title, company, overlapping skills, one achievement) with no LLM.
 
 File layout: the public ``CoverLetterAgent`` class comes first, then the
 module-level helpers grouped by purpose with banner comments -- shared

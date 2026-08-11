@@ -998,3 +998,55 @@ with comment.
   directly (verified by grep), so the signature change is test-safe.
 
 **Commit:** `simplify: phase 6d - standardized placeholder handling (_replace_placeholders shared)`
+
+---
+
+## Phase 6 - Completed sub-task 6.5: module docstring covering the agent contract
+
+Original instruction: module docstring should cover the agent contract
+(inputs, output model, fallback, two deterministic post-processors).
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/cover_letter.py`** — rewrote the first paragraph into a
+  full "Agent contract" section (mirroring the Phase 5.6 pattern) that
+  narrates, in order:
+  1. **Inputs** — `run(inputs)` takes `parsed_job_description`
+     (``JDParsingOutput``/dict), `parsed_resume`
+     (``ResumeParsingOutput``/dict), and `tailoring_strategy`
+     (``GapAnalysisOutput``/dict).
+  2. **Output model** — ``CoverLetterOutput`` (single `cover_letter`
+     string).
+  3. **LLM attempt** — one normal pass + one strict retry; failed LLM
+     call, JSON parse, Pydantic validation, or hard-reject guard fails the
+     attempt.
+  4. **Deterministic post-processors** — `_apply_company_name` (JD
+     company: placeholder tokens first, then a wrong resume company name)
+     and `_apply_candidate_name` (`[Your Name]` placeholders), plus
+     `_apply_contact_info` (appends the resume contact line); all
+     `model_copy`, never mutate in place.
+  5. **Fallback** — `_build_fallback_cover_letter` renders a data-driven
+     letter (role title, company, overlapping skills, one achievement)
+     with no LLM.
+  - Kept the "File layout" paragraph (banner groups) unchanged.
+- Cross-checked against `docs/agents.md` section 7 (Cover Letter Agent,
+  lines 312-350): the documented contract matches the code -- inputs,
+  `CoverLetterOutput` output, `_apply_company_name` /
+  `_apply_candidate_name` deterministic post-processing, and the
+  data-driven fallback are all described consistently, so no doc drift to
+  fix.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed
+- Read-back check: the documented steps match the actual `run()`/`_try_llm()`
+  flow (two attempts, strict on retry; failure -> `_build_fallback_cover_letter`)
+  and the post-processor call order in `_try_llm` (Step 8: company, name,
+  contact line last).
+
+**Commit:** `simplify: phase 6e - cover letter module docstring (agent contract story)`
