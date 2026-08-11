@@ -1,4 +1,11 @@
-"""Tests for FormatDetector regex parsing (no LLM)."""
+"""Tests for FormatDetector regex parsing (no LLM).
+
+Covers the regex extraction helpers in ``client/format_detector.py``:
+titles, headings, sections, bullets, metrics, keywords, and the
+``parse_resume`` / ``parse_job_description`` entry points.  Uses the
+``markdown_resume`` / ``markdown_jd`` and ``sample_resume`` / ``sample_jd``
+fixtures from ``conftest.py``.
+"""
 
 import pytest
 

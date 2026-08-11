@@ -1,4 +1,10 @@
-"""Tests for client/formatter.py formatting helpers."""
+"""Tests for client/formatter.py formatting helpers.
+
+Covers ``format_resume_markdown`` / ``format_resume_plain`` /
+``format_cover_letter`` and the ``_fix_encoding`` helper.  Uses local
+``_full_resume()`` / ``_empty_resume()`` factory helpers (no shared
+fixtures from ``conftest.py``).
+"""
 
 from client.formatter import (
     _fix_encoding,

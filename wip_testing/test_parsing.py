@@ -1,5 +1,17 @@
 """
-uv run python wip_testing/test_parsing.py
+test_parsing.py
+Demo the FormatDetector against the sample resume and JD, in both modes.
+
+Exercises:
+    - FormatDetector regex-only mode (no LLM): parse_resume / parse_job_description
+    - FormatDetector regex + LLM fallback mode (requires Ollama): same calls
+
+Prerequisites:
+    - Ollama running on localhost:11434
+    - Model pulled: ollama pull qwen2.5:7b-instruct
+
+Usage:
+    uv run python wip_testing/test_parsing.py
 """
 
 import asyncio

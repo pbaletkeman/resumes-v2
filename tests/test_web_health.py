@@ -1,4 +1,9 @@
-"""Phase 7.4.1 web tests: health check and model listing routes."""
+"""Phase 7.4.1 web tests: health check and model listing routes.
+
+Covers ``GET /health`` and ``GET /api/models`` on the FastAPI app.  Uses
+``fastapi.testclient.TestClient(app)`` directly — no shared fixtures from
+``conftest.py``.
+"""
 
 from __future__ import annotations
 

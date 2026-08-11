@@ -1,4 +1,9 @@
-"""Tests for JDParsingAgent company-name helpers (no LLM)."""
+"""Tests for JDParsingAgent company-name helpers (no LLM).
+
+Covers ``_extract_company_name`` and ``_sync_company_name`` used by the
+JD Parsing Agent to keep ``company_signals`` in sync.  Exercised directly
+with in-memory data — no shared fixtures from ``conftest.py``.
+"""
 
 from client.agents.jd_parsing import _extract_company_name, _sync_company_name
 from client.models import JDParsingOutput

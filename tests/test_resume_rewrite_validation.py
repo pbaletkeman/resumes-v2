@@ -1,4 +1,10 @@
-"""Tests for ResumeRewriteAgent post-validation helpers (no LLM)."""
+"""Tests for ResumeRewriteAgent post-validation helpers (no LLM).
+
+Covers the deterministic ``_coerce_*`` and ``_ensure_chronological``
+helpers used after the LLM call in ``client/agents/resume_rewrite.py``.
+Exercised directly with in-memory dicts — no shared fixtures from
+``conftest.py``.
+"""
 
 import json
 import logging

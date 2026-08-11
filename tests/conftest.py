@@ -1,4 +1,19 @@
-"""Shared fixtures for tests."""
+"""Shared fixtures for the pytest suite.
+
+Fixtures (all auto-discovered by pytest via this ``conftest.py``):
+
+- ``fake_client``: the ``FakeClient`` *class*, so each test configures its own
+  canned-response instance.  Used by every per-agent contract test.
+- ``configure_test_logging`` (autouse): pins root logging to ``WARNING`` so
+  suite output stays quiet.
+- ``sample_resume_path`` / ``sample_jd_path``: paths to the checked-in sample
+  files under ``sample/``.
+- ``sample_resume`` / ``sample_jd``: raw text of those sample files.
+- ``markdown_resume`` / ``markdown_jd``: small inline markdown documents used
+  by the ``FormatDetector`` regex tests.
+- ``rewrite_output`` / ``cover_letter_output``: fully-populated output models
+  used by the renderer and formatter tests.
+"""
 
 import logging
 from pathlib import Path
@@ -81,6 +96,7 @@ def fake_client() -> type[FakeClient]:
 
 @pytest.fixture(autouse=True)
 def configure_test_logging():
+    """Keep test output quiet by raising the root logger to ``WARNING``."""
     logging.basicConfig(
         level=logging.WARNING,
         format="%(name)s %(levelname)s: %(message)s",
@@ -89,26 +105,31 @@ def configure_test_logging():
 
 @pytest.fixture
 def sample_resume_path() -> Path:
+    """Path to ``sample/resume/Peter-Letkeman-Resume.txt``."""
     return SAMPLE_DIR / "resume" / "Peter-Letkeman-Resume.txt"
 
 
 @pytest.fixture
 def sample_jd_path() -> Path:
+    """Path to ``sample/jobs/3Pillar.txt``."""
     return SAMPLE_DIR / "jobs" / "3Pillar.txt"
 
 
 @pytest.fixture
 def sample_resume(sample_resume_path: Path) -> str:
+    """Raw text of the sample resume file."""
     return sample_resume_path.read_text()
 
 
 @pytest.fixture
 def sample_jd(sample_jd_path: Path) -> str:
+    """Raw text of the sample job description file."""
     return sample_jd_path.read_text()
 
 
 @pytest.fixture
 def markdown_resume() -> str:
+    """Small inline markdown resume for ``FormatDetector`` regex tests."""
     return """# Jane Doe
 
 ## Summary
@@ -134,6 +155,7 @@ Senior engineer with 10 years of experience.
 
 @pytest.fixture
 def markdown_jd() -> str:
+    """Small inline markdown job description for ``FormatDetector`` regex tests."""
     return """Senior Backend Engineer
 
 Key Responsibilities

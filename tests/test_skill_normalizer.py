@@ -1,4 +1,9 @@
-"""Tests for the SkillNormalizer canonical taxonomy (8.5.1)."""
+"""Tests for the SkillNormalizer canonical taxonomy (8.5.1).
+
+Covers canonicalization, variant aliasing, localization, and unknown-skill
+handling in ``client/skills/normalizer.py`` against ``taxonomy.json``.
+Uses ``SkillNormalizer`` directly — no shared fixtures from ``conftest.py``.
+"""
 
 from client.skills import SkillNormalizer
 

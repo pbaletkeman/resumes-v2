@@ -1,4 +1,9 @@
-"""Tests for CoverLetterAgent post-validation helpers (no LLM)."""
+"""Tests for CoverLetterAgent post-validation helpers (no LLM).
+
+Covers the deterministic ``_coerce_*`` and fallback-building helpers used
+after the LLM call in ``client/agents/cover_letter.py``.  Exercised
+directly with in-memory dicts — no shared fixtures from ``conftest.py``.
+"""
 
 import json
 import logging
