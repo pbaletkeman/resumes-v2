@@ -495,7 +495,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 14 - Results tabs (8 components)
+## Phase 14 - Results tabs (8 components)  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `ui/src/pages/results/ParsedJDTab.tsx`, `ParsedResumeTab.tsx`, `GapAnalysisTab.tsx`, `RewrittenResumeTab.tsx`, `ATSTab.tsx`, `PolishedTab.tsx`, `CoverLetterTab.tsx`, `ResultsTabView.tsx`
 
@@ -765,7 +768,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 14.2 Each tab: one-line header (what it shows + which pipeline field); consistent use of `coerce.ts` helpers.
 - [x] 14.3 HTML-string tabs (polished/cover letter): document trust boundary (content from our own pipeline).
 - [x] 14.4 Extract repeated row/label markup into `parts.tsx` when it appears in 2+ tabs.
-- [ ] 14.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `ATSTab.test.tsx`, `DownloadsRow.test.tsx`).
+- [x] 14.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `ATSTab.test.tsx`, `DownloadsRow.test.tsx`).
 
 ### Phase 15 - Run page & form helpers
 

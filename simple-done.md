@@ -2527,3 +2527,56 @@ appears in 2+ tabs.
   `hasContent`/`emptyText` semantics match the replaced JSX).
 
 **Commit:** `simplify: phase 14 - extract shared paragraph/pre/experience parts (14.4)`
+
+---
+
+## Phase 14 - Completed sub-task 14.5: guardrails + move + commit
+
+Original instruction: `npx tsc -b`, `npm run lint`, `npm test -- --run`
+(watch `ATSTab.test.tsx`, `DownloadsRow.test.tsx`), move to
+`simple-done.md`, commit.
+
+### Completion record
+
+**Guardrails (all green):**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files
+- `npx vitest run src/pages/results/ATSTab.test.tsx src/pages/results/DownloadsRow.test.tsx` — 7 passed (2 files)
+
+**Moved to `simple-done.md`:** the Phase 14 narrative stub stays in
+`simple.md`; all 5 sub-task completion records (14.1-14.5) are recorded
+here above. `simple.md` checklist rows 14.1-14.5 checked and the Phase 14
+header marked `✅ COMPLETED`.
+
+**Commit:** `simplify: phase 14 - close, guardrails + records in simple-done.md`
+
+---
+
+## Phase 14 - Results tabs (8 components)  ✅ COMPLETED
+
+**Files:** `ui/src/pages/results/ParsedJDTab.tsx`, `ParsedResumeTab.tsx`, `GapAnalysisTab.tsx`, `RewrittenResumeTab.tsx`, `ATSTab.tsx`, `PolishedTab.tsx`, `CoverLetterTab.tsx`, `ResultsTabView.tsx`
+
+**Inspect for:**
+
+- `ResultsTabView.tsx`: the tab map (`TAB_KEYS`, `TAB_HEADERS`, `renderTabBody` switch) is clean. Add a comment that tab order mirrors pipeline output keys.
+- Each tab: what data shape does it expect? Does it use the `coerce.ts` helpers or inline its own `as*` logic?
+- Any tab rendering an HTML string (e.g., polished/cover letter) - document the trust boundary (content came from our own pipeline).
+
+**Simplify toward:**
+
+- Keep each tab a thin "read data via `pick*`, render via `parts.tsx`" component. Move repeated row/label markup into `parts.tsx` when it appears in 2+ tabs.
+- Give every tab a one-line header comment (what it shows + which pipeline field it renders).
+
+**Documentation:** per-component docstrings plus a note in `ResultsTabView.tsx` tying tab keys to the 7-agent output keys.
+
+**Verify:** `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch the tab tests: `ATSTab.test.tsx`, `DownloadsRow.test.tsx`).
+
+### Completed sub-tasks
+
+- 14.1 `ResultsTabView.tsx` tab-key comment — commit `55bc2d0`
+- 14.2 per-tab headers + consistent `coerce.ts` use — commit `3f61964`
+- 14.3 HTML-string trust boundary docs — commit `8d51fdf`
+- 14.4 extract repeated markup into `parts.tsx` — commit `e1c5a5d`
+- 14.5 guardrails + move + commit — this close record
