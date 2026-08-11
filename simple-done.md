@@ -2371,3 +2371,41 @@ here above. `simple.md` checklist rows 13.1-13.4 checked and the Phase 13
 header marked `✅ COMPLETED`.
 
 **Commit:** `simplify: phase 13 - result coercion + parts renderer docs (13.1-13.3)`
+
+---
+
+## Phase 14 - Completed sub-task 14.1: `ResultsTabView.tsx` tab-key comment
+
+Original instruction: comment tying `TAB_KEYS` to the 7-agent output
+keys/order.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/results/ResultsTabView.tsx`** — added a module header
+  describing the component (renders the seven `PipelineRunResponse` stage
+  outputs as PrimeReact tabs; tab order mirrors the 7-agent chain).
+- Documented `ResultKey` as "the seven `PipelineRunResponse` stage keys, in
+  pipeline order".
+- Added a block comment above `TAB_KEYS` mapping each key to its agent and
+  stage, in the exact order the pipeline produces them:
+  1. `parsed_job_description` -> Agent 1 (JD Parsing)
+  2. `parsed_resume` -> Agent 2 (Resume Parsing)
+  3. `tailoring_strategy` -> Agent 3 (Gap Analysis)
+  4. `rewritten_resume` -> Agent 4 (Resume Rewrite)
+  5. `ats_optimized_resume` -> Agent 5 (ATS Compliance)
+  6. `polished_resume` -> Agent 6 (Tone Polishing)
+  7. `cover_letter` -> Agent 7 (Cover Letter)
+  and a "keep this list in sync" note tying it to `PipelineRunResponse` and
+  the 7-agent chain.
+- Commented `TAB_HEADERS` as one header per `TAB_KEYS` entry.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files
+- Comment-only; no runtime change.
+
+**Commit:** `simplify: phase 14 - results tab view comments tying TAB_KEYS to 7-agent outputs (14.1)`
