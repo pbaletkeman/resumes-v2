@@ -1,3 +1,13 @@
+/**
+ * TypeScript mirrors of the FastAPI response models and the pipeline output
+ * models.  Each interface notes the backend schema it mirrors so drift is easy
+ * to spot when the backend adds or renames fields.
+ *
+ * Web API models mirror `app/schemas.py`; the agent output models mirror
+ * `client/models.py` (serialized into the pipeline response).
+ */
+
+/** `GET /api/models` row — from `config/agents.py: get_model_summary()`. */
 export interface ModelSummary {
   agent: string
   provider: string
@@ -6,10 +16,12 @@ export interface ModelSummary {
 
 export type TaskStatusName = 'pending' | 'running' | 'completed' | 'failed'
 
+/** `POST /api/pipeline/async` response — mirrors `app.schemas.TaskCreated`. */
 export interface TaskCreated {
   task_id: string
 }
 
+/** `GET /api/tasks/{task_id}` response — mirrors `app.schemas.TaskStatus`. */
 export interface TaskStatus {
   status: TaskStatusName
   result?: Record<string, unknown> | null
@@ -18,6 +30,7 @@ export interface TaskStatus {
   completed_at?: number | null
 }
 
+/** One file row — mirrors `app.schemas.FileMeta`. */
 export interface FileMeta {
   name: string
   size: number
@@ -26,6 +39,7 @@ export interface FileMeta {
   path: string
 }
 
+/** `GET /api/files/{generated|uploaded}` response — mirrors `app.schemas.PagedFile`. */
 export interface PagedFile {
   items: FileMeta[]
   page: number
@@ -34,11 +48,13 @@ export interface PagedFile {
   total_pages: number
 }
 
+/** `DELETE /api/files` response — mirrors `app.schemas.DeleteFilesResponse`. */
 export interface DeleteFilesResponse {
   deleted: string[]
   missing: string[]
 }
 
+/** One work-history entry — mirrors `client.models.ExperienceEntry`. */
 export interface ExperienceEntry {
   title?: string
   company?: string
@@ -48,6 +64,7 @@ export interface ExperienceEntry {
   metrics?: string[]
 }
 
+/** Agent 1 output — mirrors `client.models.JDParsingOutput`. */
 export interface JDParsingOutput {
   role_title: string
   company_name: string
@@ -60,6 +77,7 @@ export interface JDParsingOutput {
   company_signals: Record<string, string>
 }
 
+/** Agent 2 output — mirrors `client.models.ResumeParsingOutput`. */
 export interface ResumeParsingOutput {
   summary: string
   skills: string[]
@@ -74,6 +92,7 @@ export interface ResumeParsingOutput {
   github: string
 }
 
+/** Agent 3 output — mirrors `client.models.GapAnalysisOutput`. */
 export interface GapAnalysisOutput {
   missing_skills: string[]
   weak_skills: string[]
@@ -84,6 +103,7 @@ export interface GapAnalysisOutput {
   tone_guidance: string
 }
 
+/** Agent 4 output — mirrors `client.models.RewriteOutput`. */
 export interface RewriteOutput {
   summary: string
   skills: string[]
@@ -93,6 +113,7 @@ export interface RewriteOutput {
   education: string[]
 }
 
+/** Agent 5 output — mirrors `client.models.ATSComplianceOutput`. */
 export interface ATSComplianceOutput {
   ats_score: number
   missing_keywords: string[]
@@ -103,16 +124,24 @@ export interface ATSComplianceOutput {
   final_resume: string
 }
 
+/** Agent 6 output — mirrors `client.models.TonePolishingOutput`. */
 export interface TonePolishingOutput {
   polished_resume: string
 }
 
+/** Agent 7 output — mirrors `client.models.CoverLetterOutput`. */
 export interface CoverLetterOutput {
   cover_letter: string
 }
 
+/**
+ * A pipeline stage's result: the typed output, an arbitrary dict when the
+ * backend returned an unexpected shape, or `null` when the stage produced no
+ * result.  Mirrors the `Any`-typed fields of `app.schemas.PipelineRunResponse`.
+ */
 export type StageResult<T> = T | Record<string, unknown> | null
 
+/** `POST /api/pipeline` response — mirrors `app.schemas.PipelineRunResponse`. */
 export interface PipelineRunResponse {
   parsed_job_description: StageResult<JDParsingOutput>
   parsed_resume: StageResult<ResumeParsingOutput>
