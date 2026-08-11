@@ -2105,3 +2105,152 @@ here above. `simple.md` checklist rows 11.1-11.6 checked and the Phase 11
 header marked `✅ COMPLETED`.
 
 **Commit:** `simplify: phase 11 - test docstrings + headers + conftest docs (11.1-11.5)`
+
+---
+
+## Phase 12 - Completed sub-task 12.1: `client.ts` error-parsing helpers
+
+Original instruction: extract the busy `parseErrorDetail` body into one or
+two small helpers (`_detailString(detail)`, `_detailArray(detail)`), each
+with a JSDoc line.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/api/client.ts`** — extracted the string branch into
+  `_detailString(detail)` (returns the detail when it is a string, else
+  `null`) and the array branch into `_detailArray(detail)` (maps each
+  element: bare strings pass through, objects with a `msg` field are
+  stringified, others are skipped; joins the survivors with `'; '`, returns
+  `null` when nothing is usable).  `parseErrorDetail` is now the thin
+  composition `_detailString(body.detail) ?? _detailArray(body.detail)`
+  inside the same try/catch.  Both helpers carry a JSDoc line describing
+  the FastAPI shape they tolerate.
+- Added a file-header comment to `client.ts` describing the `/api` fetch
+  wrapper, the thrown-`Error` convention on non-2xx, and that pages consume
+  the functions via `hooks.ts` rather than directly.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed; `client.test.ts` covers the same paths
+  (string detail, array-of-`{msg}` join, missing detail fallback).
+
+**Commit:** `simplify: phase 12 - api client error helpers + hooks/types/download docs (12.1-12.4)`
+
+---
+
+## Phase 12 - Completed sub-task 12.2: `hooks.ts` polling lifecycle docs
+
+Original instruction: document the polling lifecycle, why the files query is
+invalidated, when `onDone` fires, and the `refetchInterval` predicate.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/api/hooks.ts`** — added a file-header comment describing the
+  full polling lifecycle (launch -> poll while pending/running -> settle ->
+  invalidate `['files']` -> fire `onDone`).
+- JSDoc on every exported hook:
+  - `useModels`: per-agent model summary for the home page.
+  - `useInvokePipeline`: launches a background run, returns the task id.
+  - `useTask`: documents the `refetchInterval` predicate — polls only while
+    status is `pending`/`running`, returns `false` on terminal states so
+    polling stops.
+  - `usePollTask`: documents *why* `['files']` is invalidated (a completed
+    run writes new files to `output/`, so listings would go stale) and *when*
+    `onDone` fires (exactly once per settling `completed`/`failed` status).
+  - `useFiles`: previous page kept visible while refetching.
+  - `useDeleteFiles`: invalidates listings after a delete.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass; `npm run lint` — pass
+- `npm test -- --run` — 45 passed (`hooks.test.ts` exercises `useModels`,
+  `useFiles`, `useDeleteFiles`).
+
+**Commit:** `simplify: phase 12 - api client error helpers + hooks/types/download docs (12.1-12.4)`
+
+---
+
+## Phase 12 - Completed sub-task 12.3: `types.ts` FastAPI schema mappings
+
+Original instruction: comment each TS type with the FastAPI schema it
+mirrors (e.g. `PipelineRunResponse` -> `app.schemas.PipelineRunResponse`).
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/api/types.ts`** — added a module header noting the two backend
+  homes (web API models in `app/schemas.py`, pipeline output models in
+  `client/models.py`) and a one-line mapping comment on every interface and
+  type:
+  - `ModelSummary` -> `config/agents.py get_model_summary()` rows
+  - `TaskCreated` / `TaskStatus` / `FileMeta` / `PagedFile` /
+    `DeleteFilesResponse` -> `app.schemas.*`
+  - `ExperienceEntry` + the seven `*Output` interfaces ->
+    `client.models.*`
+  - `StageResult<T>` -> the `Any`-typed `PipelineRunResponse` stage fields
+  - `PipelineRunResponse` -> `app.schemas.PipelineRunResponse`
+
+**Behavior verification:**
+
+- Comment-only; no type changes. `npx tsc -b` — pass; `npm run lint` — pass;
+  `npm test -- --run` — 45 passed.
+
+**Commit:** `simplify: phase 12 - api client error helpers + hooks/types/download docs (12.1-12.4)`
+
+---
+
+## Phase 12 - Completed sub-task 12.4: `download.ts` URL docs
+
+Original instruction: document the URL the helper builds.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/api/download.ts`** — added a module header explaining the
+  helpers build URLs for `GET /api/outputs/{filename}` (served by
+  `app/main.py` out of `output/`) and JSDoc on both functions:
+  - `outputDownloadUrl`: bare-filename URL.
+  - `fileDownloadUrl`: accepts the dir-qualified `path` keys returned by the
+    file listings (e.g. `output/2026/resume.md`), normalizes Windows
+    backslashes, takes the basename, and delegates.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass; `npm run lint` — pass
+- `npm test -- --run` — 45 passed; `client.test.ts` covers both helpers
+  (encoding, backslash path, forward-slash path).
+
+**Commit:** `simplify: phase 12 - api client error helpers + hooks/types/download docs (12.1-12.4)`
+
+---
+
+## Phase 12 - Completed sub-task 12.5: guardrails + move + commit
+
+Original instruction: `npx tsc -b`, `npm run lint`, `npm test -- --run`
+(watch `api/client.test.ts`, `api/hooks.test.ts`), move to `simple-done.md`,
+commit.
+
+### Completion record
+
+**Guardrails (all green):**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files, including
+  `api/client.test.ts` (error-parsing + download helpers) and
+  `api/hooks.test.ts` (models/files/delete hooks)
+
+**Moved to `simple-done.md`:** the Phase 12 narrative stub stays in
+`simple.md`; all 5 sub-task completion records (12.1-12.5) are recorded
+here above. `simple.md` checklist rows 12.1-12.5 checked and the Phase 12
+header marked `✅ COMPLETED`.
+
+**Commit:** `simplify: phase 12 - api client error helpers + hooks/types/download docs (12.1-12.4)`

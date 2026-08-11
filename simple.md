@@ -447,7 +447,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ## Part B - Frontend (React / TypeScript)
 
-## Phase 12 - API layer: client, hooks, types, download
+## Phase 12 - API layer: client, hooks, types, download  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `ui/src/api/client.ts`, `ui/src/api/hooks.ts`, `ui/src/api/types.ts`, `ui/src/api/download.ts`
 
@@ -740,11 +743,11 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 12 - Frontend API layer
 
-- [ ] 12.1 `client.ts`: extract `_detailString(detail)` / `_detailArray(detail)` from `parseErrorDetail` with JSDoc.
-- [ ] 12.2 `hooks.ts`: document polling lifecycle, why files query invalidates, when `onDone` fires, `refetchInterval` predicate.
-- [ ] 12.3 `types.ts`: comment mapping each type to its FastAPI schema (e.g. `PipelineRunResponse` -> `app.schemas.PipelineRunResponse`).
-- [ ] 12.4 `download.ts`: document the URL it builds.
-- [ ] 12.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `api/client.test.ts`, `api/hooks.test.ts`).
+- [x] 12.1 `client.ts`: extract `_detailString(detail)` / `_detailArray(detail)` from `parseErrorDetail` with JSDoc.
+- [x] 12.2 `hooks.ts`: document polling lifecycle, why files query invalidates, when `onDone` fires, `refetchInterval` predicate.
+- [x] 12.3 `types.ts`: comment mapping each type to its FastAPI schema (e.g. `PipelineRunResponse` -> `app.schemas.PipelineRunResponse`).
+- [x] 12.4 `download.ts`: document the URL it builds.
+- [x] 12.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `api/client.test.ts`, `api/hooks.test.ts`).
 
 ### Phase 13 - Result data coercion + shared result parts
 
