@@ -320,7 +320,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 7 - Renderer, templates, formatter
+## Phase 7 - Renderer, templates, formatter  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `client/templates/renderer.py`, `client/templates/modern.py`, `classic.py`, `minimal.py`, `cover_letter.py`, `client/templates/__init__.py`, `client/formatter.py`
 
@@ -671,14 +674,17 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 6.5 Module docstring covering agent contract (inputs, output model, fallback, two deterministic post-processors). ✅ See `simple-done.md`.
 - [x] 6.6 Guardrails (watch `tests/test_agent_cover_letter.py` + `test_cover_letter_validation.py` 109), move to `simple-done.md`, commit.
 
-### Phase 7 - Renderer, templates, formatter
+### Phase 7 - Renderer, templates, formatter ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here so the working checklist stays intact.
 
 - [x] 7.1 Fix stale renderer.py header ("DOCX/PDF will be added in subsequent phases" -> they already exist). ✅ See `simple-done.md`.
 - [x] 7.2 Document the two rendering paths (template-based `ResumeRenderer` vs `formatter.py` helpers) at top of each module. ✅ See `simple-done.md`.
 - [x] 7.3 Extract one private `_render(template_key, context)` helper for the repeated "build context -> render -> clean output" sequence. ✅ See `simple-done.md`.
 - [x] 7.4 Docstring per template dict (modern/classic/minimal/cover_letter) naming its style and which outputs it drives. ✅ See `simple-done.md`.
 - [x] 7.5 Full class/method docstrings + `Args:`/`Returns:`/`Raises:` on `render_all`. ✅ See `simple-done.md`.
-- [ ] 7.6 Guardrails (keep output byte-identical; watch `tests/test_renderer.py` 43 + `test_formatter.py` 41), move to `simple-done.md`, commit.
+- [x] 7.6 Guardrails (keep output byte-identical; watch `tests/test_renderer.py` 43 + `test_formatter.py` 41), move to `simple-done.md`, commit.
 
 ### Phase 8 - Skill taxonomy & normalization
 

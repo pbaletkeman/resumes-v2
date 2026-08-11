@@ -1315,3 +1315,91 @@ Original instruction: full class/method docstrings; add
 - Docstring-only change; no code paths altered.
 
 **Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`
+
+---
+
+## Phase 7 - Renderer, templates, formatter  ✅ COMPLETED
+
+**Files:** `client/templates/renderer.py`, `client/templates/modern.py`, `classic.py`, `minimal.py`, `cover_letter.py`, `client/templates/__init__.py`, `client/formatter.py`
+
+**Inspect for:**
+
+- `renderer.py` (890): the module docstring says *"DOCX/PDF support will be added in subsequent phases"*, but DOCX/PDF rendering already exists (`render_all`, docx/pdf writers). **This stale claim must be fixed.**
+- The big public methods (`render_plaintext`, `render_markdown`, `render_cover_letter`, `render_docx`, `render_pdf`, `render_all`, `_clean_output`) - check each for inlined format-specific logic that belongs in a named private method.
+- `modern.py`/`classic.py`/`minimal.py`: dict templates with `plaintext`/`markdown` keys - verify the Jinja string templates are readable and each has a docstring naming its style.
+- `formatter.py`: `format_resume_markdown`/`plain`/`format_cover_letter` - the "other" rendering path; document how it differs from `ResumeRenderer`.
+
+**Simplify toward:**
+
+- Fix the stale header. Document the two rendering paths (template-based renderer vs. formatter helpers) at the top of each module.
+- Break the repeated "build context -> render -> clean output" sequence into one private `_render(template_key, context)` helper used by each public method.
+- Give every template dict an explicit docstring of what it contains and which outputs it drives.
+
+**Documentation:** full class/method docstrings; add `Args:`/`Returns:`/`Raises:` to `render_all`. Keep output byte-identical - `tests/test_renderer.py` (43 tests) and `tests/test_formatter.py` (41 tests) guard this.
+
+**Verify:** watch `tests/test_renderer.py`, `tests/test_formatter.py`.
+
+### Phase 7 Completion record
+
+**Overview:** Phase 7 made the renderer/formatter layer's documentation and
+structure match its actual behavior.  The stale "DOCX/PDF support will be
+added in subsequent phases" header was corrected (DOCX/PDF already exist
+and are covered by tests).  Both rendering paths are now documented at
+the top of each module (template-based `ResumeRenderer` vs the direct
+string-building `formatter.py` helpers) with explicit guidance on which
+to prefer.  The repeated "render -> clean" tail that every text-format
+method duplicated was extracted into one private `_render` helper.  Every
+template dict (modern/classic/minimal/letter) now has an explicit
+description of its style and the outputs it drives, and `render_all`
+(plus `render_docx`/`render_pdf`/`_write_text`/`_build_context`/
+`_clean_output`) received complete `Args:`/`Returns:`/`Raises:` sections.
+All changes were documentation/comment/structure only -- rendered output
+was proven byte-identical to `HEAD` and the full 493-test suite stayed
+green.
+
+**Changes made (by sub-task):**
+
+- **7.1** — Fixed the stale `renderer.py` module header: it now states
+  all four formats (plaintext, Markdown, DOCX, PDF) render via
+  `render_all`.  Docstring-only.
+- **7.2** — Documented the two rendering paths: `renderer.py` and
+  `formatter.py` module docstrings each name the template-based path and
+  the direct string-building path, how they differ (templates vs not,
+  DOCX/PDF vs not), and when to prefer which.  Docstring-only.
+- **7.3** — Extracted `ResumeRenderer._render(template_source, context)`
+  as the single private render+clean step; all four text-format methods
+  (`render_plaintext`, `render_markdown`, `render_cover_letter_plaintext`,
+  `render_cover_letter_markdown`) now resolve the source and delegate to
+  it.  Byte-identical output proven by dumping all 8 text outputs from
+  HEAD vs working tree (`git diff --no-index` clean).  Note: the plan's
+  sketch `_render(template_key, context)` became `_render(source, context)`
+  because resume and letter templates live in different containers
+  (`self._templates` vs module-level `COVER_LETTER`).
+- **7.4** — Added style+outputs documentation to every template dict:
+  `modern.py`/`classic.py`/`minimal.py` module docstrings name the style
+  and that their `{"plaintext", "markdown"}` sources drive
+  `render_plaintext`/`render_markdown` plus the shared-context DOCX/PDF
+  writers; `cover_letter.py` names the single shared letter template and
+  its two sources.  Since dicts cannot hold docstrings, each constant got
+  an explicit comment block above it.  Docstring/comment-only.
+- **7.5** — Completed the renderer docstrings: `render_all` gained a
+  `Raises:` section (KeyError / `jinja2.UndefinedError` / OSError);
+  `render_docx`/`render_pdf` gained `Raises:` (OSError); `_write_text`,
+  `_build_context`, and `_clean_output` expanded from one-liners to full
+  `Args:`/`Returns:` (and `Raises:` where writes occur).  Docstring-only.
+- **7.6** — Guardrails run across the phase (below); phase moved here.
+
+**Behavior verification:**
+
+- Byte-identical output: all 8 renderer text outputs (3 templates x
+  plaintext/markdown + 2 letter formats) dumped from HEAD and the working
+  tree; `git diff --no-index` reported zero differences.
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings (full run)
+- `uv run pytest` — 493 passed, including
+  `tests/test_renderer.py` (43) and `tests/test_formatter.py` (41)
+- Template strings and all rendering code paths untouched; only
+  docstrings, comments, and the one extracted `_render` helper changed.
+
+**Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`
