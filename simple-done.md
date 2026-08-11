@@ -2482,3 +2482,48 @@ pipeline.
 - Comment-only; no runtime change.
 
 **Commit:** `simplify: phase 14 - trust boundary comments for pipeline text tabs (14.3)`
+
+---
+
+## Phase 14 - Completed sub-task 14.4: extract repeated markup into `parts.tsx`
+
+Original instruction: move repeated row/label markup into `parts.tsx` when it
+appears in 2+ tabs.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/results/parts.tsx`** — added three shared parts:
+  - `ParagraphSection({ label, text })`: a titled section rendering a single
+    paragraph; `NoData` when `text` is null.  Replaces the duplicated
+    Summary and Contact blocks.
+  - `PreSection({ label, text })`: a titled section rendering pre-formatted
+    text in a `<pre class="results-pre">`; `NoData` when `text` is null.
+    Replaces the duplicated polished-resume / cover-letter / ATS final-resume
+    blocks.  (Also carries the trust-boundary rationale in its docstring.)
+  - `ExperienceSection({ entries })`: a titled "Experience" section mapping
+    entries through `ExperienceEntryView`; `NoData` when empty.  Replaces the
+    duplicated experience mapping.
+  - Updated the module header to list the new parts.
+- **`ParsedResumeTab.tsx`** — Summary and Contact now use `ParagraphSection`;
+  Experience uses `ExperienceSection`.  Dropped the now-unused
+  `ExperienceEntryView` and `Section` imports.
+- **`RewrittenResumeTab.tsx`** — Summary uses `ParagraphSection`; Experience
+  uses `ExperienceSection`.  Dropped unused imports.
+- **`PolishedTab.tsx`** / **`CoverLetterTab.tsx`** — body now a single
+  `PreSection`; the trust-boundary note moved up into the file-header comment.
+- **`ATSTab.tsx`** — final-resume block replaced with `PreSection`, keeping an
+  inline trust-boundary comment above it.  `Section` still used for the Score
+  block.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed (tab tests `ATSTab.test.tsx` /
+  `DownloadsRow.test.tsx` green)
+- Refactor is markup-identical for populated and empty states (verified the
+  `hasContent`/`emptyText` semantics match the replaced JSX).
+
+**Commit:** `simplify: phase 14 - extract shared paragraph/pre/experience parts (14.4)`

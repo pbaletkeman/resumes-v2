@@ -764,7 +764,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 14.1 `ResultsTabView.tsx`: comment tying `TAB_KEYS` to the 7-agent output keys/order.
 - [x] 14.2 Each tab: one-line header (what it shows + which pipeline field); consistent use of `coerce.ts` helpers.
 - [x] 14.3 HTML-string tabs (polished/cover letter): document trust boundary (content from our own pipeline).
-- [ ] 14.4 Extract repeated row/label markup into `parts.tsx` when it appears in 2+ tabs.
+- [x] 14.4 Extract repeated row/label markup into `parts.tsx` when it appears in 2+ tabs.
 - [ ] 14.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `ATSTab.test.tsx`, `DownloadsRow.test.tsx`).
 
 ### Phase 15 - Run page & form helpers
