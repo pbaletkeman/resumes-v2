@@ -42,6 +42,8 @@ function ATSTab({ value }: ATSTabProps) {
       <BulletSection label="Recommended fixes" items={fixes} emptyText="No data" />
       <BulletSection label="Auto-fixes applied" items={autoFixes} emptyText="No data" />
       <Section label="Final resume" hasContent={finalResume !== null}>
+        {/* Trust boundary: `final_resume` is plain text from our own pipeline
+            (LLM output, not user-supplied HTML); React escapes it in <pre>. */}
         <pre className="results-pre">{finalResume}</pre>
       </Section>
     </div>

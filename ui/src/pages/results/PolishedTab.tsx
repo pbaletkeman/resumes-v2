@@ -1,4 +1,7 @@
 // Polished tab — renders the Agent 6 output (polished_resume).
+// Trust boundary: the polished resume is plain text produced by our own
+// pipeline (LLM output, not user-supplied HTML).  It is rendered inside a
+// <pre> as text — React escapes the string, so no HTML is interpreted.
 import { textFromValue } from './coerce'
 import { NoData, Section } from './parts'
 
