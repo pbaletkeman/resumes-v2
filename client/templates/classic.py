@@ -1,8 +1,19 @@
 """
 classic.py
 Classic resume template — traditional format with underlined section headers.
+
+The ``CLASSIC_RESUME`` dict contains the Jinja2 template strings for the
+classic style: one ``"plaintext"`` source and one ``"markdown"`` source.
+These drive ``ResumeRenderer.render_plaintext`` /
+``render_markdown`` (via the ``"classic"`` key in ``client.templates``)
+and, through the shared context, the DOCX/PDF writers in
+``client/templates/renderer.py``.
 """
 
+# CLASSIC_RESUME: classic-style resume templates.
+# {"plaintext", "markdown"} Jinja2 sources consumed by ResumeRenderer's
+# render_plaintext / render_markdown (template key "classic") and the
+# DOCX/PDF writers that share the same context.
 CLASSIC_RESUME = {
     "plaintext": """\
 {{ name }}

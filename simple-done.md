@@ -1138,3 +1138,180 @@ brings the file's documentation in line with its Phase-5 sibling.  The
   achievement).
 
 **Commit:** `simplify: phase 6 - cover letter cleanup (banner sections, shared guards, step comments, placeholder standardization, agent-contract docs) (6.1-6.6)`
+
+---
+
+## Phase 7 - Completed sub-task 7.1: fix stale renderer.py header
+
+Original instruction: fix the stale renderer.py header ("DOCX/PDF will
+be added in subsequent phases" -> they already exist).
+
+### Completion record
+
+**Changes made:**
+
+- **`client/templates/renderer.py`** — module docstring rewritten.  The
+  previous text claimed "DOCX/PDF support will be added in subsequent
+  phases", which was stale: `render_docx` / `render_pdf` / `render_all`
+  already exist and are exercised by `tests/test_renderer.py`.  The
+  header now states all four formats (plaintext, Markdown, DOCX,
+  PDF) and points at `render_all` as the entry point that renders them.
+
+**Behavior verification:**
+
+- `uv run ruff check client/templates/renderer.py` — pass
+- `uv run ruff format --check` (targeted files) — pass
+- `uv run pyright client/templates/renderer.py client/formatter.py` —
+  0 errors, 0 warnings
+- `uv run pytest tests/test_renderer.py tests/test_formatter.py` —
+  84 passed (43 + 41)
+- Docstring-only change; no runtime behavior touched.
+
+**Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`
+
+---
+
+## Phase 7 - Completed sub-task 7.2: document the two rendering paths
+
+Original instruction: document the two rendering paths (template-based
+`ResumeRenderer` vs `formatter.py` helpers) at the top of each module.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/templates/renderer.py`** — module docstring now names the
+  template-based path explicitly: templates load from `client.templates`
+  (`TEMPLATES` + `COVER_LETTER`), contexts are built by
+  `_build_context` / `_build_cover_letter_context`, and every format
+  (text, DOCX, PDF) renders from that one context.  It contrasts the
+  alternative `client/formatter.py` path (no templates, no DOCX/PDF)
+  and states when to prefer which.
+- **`client/formatter.py`** — module docstring now names the simpler of
+  the two paths (direct string building, single-format text only) and
+  points at `client/templates/renderer.py` as the template-based
+  alternative, again with a use-which guidance line.
+
+**Behavior verification:**
+
+- `uv run ruff check .` (targeted) — pass; `ruff format --check` — pass
+- `uv run pyright` (targeted) — 0 errors, 0 warnings
+- `uv run pytest tests/test_renderer.py tests/test_formatter.py` —
+  84 passed
+- Docstring-only change.
+
+**Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`
+
+---
+
+## Phase 7 - Completed sub-task 7.3: extract shared `_render` helper
+
+Original instruction: extract one private `_render(template_key,
+context)` helper for the repeated "build context -> render -> clean
+output" sequence.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/templates/renderer.py`** — added private
+  `ResumeRenderer._render(template_source, context)` in the internal
+  helpers section.  It owns the repeated "render -> clean" tail that
+  every text-format public method had duplicated:
+  ``self._env.from_string(template_source).render(**context)`` then
+  ``self._clean_output(...)``.  Full `Args:`/`Returns:`/`Raises:`.
+- All four text-format methods now resolve the template source
+  (``self._templates[template][fmt]`` or ``COVER_LETTER[fmt]``), build
+  their context, and delegate the render+clean step to `_render`:
+  `render_plaintext`, `render_markdown`,
+  `render_cover_letter_plaintext`, `render_cover_letter_markdown`.
+- Note on naming: the plan sketched `_render(template_key, context)`;
+  the implementation passes the already-resolved *source string* because
+  resume and cover-letter templates live in different containers
+  (`self._templates` vs the module-level `COVER_LETTER`).  The one
+  private render+clean step is used by every text-format method either way.
+
+**Behavior verification:**
+
+- Byte-identical output proven: dumped all 8 renderer text outputs
+  (3 templates x plaintext/markdown + 2 letter formats) from HEAD and
+  from the working tree; `git diff --no-index` reported no differences.
+- `uv run ruff check .` (targeted) — pass; `ruff format --check` — pass
+- `uv run pyright` (targeted) — 0 errors, 0 warnings
+- `uv run pytest tests/test_renderer.py tests/test_formatter.py` —
+  84 passed
+
+**Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`
+
+---
+
+## Phase 7 - Completed sub-task 7.4: docstring per template dict
+
+Original instruction: docstring per template dict
+(modern/classic/minimal/cover_letter) naming its style and which outputs
+it drives.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/templates/modern.py`**, **`classic.py`**, **`minimal.py`** —
+  each module docstring expanded to name its style and that its dict's
+  `{"plaintext", "markdown"}` Jinja2 sources drive
+  `ResumeRenderer.render_plaintext` / `render_markdown` (via its key in
+  `client.templates`) plus the shared-context DOCX/PDF writers.
+- **`client/templates/cover_letter.py`** — module docstring expanded to
+  name the single shared letter template and that its two sources drive
+  `render_cover_letter_plaintext` / `render_cover_letter_markdown`
+  (no per-style variants).
+- Because Python dicts cannot carry docstrings, each dict constant
+  (`MODERN_RESUME` / `CLASSIC_RESUME` / `MINIMAL_RESUME` /
+  `COVER_LETTER`) now has an explicit comment block directly above it
+  stating exactly that, plus the expected context keys for the letter.
+
+**Behavior verification:**
+
+- `uv run ruff check .` (targeted) — pass; `ruff format --check` — pass
+- `uv run pyright` (targeted) — 0 errors, 0 warnings
+- `uv run pytest tests/test_renderer.py tests/test_formatter.py` —
+  84 passed
+- Docstring/comment-only change; template strings untouched.
+
+**Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`
+
+---
+
+## Phase 7 - Completed sub-task 7.5: full class/method docstrings + `Raises:` on `render_all`
+
+Original instruction: full class/method docstrings; add
+`Args:`/`Returns:`/`Raises:` to `render_all`.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/templates/renderer.py`**:
+  - `render_all` gained a `Raises:` section (KeyError for an unknown
+    `resume_template`, `jinja2.UndefinedError` for a missing context
+    variable, `OSError` for directory/file write failures).
+  - `render_docx` and `render_pdf` each gained a `Raises:` section
+    (`OSError` on directory creation / save failures).
+  - `_write_text` expanded from a one-liner to full
+    `Args:`/`Returns:`/`Raises:`.
+  - `_build_context` and `_clean_output` expanded from one-liners to
+    full `Args:`/`Returns:`.
+  - `_build_cover_letter_context` already had a thorough docstring and
+    was left as-is.
+- Public methods (`render_plaintext`, `render_markdown`,
+  `render_cover_letter_*`) already had complete
+  `Args:`/`Returns:`/`Raises:`; unchanged.
+
+**Behavior verification:**
+
+- `uv run ruff check .` (targeted) — pass; `ruff format --check` — pass
+- `uv run pyright` (targeted) — 0 errors, 0 warnings
+- `uv run pytest tests/test_renderer.py tests/test_formatter.py` —
+  84 passed
+- Docstring-only change; no code paths altered.
+
+**Commit:** `simplify: phase 7 - renderer/templates/formatter docs + shared _render helper (7.1-7.5)`

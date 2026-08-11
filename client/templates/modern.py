@@ -1,8 +1,19 @@
 """
 modern.py
 Modern resume template — clean lines, bold section headers, compact layout.
+
+The ``MODERN_RESUME`` dict contains the Jinja2 template strings for the
+modern style: one ``"plaintext"`` source and one ``"markdown"`` source.
+These drive ``ResumeRenderer.render_plaintext`` /
+``render_markdown`` (via the ``"modern"`` key in ``client.templates``)
+and, through the shared context, the DOCX/PDF writers in
+``client/templates/renderer.py``.
 """
 
+# MODERN_RESUME: modern-style resume templates.
+# {"plaintext", "markdown"} Jinja2 sources consumed by ResumeRenderer's
+# render_plaintext / render_markdown (template key "modern") and the
+# DOCX/PDF writers that share the same context.
 MODERN_RESUME = {
     "plaintext": """\
 {{ name }}

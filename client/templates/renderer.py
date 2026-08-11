@@ -3,8 +3,22 @@ renderer.py
 Template-based multi-format resume renderer.
 
 Renders ``RewriteOutput`` and ``CoverLetterOutput`` models against
-Jinja2 templates to produce plaintext and Markdown output.  DOCX/PDF
-support will be added in subsequent phases.
+Jinja2 templates to produce plaintext, Markdown, DOCX (python-docx), and
+PDF (ReportLab Platypus) output.  DOCX/PDF rendering is fully supported:
+``render_docx`` / ``render_pdf`` build the documents directly from the
+same context the text templates use (see :meth:`ResumeRenderer.render_all`).
+
+Rendering path: this is *the* template-based path.  ``ResumeRenderer``
+loads Jinja2 sources from ``client.templates`` (``TEMPLATES`` +
+``COVER_LETTER``), builds a context dict from the Pydantic models
+(:meth:`ResumeRenderer._build_context` /
+:meth:`ResumeRenderer._build_cover_letter_context`), and renders every
+format (text, DOCX, PDF) from that one context.  The alternative,
+simpler path lives in ``client/formatter.py``: plain string-building
+helpers (``format_resume_markdown`` / ``format_resume_plain`` /
+``format_cover_letter``) with no templates and no DOCX/PDF support.
+Prefer ``ResumeRenderer`` for multi-format output; use the formatter
+helpers for a single plain/markdown string.
 """
 
 import os
@@ -96,8 +110,7 @@ class ResumeRenderer:
         tpl_source = tpl_dict["plaintext"]
 
         context = self._build_context(resume, name=name, title=title)
-        rendered = self._env.from_string(tpl_source).render(**context)
-        return self._clean_output(rendered)
+        return self._render(tpl_source, context)
 
     def render_markdown(
         self,
@@ -128,8 +141,7 @@ class ResumeRenderer:
         tpl_source = tpl_dict["markdown"]
 
         context = self._build_context(resume, name=name, title=title)
-        rendered = self._env.from_string(tpl_source).render(**context)
-        return self._clean_output(rendered)
+        return self._render(tpl_source, context)
 
     def render_cover_letter_plaintext(
         self,
@@ -171,8 +183,7 @@ class ResumeRenderer:
             linkedin=linkedin,
             github=github,
         )
-        rendered = self._env.from_string(tpl_source).render(**context)
-        return self._clean_output(rendered)
+        return self._render(tpl_source, context)
 
     def render_cover_letter_markdown(
         self,
@@ -214,8 +225,7 @@ class ResumeRenderer:
             linkedin=linkedin,
             github=github,
         )
-        rendered = self._env.from_string(tpl_source).render(**context)
-        return self._clean_output(rendered)
+        return self._render(tpl_source, context)
 
     def render_docx(
         self,
@@ -241,6 +251,10 @@ class ResumeRenderer:
 
         Returns:
             The ``Path`` the document was written to.
+
+        Raises:
+            OSError: If the output directory cannot be created or the
+                document cannot be saved (disk/permission errors).
         """
         doc: DocumentType = create_document()
 
@@ -289,6 +303,10 @@ class ResumeRenderer:
 
         Returns:
             The ``Path`` the document was written to.
+
+        Raises:
+            OSError: If the output directory cannot be created or the
+                PDF cannot be built (disk/permission errors).
         """
         path = Path(output_path) if output_path is not None else _temp_pdf_path()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -343,6 +361,14 @@ class ResumeRenderer:
 
         Returns:
             Mapping of format name to the written ``Path``.
+
+        Raises:
+            KeyError: If *resume_template* is not one of the built-in
+                template keys (``"modern"``, ``"classic"``, ``"minimal"``).
+            jinja2.UndefinedError: If a template references a variable
+                that is not provided in the built context.
+            OSError: If *output_dir* cannot be created or a rendered
+                file cannot be written (disk/permission errors).
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -446,7 +472,24 @@ class ResumeRenderer:
         output_dir: Path,
         ext: str,
     ) -> Path:
-        """Write *content* to a timestamped output file and return its path."""
+        """Write *content* to a timestamped output file and return its path.
+
+        Args:
+            content: Text to write (UTF-8).
+            document_type: Type of document, e.g. ``"resume"`` or
+                ``"cover_letter"`` (used for the filename and extension).
+            candidate_name: Candidate name for the filename segment.
+            company_name: Company name for the filename segment.
+            output_dir: Directory the file is written to.
+            ext: File extension including the leading dot.
+
+        Returns:
+            The ``Path`` of the written file.
+
+        Raises:
+            OSError: If *output_dir* cannot be created or *content*
+                cannot be written (disk/permission errors).
+        """
         path = ResumeRenderer.build_output_path(
             document_type,
             candidate_name=candidate_name,
@@ -505,6 +548,31 @@ class ResumeRenderer:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _render(self, template_source: str, context: dict[str, object]) -> str:
+        """Render *context* against *template_source* and clean the output.
+
+        Shared by every text-format public method: run the Jinja2 render
+        then collapse excess blank lines via :meth:`_clean_output`.  The
+        caller is responsible for resolving *template_source* from the
+        right template container (``self._templates[template][fmt]`` for
+        resume formats, ``COVER_LETTER[fmt]`` for letters) and building
+        *context* with :meth:`_build_context` /
+        :meth:`_build_cover_letter_context`.
+
+        Args:
+            template_source: A Jinja2 template string.
+            context: Template variables, keyed by name.
+
+        Returns:
+            The cleaned rendered output.
+
+        Raises:
+            jinja2.UndefinedError: If the template references a variable
+                that is not provided.
+        """
+        rendered = self._env.from_string(template_source).render(**context)
+        return self._clean_output(rendered)
+
     @staticmethod
     def _slugify(text: str) -> str:
         """Normalize *text* to a filename-safe ASCII token.
@@ -524,7 +592,19 @@ class ResumeRenderer:
         name: str = "",
         title: str = "",
     ) -> dict[str, object]:
-        """Convert a ``RewriteOutput`` into a Jinja2 template context dict."""
+        """Convert a ``RewriteOutput`` into a Jinja2 template context dict.
+
+        Args:
+            resume: Structured resume data from the Resume Rewrite Agent.
+            name: Candidate name for the header.
+            title: Candidate title for the header.
+
+        Returns:
+            A context dict with the keys the resume templates expect:
+            ``name``, ``title``, ``summary``, ``skills``, ``experience``
+            (list of per-job dicts), ``projects``, ``certifications``,
+            and ``education``.
+        """
         return {
             "name": name,
             "title": title,
@@ -586,7 +666,16 @@ class ResumeRenderer:
 
     @staticmethod
     def _clean_output(text: str) -> str:
-        """Collapse excessive blank lines produced by Jinja2 templates."""
+        """Collapse excessive blank lines produced by Jinja2 templates.
+
+        Args:
+            text: Raw rendered output.
+
+        Returns:
+            The rendered text with runs of blank lines reduced to a single
+            blank line, trailing whitespace stripped, and the outer
+            whitespace removed.
+        """
         lines = text.split("\n")
         cleaned: list[str] = []
         prev_blank = False

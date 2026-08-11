@@ -4,6 +4,15 @@ Output formatting utilities for pipeline results.
 
 Converts structured Pydantic models into clean Markdown, plain text, and
 cover letter strings suitable for downstream rendering or ATS upload.
+
+Rendering path: these helpers are the *simpler* of the two rendering
+paths.  They build output strings directly (no Jinja2 templates) and
+support only single-format text output.  The alternative, template-based
+path is ``client/templates/renderer.py`` (``ResumeRenderer``), which
+renders the same models as plaintext, Markdown, DOCX, and PDF from one
+shared context.  Prefer ``ResumeRenderer`` for multi-format output; use
+these helpers when you need a single plain/markdown string without the
+template machinery (e.g. quick previews or simple serialization).
 """
 
 from client.models import CoverLetterOutput, RewriteOutput
