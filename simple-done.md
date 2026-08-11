@@ -1050,3 +1050,91 @@ Original instruction: module docstring should cover the agent contract
   contact line last).
 
 **Commit:** `simplify: phase 6e - cover letter module docstring (agent contract story)`
+
+---
+
+## Phase 6 - Cover Letter agent (largest file)  ✅ COMPLETED
+
+**Files:** `client/agents/cover_letter.py`
+
+968 lines. Highest-impact simplification target on the backend.
+
+**Inspect for:**
+
+- Seven occurrences of the `json.loads` guard (the Phase 4 helper removes them all).
+- The chain of `_validate_*` / `_apply_company_name` / `_apply_candidate_name` post-processors - list every module-level function and assign each a clear intent.
+- Where does the file switch from LLM output handling to HTML/plain rendering helpers? That split should become visible in the file structure.
+
+**Simplify toward:**
+
+- Split the file's helpers into named sections with banner comments (`# --- validation ---`, `# --- deterministic post-processors ---`, `# --- rendering/formatting ---`).
+- Break any method over ~50 lines into smaller named steps.
+- Standardize the placeholder-token handling (`[Company Name]`, `[Your Name]`) so every substitution is one obvious path with a comment.
+
+**Documentation:** module docstring covering the agent contract (inputs from which prior agents, output model, fallback behavior, the two deterministic post-processors). This is *the* file to document thoroughly because it is the largest.
+
+**Verify:** watch `tests/test_agent_cover_letter.py` + `tests/test_cover_letter_validation.py` (109 tests).
+
+### Phase 6 Completion record
+
+**Overview:** Phase 6 re-ordered `cover_letter.py` into banner-grouped
+sections with the public `CoverLetterAgent` class first, routed all seven
+`json.loads` guards through the shared `load_json_safe`, added
+named-step (Step 1..N) comments to the two long methods (`run` and
+`_try_llm`), standardized placeholder-token handling so both company and
+candidate-name substitutions go through one shared
+`_replace_placeholders` helper, and rewrote the module docstring with the
+full agent-contract story.  Sub-tasks 6.1-6.5 were behavior-preserving
+(re-order, shared guards, comments, shared helper); the module docstring
+brings the file's documentation in line with its Phase-5 sibling.  The
+109-test `test_cover_letter_validation.py` + 10-test
+`test_agent_cover_letter.py` suites stayed green throughout.
+
+**Changes made (by sub-task):**
+
+- **6.1** — Re-ordered the file: public `CoverLetterAgent` class first,
+  then the 33 module helpers under five banner sections (shared
+  serialization/parsing utilities -> prompt helpers -> validation guards ->
+  deterministic post-processors -> rendering/formatting).  AST-compare
+  against `HEAD` confirmed identical function/class sets and 0 body diffs.
+  (`simplify: phase 6a ...`)
+- **6.2** — Routed all seven guarded `json.loads` blocks through
+  `load_json_safe` in `_load_str_list`, `_contact_from_resume`,
+  `_validate_role`, `_get_company_name`, `_resume_company_in_letter`,
+  `_candidate_name_from_resume`, and `_apply_contact_info`; each kept the
+  same early-return default.  New parse path is strictly more defensive
+  for fenced/non-object input.  (`simplify: phase 6b ...`)
+- **6.3** — Measured body lengths with an AST script; only `run` (60) and
+  `_try_llm` (142) crossed the bar.  Both now read as `# Step N.` numbered
+  steps (Step 1 collect inputs -> ... -> Step 5 fallback; Step 1 compose
+  prompt -> ... -> Step 8 deterministic post-processors).  Comment-only,
+  no behavior change.  (`simplify: phase 6c ...`)
+- **6.4** — Standardized placeholder-token handling: `_replace_placeholders`
+  now takes the token tuple, and both `_apply_company_name`
+  (company tokens) and `_apply_candidate_name` (name tokens) go through
+  it -- one substitution path with a comment instead of the previous
+  helper-plus-inline-loop asymmetry.  Constant blocks documented.
+  (`simplify: phase 6d ...`)
+- **6.5** — Module docstring rewritten with a full "Agent contract"
+  section (inputs, output model, LLM attempt/retry, the two deterministic
+  post-processors + contact line, fallback builder) in addition to the
+  file-layout paragraph; cross-checked `docs/agents.md` section 7 -- no
+  drift.  (`simplify: phase 6e ...`)
+- **6.6** — Guardrails run across the phase (below); phase moved here.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings (full run)
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_cover_letter.py` (10) and
+  `tests/test_cover_letter_validation.py` (109)
+- AST compare after 6.1: 0 function/class body diffs vs `HEAD` (pure
+  re-order); subsequent sub-tasks verified by the full suite.
+- Fallback behavior unchanged: LLM success -> validated + post-processed
+  `CoverLetterOutput`; failure -> `_build_fallback_cover_letter`
+  data-driven letter (role title, company, overlapping skills, one
+  achievement).
+
+**Commit:** `simplify: phase 6 - cover letter cleanup (banner sections, shared guards, step comments, placeholder standardization, agent-contract docs) (6.1-6.6)`

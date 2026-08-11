@@ -293,7 +293,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 6 - Cover Letter agent (largest file)
+## Phase 6 - Cover Letter agent (largest file)  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `client/agents/cover_letter.py`
 
@@ -656,14 +659,17 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 5.6 Module docstring: LLM -> Pydantic -> post-validation -> chronological -> sanitize -> fallback story. ✅ See `simple-done.md`.
 - [x] 5.7 Guardrails (watch `tests/test_resume_rewrite_validation.py` 63 + `test_agent_resume_rewrite.py`), move to `simple-done.md`, commit.
 
-### Phase 6 - Cover Letter agent (largest file)
+### Phase 6 - Cover Letter agent (largest file) ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here so the working checklist stays intact.
 
 - [x] 6.1 Split helpers into banner sections: `# --- validation ---`, `# --- deterministic post-processors ---`, `# --- rendering/formatting ---`. ✅ See `simple-done.md`.
 - [x] 6.2 Replace all seven `json.loads` guards with `load_json_safe`. ✅ See `simple-done.md`.
 - [x] 6.3 Break any method over ~50 lines into named steps with `# 1.`/`# 2.` comments. ✅ See `simple-done.md`.
 - [x] 6.4 Standardize placeholder-token handling (`[Company Name]`, `[Your Name]`) - every substitution one obvious path with comment. ✅ See `simple-done.md`.
 - [x] 6.5 Module docstring covering agent contract (inputs, output model, fallback, two deterministic post-processors). ✅ See `simple-done.md`.
-- [ ] 6.6 Guardrails (watch `tests/test_agent_cover_letter.py` + `test_cover_letter_validation.py` 109), move to `simple-done.md`, commit.
+- [x] 6.6 Guardrails (watch `tests/test_agent_cover_letter.py` + `test_cover_letter_validation.py` 109), move to `simple-done.md`, commit.
 
 ### Phase 7 - Renderer, templates, formatter
 
