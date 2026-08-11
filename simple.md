@@ -394,7 +394,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 10 - Web API layer
+## Phase 10 - Web API layer  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `app/main.py`, `app/schemas.py`, `app/files.py`, `app/upload.py`, `app/tasks.py`, `app/__init__.py`
 
@@ -713,14 +716,17 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 9.4 Pipeline module docstring: stage table (agent -> output key -> consumed by); CLI `main()` plain sequential steps. ✅ See `simple-done.md`.
 - [x] 9.5 Guardrails (watch `tests/test_pipeline.py` 17) + CLI smoke: `uv run python pipeline.py` (sample + with `--resume`/`--job-description`). ✅ See `simple-done.md`.
 
-### Phase 10 - Web API layer
+### Phase 10 - Web API layer ✅ COMPLETED
 
-- [ ] 10.1 `main.py` module docstring listing every route + purpose; decide/document `list_generated` vs `list_uploaded` parallel.
-- [ ] 10.2 Remove redundant size double-check in `_read_text_input` (already in `_persist_upload`) with comment; expand `_read_text_input`/`_to_response`/`_require_runner` `Args`/`Returns`/`Raises`.
-- [ ] 10.3 `files.py`: verify `safe_dir_path`/`safe_delete_path` docstrings explain traversal defense.
-- [ ] 10.4 `upload.py`: document each extraction path (.txt/.docx/.pdf).
-- [ ] 10.5 `tasks.py`: thread/loop-safety notes; `schemas.py`: field descriptions.
-- [ ] 10.6 Guardrails (watch all `test_web_*.py`), move to `simple-done.md`, commit.
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here so the working checklist stays intact.
+
+- [x] 10.1 `main.py` module docstring listing every route + purpose; decide/document `list_generated` vs `list_uploaded` parallel. ✅ See `simple-done.md`.
+- [x] 10.2 Remove redundant size double-check in `_read_text_input` (already in `_persist_upload`) with comment; expand `_read_text_input`/`_to_response`/`_require_runner` `Args`/`Returns`/`Raises`. ✅ See `simple-done.md`.
+- [x] 10.3 `files.py`: verify `safe_dir_path`/`safe_delete_path` docstrings explain traversal defense. ✅ See `simple-done.md`.
+- [x] 10.4 `upload.py`: document each extraction path (.txt/.docx/.pdf). ✅ See `simple-done.md`.
+- [x] 10.5 `tasks.py`: thread/loop-safety notes; `schemas.py`: field descriptions. ✅ See `simple-done.md`.
+- [x] 10.6 Guardrails (watch all `test_web_*.py`), move to `simple-done.md`, commit. ✅ See `simple-done.md`.
 
 ### Phase 11 - Backend tests & scratch scripts
 

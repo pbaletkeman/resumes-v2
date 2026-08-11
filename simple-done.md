@@ -1753,3 +1753,182 @@ with `uv run python pipeline.py` (sample mode) and with
 - Validation branches (no LLM): missing `--job-description` -> exit 2 with `missing required argument(s)`; nonexistent file -> `parser.error` "resume file not found".
 
 **Commit:** `simplify: phase 9 - _run_stage helper + stage chain + CLI step comments (9.1-9.4)`
+
+---
+
+## Phase 10 - Completed sub-task 10.1: `main.py` module docstring + listing parallel
+
+Original instruction: module docstring listing every route + purpose;
+decide/document the `list_generated` vs `list_uploaded` parallel.
+
+### Completion record
+
+**Changes made:**
+
+- **`app/main.py`** — module docstring rewritten as a route table:
+  `GET /health`, `GET /api/models`, `POST /api/pipeline`,
+  `POST /api/pipeline/async`, `GET /api/tasks/{task_id}`,
+  `GET /api/outputs/{filename}`, `GET /api/files/generated`,
+  `GET /api/files/uploaded`, `DELETE /api/files`, and the SPA fallback
+  `GET /{full_path:path}`, each with a one-line purpose.
+- Decision on the parallel: kept the two listing handlers (no shared
+  factory) because they are short and differ only by directory; documented
+  the parallel explicitly in the module docstring and in both handler
+  docstrings ("Parallel of ... same query params, only the directory
+  differs").  Also documented the multipart-signature parallel between
+  `run_pipeline` and `run_pipeline_async` in their docstrings (mirrors
+  each other; sync blocks, async returns a task id).
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_web_health.py tests/test_web_pipeline.py
+  tests/test_web_tasks.py tests/test_web_outputs.py tests/test_web_files.py
+  tests/test_web_upload.py tests/test_web_spa.py` — 51 passed
+- `uv run ruff check app/` — pass; `ruff format --check app/` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+- Docstring-only; no runtime change.
+
+**Commit:** `simplify: phase 10 - web API layer docs (routes table, traversal defense, extraction paths, thread-safety notes, schema descriptions) (10.1-10.5)`
+
+---
+
+## Phase 10 - Completed sub-task 10.2: `_read_text_input` dedupe + helper docs
+
+Original instruction: remove the redundant size double-check in
+`_read_text_input` (already enforced in `_persist_upload`); expand
+`_read_text_input`/`_to_response`/`_require_runner` docs.
+
+### Completion record
+
+**Changes made:**
+
+- **`app/main.py`** — `_read_text_input` no longer re-checks
+  `file.size > MAX_UPLOAD_BYTES` after calling `_persist_upload`; the call
+  site now carries the comment ``# also enforces MAX_UPLOAD_BYTES`` so the
+  enforcement point is obvious.  The check still lives in `_persist_upload`
+  (identical guard, same error detail).
+- `_read_text_input` docstring gained `Args:`/`Returns:`/`Raises:`.
+- `_to_response` gained `Args:`/`Returns:`.
+- `_require_runner` gained a full docstring (return of the lifespan-built
+  runner, `Raises: HTTPException(503)`).
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_web_pipeline.py tests/test_web_files.py` — 26 passed
+  (oversized-file `400` still covered by `test_oversized_file_returns_400`)
+- `uv run ruff check app/` — pass; `ruff format --check app/` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+
+**Commit:** `simplify: phase 10 - web API layer docs (routes table, traversal defense, extraction paths, thread-safety notes, schema descriptions) (10.1-10.5)`
+
+---
+
+## Phase 10 - Completed sub-task 10.3: `files.py` traversal-defense docs
+
+Original instruction: verify `safe_dir_path`/`safe_delete_path` docstrings
+explain the traversal defense.
+
+### Completion record
+
+**Changes made:**
+
+- **`app/files.py`** — `safe_dir_path` docstring expanded: explains the
+  resolve-then-ancestor-check defense (both paths `resolve()`, candidate
+  must equal base or live inside it), which blocks `..` traversal and
+  symlink escapes; added `Args:`/`Returns:`/`Raises:`.
+- `safe_delete_path` docstring expanded: states it reuses
+  `safe_dir_path` for traversal defense and additionally requires a regular
+  file (blocks directory targets and missing paths); added
+  `Args:`/`Returns:`/`Raises:`.
+- `list_files` already carried a clear filter/sort/paginate docstring;
+  left unchanged.
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_web_files.py` — 11 passed (incl. traversal
+  escape test `test_path_traversal_never_deletes_outside_dir`)
+- `uv run ruff check app/` — pass; `ruff format --check app/` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+- Docstring-only; no runtime change.
+
+**Commit:** `simplify: phase 10 - web API layer docs (routes table, traversal defense, extraction paths, thread-safety notes, schema descriptions) (10.1-10.5)`
+
+---
+
+## Phase 10 - Completed sub-task 10.4: `upload.py` extraction-path docs
+
+Original instruction: document each extraction path (.txt/.docx/.pdf).
+
+### Completion record
+
+**Changes made:**
+
+- **`app/upload.py`** — `extract_text` docstring rewritten as a dispatch
+  table: `.txt` decoded UTF-8 with `utf-8-sig` BOM-tolerant pass and
+  `latin-1` fallback; `.docx` parsed via `python-docx` joining paragraph
+  texts; `.pdf` parsed via `pypdf` joining per-page extracted text.  Added
+  `Args:`/`Returns:`/`Raises:`.
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_web_upload.py` — 9 passed (txt/docx/pdf paths
+  and unsupported-MIME `400` all covered)
+- `uv run ruff check app/` — pass; `ruff format --check app/` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+- Docstring-only; no runtime change.
+
+**Commit:** `simplify: phase 10 - web API layer docs (routes table, traversal defense, extraction paths, thread-safety notes, schema descriptions) (10.1-10.5)`
+
+---
+
+## Phase 10 - Completed sub-task 10.5: `tasks.py` thread-safety + `schemas.py` descriptions
+
+Original instruction: `tasks.py` thread/loop-safety notes; `schemas.py`
+field descriptions.
+
+### Completion record
+
+**Changes made:**
+
+- **`app/tasks.py`** — `TaskRegistry` class docstring expanded: all
+  records live in a plain `dict` guarded by one `threading.Lock`; safe to
+  call from both the async task coroutine (event loop) and sync route
+  handlers (thread pool); state is in-memory only, keyed by `uuid` hex ids,
+  not persisted across restarts and not shared between app instances.
+- **`app/schemas.py`** — added `Field(description=...)` to every field
+  lacking one: `TaskCreated.task_id`, `TaskStatus` (status/result/error/
+  created_at/completed_at), `FileMeta` (name/size/modified/type/path),
+  `PagedFile` (items/page/page_size/total/total_pages),
+  `DeleteFilesRequest.files`.  `PipelineRunRequest`/`PipelineRunResponse`/
+  `DeleteFilesResponse` already had descriptions.
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_web_tasks.py` — 8 passed
+- `uv run ruff check app/` — pass; `ruff format --check app/` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+- Docstring/annotation-description only; serialization unchanged.
+
+**Commit:** `simplify: phase 10 - web API layer docs (routes table, traversal defense, extraction paths, thread-safety notes, schema descriptions) (10.1-10.5)`
+
+---
+
+## Phase 10 - Completed sub-task 10.6: guardrails + move + commit
+
+Original instruction: watch all `test_web_*.py`, move to `simple-done.md`,
+commit.
+
+### Completion record
+
+**Guardrails (all green):**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including the 7 web suites:
+  `test_web_health.py` (2), `test_web_pipeline.py` (9),
+  `test_web_tasks.py` (9), `test_web_outputs.py` (3),
+  `test_web_files.py` (11), `test_web_upload.py` (9), `test_web_spa.py` (8)
+  — 51 web tests total.
+
+**Commit:** `simplify: phase 10 - web API layer docs (routes table, traversal defense, extraction paths, thread-safety notes, schema descriptions) (10.1-10.5)`
