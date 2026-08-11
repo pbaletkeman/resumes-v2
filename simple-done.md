@@ -1593,3 +1593,163 @@ the full 493-test suite stayed green.
   unchanged.
 
 **Commit:** `simplify: phase 8 - skill normalizer step-by-step lookup + docs (8.1-8.3)`
+
+---
+
+## Phase 9 - Completed sub-task 9.1: extract `_run_stage` helper
+
+Original instruction: extract a small
+`_run_stage(runner, agent_name, *, prompt, output, rules, **context)`
+helper that returns the resolved field via `_extract_field`.
+
+### Completion record
+
+**Changes made:**
+
+- **`pipeline.py`** — added
+  ``async def _run_stage(runner, agent_name, *, prompt="", output=None, rules=None, fields=(), **context)``
+  between `run_resume_pipeline` and `_run_pipeline_core`.  It assembles
+  the stage input dict (`prompt`/`output`/`rules` only when non-empty,
+  plus all keyword `context` entries), awaits
+  ``runner.run_agent_async(agent_name, inputs)``, and returns
+  ``_extract_field(result, *fields)``.
+- Deviation from the plan's literal signature: a keyword-only
+  ``fields: tuple[str, ...] = ()`` parameter was added because
+  ``_extract_field`` needs candidate field names (e.g. stage 5 checks
+  ``ats_optimized_resume`` then ``final_resume``).  Parsing agents
+  (stages 1-2) pass no `prompt`/`output`/`rules` and no `fields`, so the
+  raw result is returned unchanged — exactly the previous behavior.
+- Full class-style docstring with `Args:`/`Returns:` documenting the
+  generic-agent contract keys and the empty-`fields` passthrough.
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_pipeline.py` — 17 passed
+- `uv run ruff check pipeline.py` — pass; `ruff format --check` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+
+**Commit:** `simplify: phase 9 - _run_stage helper + stage chain + CLI step comments (9.1-9.4)`
+
+---
+
+## Phase 9 - Completed sub-task 9.2: convert seven blocks to `_run_stage` calls
+
+Original instruction: convert the seven near-identical blocks in
+`_run_pipeline_core` to one-line `_run_stage` calls with a
+`# 1. JD Parsing` ... `# 7. Cover Letter` comment above each.
+
+### Completion record
+
+**Changes made:**
+
+- **`pipeline.py`** — `_run_pipeline_core` now runs the chain as seven
+  `await _run_stage(...)` calls, each preceded by a short step comment:
+  `# 1. JD Parsing`, `# 2. Resume Parsing`, `# 3. Gap Analysis`,
+  `# 4. Resume Rewrite`, `# 5. ATS Compliance`, `# 6. Tone Polishing`,
+  `# 7. Cover Letter`.
+- Each stage passes its dedicated prompt/output/rules, the `fields` to
+  resolve via `_extract_field`, and the context inputs consumed by that
+  agent.  The previous per-stage `_extract_field` lines moved into the
+  helper's return; stage ordering is now visually obvious.
+- No stage arguments changed: same prompts, output lists, rules, and
+  context keys as before (verified against the old diff).
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_pipeline.py` — 17 passed (dependency
+  threading tests confirm identical inputs reach each stub agent)
+- `uv run ruff check pipeline.py` — pass; `ruff format --check` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+
+**Commit:** `simplify: phase 9 - _run_stage helper + stage chain + CLI step comments (9.1-9.4)`
+
+---
+
+## Phase 9 - Completed sub-task 9.3: `run_agent_async` + `PipelineAgent` docs
+
+Original instruction: verify the instantiate-on-first-use logic is
+clearly commented in `run_agent_async`; confirm `PipelineAgent` docstring
+explains backward compatibility with the dedicated classes.
+
+### Completion record
+
+**Changes made:**
+
+- **`pipeline.py`** — `AgentRunner.run_agent_async`: the
+  instantiate-on-first-use block comment expanded to explain *why* the
+  instance is cached (lazy build with the per-agent client on first
+  dispatch; later runs reuse the same instance and the same bound event
+  loop).  The long docstring's shared-event-loop rationale (fresh
+  `asyncio.run()` per agent closing the Ollama/OpenAI `AsyncClient`'s
+  loop) was verified as still accurate — unchanged.
+- **`pipeline.py`** — `PipelineAgent` class docstring rewritten to
+  explicitly state it is the generic wrapper kept for backward
+  compatibility with the dedicated per-agent classes (`JDParsingAgent`
+  through `CoverLetterAgent`), and that the dedicated classes add Pydantic
+  validation + deterministic fallbacks while `PipelineAgent` accepts raw
+  `prompt`/`output`/`rules` inputs and returns the raw chat response.
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_pipeline.py` — 17 passed
+- `uv run ruff check pipeline.py` — pass; `ruff format --check` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+
+**Commit:** `simplify: phase 9 - _run_stage helper + stage chain + CLI step comments (9.1-9.4)`
+
+---
+
+## Phase 9 - Completed sub-task 9.4: module docstring stage table + CLI steps
+
+Original instruction: extend the pipeline module docstring with a stage
+table (agent -> output key -> consumed by); keep the CLI `main()` flow in
+plain sequential steps.
+
+### Completion record
+
+**Changes made:**
+
+- **`pipeline.py`** — module docstring now contains a stage table
+  (`Step | Agent name | Output key | Consumed by`) for the 7 stages, with
+  a note that the output keys are the `run_resume_pipeline` result dict
+  keys and that `_run_pipeline_core` runs the chain via `_run_stage`
+  calls.  Existing text about dedicated classes + `PipelineAgent`
+  compatibility retained.
+- **`pipeline.py`** — `main()` flow split into numbered step comments:
+  `# Step 1` sample-mode branch, `# Step 2` missing-flag check,
+  `# Step 3` path validation, `# Step 4` read + run pipeline,
+  `# Step 5` print results / rendered files.  Argument handling unchanged.
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_pipeline.py` — 17 passed
+- `uv run ruff check pipeline.py` — pass; `ruff format --check` — pass
+- `uv run pyright` — 0 errors, 0 warnings
+- Docstring/comment-only changes; no runtime behavior change.
+
+**Commit:** `simplify: phase 9 - _run_stage helper + stage chain + CLI step comments (9.1-9.4)`
+
+---
+
+## Phase 9 - Completed sub-task 9.5: guardrails + CLI smoke
+
+Original instruction: watch `tests/test_pipeline.py` (17); CLI still works
+with `uv run python pipeline.py` (sample mode) and with
+`--resume`/`--job-description`.
+
+### Completion record
+
+**Guardrails (all green):**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including `tests/test_pipeline.py` (17)
+
+**CLI smoke (live Ollama, `qwen2.5:7b-instruct` pulled):**
+
+- `uv run python pipeline.py --resume sample/resume/Peter-Letkeman-Resume.txt --job-description sample/jobs/Zafin.txt --candidate-name "Peter Letkeman" --company-name "Zafin"` — exit 0; printed polished resume + cover letter and rendered 6 output files under `output/` (`20260811_1028_peter-letkeman_zafin_*`).
+- `uv run python pipeline.py` (sample mode) — exit 0; placeholder pipeline ran to completion.
+- Validation branches (no LLM): missing `--job-description` -> exit 2 with `missing required argument(s)`; nonexistent file -> `parser.error` "resume file not found".
+
+**Commit:** `simplify: phase 9 - _run_stage helper + stage chain + CLI step comments (9.1-9.4)`

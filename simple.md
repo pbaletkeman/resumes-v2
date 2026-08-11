@@ -369,7 +369,10 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 9 - Pipeline orchestration + CLI
+## Phase 9 - Pipeline orchestration + CLI  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `pipeline.py`, `basic.py`
 
@@ -699,13 +702,16 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 8.3 Module docstring: canonical taxonomy -> normalized forms; when to prefer `normalize_list` vs `match_skills`; cross-check `docs/skill-taxonomy.md`. ✅ See `simple-done.md`.
 - [x] 8.4 Guardrails (watch `tests/test_skill_normalizer.py` 15), move to `simple-done.md`, commit.
 
-### Phase 9 - Pipeline orchestration + CLI
+### Phase 9 - Pipeline orchestration + CLI ✅ COMPLETED
 
-- [ ] 9.1 Extract `_run_stage(runner, agent_name, *, prompt, output, rules, **context)` helper returning the resolved field.
-- [ ] 9.2 Convert the seven near-identical blocks in `_run_pipeline_core` to one-line `_run_stage` calls with `# 1. JD Parsing` ... `# 7. Cover Letter` comments.
-- [ ] 9.3 Verify `run_agent_async` instantiate-on-first-use comments + shared-event-loop rationale; `PipelineAgent` backward-compat docstring.
-- [ ] 9.4 Pipeline module docstring: stage table (agent -> output key -> consumed by); CLI `main()` plain sequential steps.
-- [ ] 9.5 Guardrails (watch `tests/test_pipeline.py` 17) + CLI smoke: `uv run python pipeline.py` (sample + with `--resume`/`--job-description`).
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here so the working checklist stays intact.
+
+- [x] 9.1 Extract `_run_stage(runner, agent_name, *, prompt, output, rules, **context)` helper returning the resolved field. ✅ See `simple-done.md`.
+- [x] 9.2 Convert the seven near-identical blocks in `_run_pipeline_core` to one-line `_run_stage` calls with `# 1. JD Parsing` ... `# 7. Cover Letter` comments. ✅ See `simple-done.md`.
+- [x] 9.3 Verify `run_agent_async` instantiate-on-first-use comments + shared-event-loop rationale; `PipelineAgent` backward-compat docstring. ✅ See `simple-done.md`.
+- [x] 9.4 Pipeline module docstring: stage table (agent -> output key -> consumed by); CLI `main()` plain sequential steps. ✅ See `simple-done.md`.
+- [x] 9.5 Guardrails (watch `tests/test_pipeline.py` 17) + CLI smoke: `uv run python pipeline.py` (sample + with `--resume`/`--job-description`). ✅ See `simple-done.md`.
 
 ### Phase 10 - Web API layer
 
