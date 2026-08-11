@@ -2450,3 +2450,35 @@ helpers consistently.
 - Comment + equivalent-refactor only; no runtime change.
 
 **Commit:** `simplify: phase 14 - per-tab headers + asRecord coercion consistency (14.2)`
+
+---
+
+## Phase 14 - Completed sub-task 14.3: HTML-string trust boundary docs
+
+Original instruction: any tab rendering an HTML string (e.g., polished/cover
+letter) — document the trust boundary: the content came from our own
+pipeline.
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/results/PolishedTab.tsx`** — added a header note after the
+  one-line description documenting the trust boundary: the polished resume is
+  plain text produced by our own pipeline (LLM output, not user-supplied
+  HTML) and is rendered inside a `<pre>` as text, so React escapes the string
+  and no HTML is interpreted.
+- **`ui/src/pages/results/CoverLetterTab.tsx`** — same trust-boundary note
+  for the cover letter.
+- **`ui/src/pages/results/ATSTab.tsx`** — the `final_resume` section renders
+  the same kind of long-form pipeline text in a `<pre>`; added the same
+  trust-boundary comment inline above that element.
+
+**Behavior verification:**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed (`ATSTab.test.tsx` still green)
+- Comment-only; no runtime change.
+
+**Commit:** `simplify: phase 14 - trust boundary comments for pipeline text tabs (14.3)`
