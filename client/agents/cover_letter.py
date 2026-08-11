@@ -605,6 +605,9 @@ def _validate_length(result: CoverLetterOutput) -> bool:
 # Deterministic post-processors -- fix the letter (never mutate in place)
 # ---------------------------------------------------------------------------
 
+# Placeholder tokens the LLM may emit instead of the real company name
+# (e.g. "[Company Name]" when it cannot resolve the employer).  Every
+# company substitution goes through _replace_placeholders below.
 _PLACEHOLDER_TOKENS = (
     "[Company Name]",
     "[Company]",
@@ -639,9 +642,16 @@ def _company_from(jd_data: dict[str, Any]) -> str:
     return ""
 
 
-def _replace_placeholders(text: str, target: str) -> str:
-    """Replace literal company placeholder tokens with the target name."""
-    for token in _PLACEHOLDER_TOKENS:
+def _replace_placeholders(text: str, target: str, tokens: tuple[str, ...]) -> str:
+    """Replace every literal placeholder token in ``text`` with ``target``.
+
+    The single substitution path for placeholder tokens: ``tokens`` is a
+    tuple of literal strings the LLM may emit (company or candidate-name
+    placeholders); each occurrence of each token is replaced with the real
+    value.  Tokens absent from ``text`` are skipped (``str.replace`` is a
+    no-op for them).
+    """
+    for token in tokens:
         if token in text:
             text = text.replace(token, target)
     return text
@@ -716,7 +726,8 @@ def _apply_company_name(
         return result
     letter = result.cover_letter
 
-    letter = _replace_placeholders(letter, target)
+    # Substitution path 1: replace any literal company placeholder tokens
+    letter = _replace_placeholders(letter, target, _PLACEHOLDER_TOKENS)
 
     letter_lower = letter.lower()
     if not _company_mentioned(letter_lower, target):
@@ -734,6 +745,9 @@ def _apply_company_name(
     return CoverLetterOutput(cover_letter=letter)
 
 
+# Placeholder tokens the LLM may emit instead of the candidate's real
+# name (e.g. "[Your Name]" at the closing).  Every name substitution goes
+# through the same _replace_placeholders helper as the company tokens.
 _NAME_PLACEHOLDER_TOKENS = (
     "[Your Name]",
     "[Candidate Name]",
@@ -767,9 +781,10 @@ def _apply_candidate_name(
     if not name:
         return result
     letter = result.cover_letter
-    for token in _NAME_PLACEHOLDER_TOKENS:
-        if token in letter:
-            letter = letter.replace(token, name)
+
+    # Substitution path 2: replace any literal candidate-name placeholders
+    letter = _replace_placeholders(letter, name, _NAME_PLACEHOLDER_TOKENS)
+
     if letter == result.cover_letter:
         return result
     return CoverLetterOutput(cover_letter=letter)

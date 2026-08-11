@@ -951,3 +951,50 @@ Original instruction: break any method over ~50 lines into named steps with
   `tests/test_cover_letter_validation.py` (109)
 
 **Commit:** `simplify: phase 6c - cover letter long method step comments (run/_try_llm)`
+
+---
+
+## Phase 6 - Completed sub-task 6.4: standardize placeholder-token handling
+
+Original instruction: standardize placeholder-token handling
+(`[Company Name]`, `[Your Name]`) -- every substitution one obvious path
+with comment.
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/cover_letter.py`** — before this change the company
+  placeholders went through a named `_replace_placeholders` helper while
+  the candidate-name placeholders inlined the same loop inside
+  `_apply_candidate_name` (two different substitution paths).  Now both go
+  through the same helper:
+  - `_replace_placeholders(text, target, tokens)` gained a `tokens`
+    parameter (a tuple of literal placeholders) and is documented as *the*
+    single substitution path for placeholder tokens; each present token is
+    replaced with the real value, absent tokens are no-ops.
+  - `_apply_company_name` calls it with `_PLACEHOLDER_TOKENS`
+    (substitution path 1 -- company tokens).
+  - `_apply_candidate_name` calls it with `_NAME_PLACEHOLDER_TOKENS`
+    (substitution path 2 -- name tokens), replacing the inline loop.
+  - Comment above `_PLACEHOLDER_TOKENS` and `_NAME_PLACEHOLDER_TOKENS`
+    explains what the tokens are and that every substitution goes through
+    `_replace_placeholders`.
+  - Behavior identical: company path unchanged (same tokens, same
+    replace-all semantics); name path now runs the identical loop via the
+    shared helper.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_cover_letter.py` (10) and
+  `tests/test_cover_letter_validation.py` (109) -- the placeholder
+  substitution tests (`[Company Name]`, `[Company]`, `[Employer Name]`,
+  `[Your Name]`, `[Candidate Name]`, `<Your Name>`) all still pass.
+- Tests do not import `_replace_placeholders` or the token constants
+  directly (verified by grep), so the signature change is test-safe.
+
+**Commit:** `simplify: phase 6d - standardized placeholder handling (_replace_placeholders shared)`
