@@ -659,7 +659,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 ### Phase 6 - Cover Letter agent (largest file)
 
 - [x] 6.1 Split helpers into banner sections: `# --- validation ---`, `# --- deterministic post-processors ---`, `# --- rendering/formatting ---`. ✅ See `simple-done.md`.
-- [ ] 6.2 Replace all seven `json.loads` guards with `load_json_safe`.
+- [x] 6.2 Replace all seven `json.loads` guards with `load_json_safe`. ✅ See `simple-done.md`.
 - [ ] 6.3 Break any method over ~50 lines into named steps with `# 1.`/`# 2.` comments.
 - [ ] 6.4 Standardize placeholder-token handling (`[Company Name]`, `[Your Name]`) - every substitution one obvious path with comment.
 - [ ] 6.5 Module docstring covering agent contract (inputs, output model, fallback, two deterministic post-processors).

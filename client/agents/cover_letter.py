@@ -22,7 +22,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from client.errors import LLMConnectionError, LLMResponseError, LLMTimeoutError
-from client.json_utils import model_to_json_schema, parse_json_response
+from client.json_utils import load_json_safe, model_to_json_schema, parse_json_response
 from client.model_client import ModelClient
 from client.models import CoverLetterOutput
 from client.skills import SkillNormalizer
@@ -352,9 +352,8 @@ def _read_str_list(data: dict[str, Any], field: str) -> list[str]:
 
 def _load_str_list(json_text: str, field: str) -> list[str]:
     """Load a list-of-strings field from a serialized object."""
-    try:
-        data: dict[str, Any] = json.loads(json_text)
-    except json.JSONDecodeError, TypeError:
+    data = load_json_safe(json_text)
+    if data is None:
         return []
     value = data.get(field, [])
     if not isinstance(value, list):
@@ -375,9 +374,8 @@ def _contact_from_resume(resume_json: str) -> str:
     ``"(none)"`` when every field is empty or absent so the LLM knows
     no contact details are available.
     """
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    resume_data = load_json_safe(resume_json)
+    if resume_data is None:
         return "(none available)"
     labels = (
         ("Phone", "phone"),
@@ -441,9 +439,8 @@ def _validate_role(result: CoverLetterOutput, jd_json: str) -> bool:
     non-filler tokens must each appear as whole words (so "Senior Data
     Scientist" still passes a letter that only says "Data Scientist").
     """
-    try:
-        jd_data: dict[str, Any] = json.loads(jd_json)
-    except json.JSONDecodeError, TypeError:
+    jd_data = load_json_safe(jd_json)
+    if jd_data is None:
         return True  # can't validate, pass
     role_title = jd_data.get("role_title", "")
     if not isinstance(role_title, str) or not role_title.strip():
@@ -607,9 +604,8 @@ _PLACEHOLDER_TOKENS = (
 
 def _get_company_name(jd_json: str) -> str:
     """Return the JD company name, or an empty string when unavailable."""
-    try:
-        jd_data: dict[str, Any] = json.loads(jd_json)
-    except json.JSONDecodeError, TypeError:
+    jd_data = load_json_safe(jd_json)
+    if jd_data is None:
         return ""
     return _company_from(jd_data)
 
@@ -666,9 +662,8 @@ def _resume_company_in_letter(letter_lower: str, resume_json: str, target: str) 
     """
     if not resume_json:
         return ""
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    resume_data = load_json_safe(resume_json)
+    if resume_data is None:
         return ""
     target_lower = target.lower()
     for company in _resume_companies(resume_data):
@@ -739,9 +734,8 @@ def _candidate_name_from_resume(resume_json: str) -> str:
     """Return the candidate's name from a serialized resume, or empty."""
     if not resume_json:
         return ""
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    resume_data = load_json_safe(resume_json)
+    if resume_data is None:
         return ""
     name = resume_data.get("name", "")
     if isinstance(name, str):
@@ -783,9 +777,8 @@ def _apply_contact_info(
     already present or no contact info exists, the letter is returned
     unchanged.  Pure string post-processing -- no LLM call.
     """
-    try:
-        resume_data: dict[str, Any] = json.loads(resume_json)
-    except json.JSONDecodeError, TypeError:
+    resume_data = load_json_safe(resume_json)
+    if resume_data is None:
         return result
     contact_values = [
         v.strip()

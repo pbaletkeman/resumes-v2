@@ -859,3 +859,49 @@ Original instruction: split helpers into banner sections
   left in place for 6.2.
 
 **Commit:** `simplify: phase 6a - cover letter banner sections (class first, helpers grouped)`
+
+---
+
+## Phase 6 - Completed sub-task 6.2: route the seven `json.loads` guards through `load_json_safe`
+
+Original instruction: replace all seven `json.loads` guards with
+`load_json_safe` (the shared helper from Phase 4.1, already used by the
+Phase 5 validation guards).
+
+### Completion record
+
+**Changes made:**
+
+- **`client/agents/cover_letter.py`** — all seven guarded
+  ``try: json.loads(...) / except (json.JSONDecodeError, TypeError):``
+  blocks replaced with the shared ``load_json_safe`` helper, each keeping
+  the same early-return default:
+  - `_load_str_list` — `data = load_json_safe(...)`, return `[]` on `None`.
+  - `_contact_from_resume` — return `"(none available)"` on `None`.
+  - `_validate_role` — return `True` (can't validate, pass) on `None`.
+  - `_get_company_name` — return `""` on `None`, then
+    ``_company_from(jd_data)``.
+  - `_resume_company_in_letter` — return `""` on `None` (after the
+    existing empty-`resume_json` guard).
+  - `_candidate_name_from_resume` — return `""` on `None`.
+  - `_apply_contact_info` — return `result` (unchanged letter) on `None`.
+  - Removed the now-unused per-site `dict[str, Any]` type annotations
+    (the `load_json_safe` return type is `dict[str, Any] | None`, narrowed
+    by the `None` early-returns); `from client.json_utils import
+    load_json_safe` added to the import line.
+  - The remaining `json.dumps` call sites (logging + `_serialize`) are
+    unchanged, so the `json` module import stays.
+
+**Behavior verification:**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `uv run pytest` — 493 passed, including
+  `tests/test_agent_cover_letter.py` (10) and
+  `tests/test_cover_letter_validation.py` (109)
+- New parse path is strictly more defensive than the old guards: for
+  valid JSON objects the behavior is identical, and for fenced/non-object
+  input `load_json_safe` returns `None` instead of raising.
+
+**Commit:** `simplify: phase 6b - cover letter json.loads guards via load_json_safe`
