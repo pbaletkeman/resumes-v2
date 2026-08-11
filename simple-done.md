@@ -1932,3 +1932,176 @@ commit.
   — 51 web tests total.
 
 **Commit:** `simplify: phase 10 - web API layer docs (routes table, traversal defense, extraction paths, thread-safety notes, schema descriptions) (10.1-10.5)`
+
+---
+
+## Phase 11 - Completed sub-task 11.1: `tests/conftest.py` fixture docs
+
+Original instruction: verify fixture names read clearly and are documented.
+
+### Completion record
+
+**Changes made:**
+
+- **`tests/conftest.py`** — module docstring rewritten as a fixture index
+  enumerating all ten fixtures with one-line purposes. Added docstrings to
+  every previously-undocumented fixture: `configure_test_logging` (pins
+  root logging to WARNING), `sample_resume_path`/`sample_jd_path` (paths
+  under `sample/`), `sample_resume`/`sample_jd` (raw text of those files),
+  and `markdown_resume`/`markdown_jd` (inline markdown used by the
+  FormatDetector regex tests). `fake_client`, `rewrite_output`, and
+  `cover_letter_output` already had docstrings and were left as-is.
+- No fixture renamed: names already read clearly (`sample_*` = file-backed,
+  `markdown_*` = inline, `fake_client` = mock client class, `*_output` =
+  populated output models).
+
+**Behavior verification:**
+
+- `uv run pytest tests/test_format_detector.py tests/test_renderer.py
+  tests/test_pipeline.py` — pass (exercises the documented fixtures)
+- `uv run ruff check tests/conftest.py` — pass
+- Docstring-only; no runtime change.
+
+**Commit:** `simplify: phase 11 - test docstrings + headers + conftest docs (11.1-11.5)`
+
+---
+
+## Phase 11 - Completed sub-task 11.2: per-agent contract test audit
+
+Original instruction: confirm the per-agent contract tests assert *behavior*
+rather than *implementation*, so the Phase 3-6 simplifications do not churn
+them.
+
+### Completion record
+
+**Findings (audit only, no code change):**
+
+- All seven `tests/test_agent_*.py` suites drive each agent through its
+  public `run()` entry point with the `fake_client` fixture and assert on
+  (a) the returned Pydantic output values and (b) the recorded `chat()`
+  contract — `purpose`/`output`/`inputs`/`response_format`/`json_schema`.
+  That is the documented LLM-call contract, not the agent internals.
+- The only private symbols referenced are contract pins: `_SYSTEM_PROMPT`
+  (asserts `purpose` matches the documented prompt), `_STRICT_RULES` /
+  `_SCHEMA_HINT` (asserts the strict-retry round passes the strict rules),
+  and `_build_fallback_cover_letter` (asserts the deterministic fallback
+  builder output for the error path). These are stable interface values the
+  agents expose to the chat contract, so the Phase 3-6 simplifications
+  (which changed internal scaffolding, not the contract) leave them intact.
+- Conclusion: contract tests assert behavior over implementation. No
+  changes needed.
+
+**Commit:** `simplify: phase 11 - test docstrings + headers + conftest docs (11.1-11.5)`
+
+---
+
+## Phase 11 - Completed sub-task 11.3: `wip_testing/*.py` header comments
+
+Original instruction: confirm each scratch script has a header comment
+stating which agents it exercises and how to run it.
+
+### Completion record
+
+**Changes made:**
+
+- Seven of eight `wip_testing/` scripts already had full headers
+  (agent/chain description, prerequisites, usage): `test_job_description.py`,
+  `test_resume_parsing.py`, `test_gap_analysis.py`, `test_resume_rewrite.py`,
+  `test_ats_compliance.py`, `test_tone_polishing.py`, `test_cover_letter.py`.
+  Left as-is.
+- **`wip_testing/test_parsing.py`** — was a bare one-line run command.
+  Rewrote the header to state what it exercises (FormatDetector regex-only
+  and regex+LLM-fallback modes against the sample resume and JD) plus the
+  standard prerequisites and usage block.
+- Count note: the plan says 7 `wip_testing/*.py` files; the directory
+  actually contains 8 (`test_parsing.py` included). All 8 now have headers.
+
+**Behavior verification:**
+
+- Docstring-only; the scripts themselves unchanged. `uv run ruff check
+  wip_testing/` — pass.
+
+**Commit:** `simplify: phase 11 - test docstrings + headers + conftest docs (11.1-11.5)`
+
+---
+
+## Phase 11 - Completed sub-task 11.4: `test_real_files.py` guard docs
+
+Original instruction: verify the `RUN_LIVE_PIPELINE` guard is documented.
+
+### Completion record
+
+**Findings (verify only, no code change):**
+
+- `test_real_files.py` module docstring already documents the guard:
+  the file deliberately lives outside `tests/` because it needs a live
+  Ollama, shows both invocation forms (`uv run python test_real_files.py`
+  and `RUN_LIVE_PIPELINE=1; uv run pytest test_real_files.py`), and notes
+  that a plain pytest run skips (not fails) the test. Satisfied.
+
+**Commit:** `simplify: phase 11 - test docstrings + headers + conftest docs (11.1-11.5)`
+
+---
+
+## Phase 11 - Completed sub-task 11.5: file-top comments per test file
+
+Original instruction: add/confirm a file-top comment for every test file
+stating what it covers and the key fixture/hook it relies on.
+
+### Completion record
+
+**Changes made:**
+
+All 23 `tests/*.py` files now have file-top docstrings stating coverage and
+the fixtures/helpers they rely on. Enhanced the previously-thin docstrings:
+
+- **`tests/test_format_detector.py`** — added coverage summary (titles,
+  headings, sections, bullets, metrics, keywords, parse entry points) and
+  noted the `markdown_*`/`sample_*` fixtures from `conftest.py`.
+- **`tests/test_formatter.py`** — noted it uses local `_full_resume()` /
+  `_empty_resume()` factories, no shared fixtures.
+- **`tests/test_skill_normalizer.py`** — noted direct `SkillNormalizer`
+  usage against `taxonomy.json`, no shared fixtures.
+- **`tests/test_cover_letter_validation.py`** — noted it exercises the
+  deterministic post-validation helpers directly, no shared fixtures.
+- **`tests/test_resume_rewrite_validation.py`** — same treatment.
+- **`tests/test_jd_parsing.py`** — noted `_extract_company_name` /
+  `_sync_company_name` are exercised directly, no shared fixtures.
+- **`tests/test_web_health.py`** — noted it uses
+  `fastapi.testclient.TestClient(app)`, no shared fixtures.
+
+The remaining suites already had adequate multi-line docstrings
+(`test_agent_*.py`, `test_json_utils.py`, `test_model_clients.py`,
+`test_pipeline.py`, `test_renderer.py`, `test_web_pipeline.py`,
+`test_web_tasks.py`, `test_web_outputs.py`, `test_web_files.py`,
+`test_web_upload.py`, `test_web_spa.py`).
+
+**Behavior verification:**
+
+- Docstring-only; test logic unchanged. `uv run pytest -q` — 493 passed
+  (full suite, including all 23 test files).
+
+**Commit:** `simplify: phase 11 - test docstrings + headers + conftest docs (11.1-11.5)`
+
+---
+
+## Phase 11 - Completed sub-task 11.6: guardrails + move + commit
+
+Original instruction: full `uv run pytest` green + `uv run ruff check .`,
+move to `simple-done.md`, commit.
+
+### Completion record
+
+**Guardrails (all green):**
+
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (96 files formatted)
+- `uv run pytest -q` — 493 passed, full suite (test logic untouched;
+  docstring/header-only changes across `tests/` and `wip_testing/`)
+
+**Moved to `simple-done.md`:** the Phase 11 narrative stub stays in
+`simple.md`; all 6 sub-task completion records (11.1-11.6) are recorded
+here above. `simple.md` checklist rows 11.1-11.6 checked and the Phase 11
+header marked `✅ COMPLETED`.
+
+**Commit:** `simplify: phase 11 - test docstrings + headers + conftest docs (11.1-11.5)`

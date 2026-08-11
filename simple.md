@@ -420,11 +420,12 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Phase 11 - Backend tests & scratch scripts
+## Phase 11 - Backend tests & scratch scripts  ✅ COMPLETED
+
+> **Status:** completed. Phase text and completion record moved to `simple-done.md`.
+> This section is retained here as a stub so the numbered plan stays intact.
 
 **Files:** `tests/*.py` (23 files), `wip_testing/*.py` (7 files), `test_real_files.py`
-
-Tests are not "code to ship", but they are part of the repo and this plan reviews every file. Keep test *behavior* identical (the suites must stay green).
 
 **Inspect for:**
 
@@ -730,12 +731,12 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 11 - Backend tests & scratch scripts
 
-- [ ] 11.1 `tests/conftest.py` (190): fixture names read clearly, documented.
-- [ ] 11.2 Audit per-agent contract tests assert behavior over implementation.
-- [ ] 11.3 `wip_testing/*.py`: header comment per file (which agents, how to run).
-- [ ] 11.4 `test_real_files.py`: document `RUN_LIVE_PIPELINE` guard.
-- [ ] 11.5 File-top comment per test file (what it covers, key fixture/hook).
-- [ ] 11.6 Guardrails: full `uv run pytest` green + `uv run ruff check .`, move to `simple-done.md`, commit.
+- [x] 11.1 `tests/conftest.py` (190): fixture names read clearly, documented.
+- [x] 11.2 Audit per-agent contract tests assert behavior over implementation.
+- [x] 11.3 `wip_testing/*.py`: header comment per file (which agents, how to run).
+- [x] 11.4 `test_real_files.py`: document `RUN_LIVE_PIPELINE` guard.
+- [x] 11.5 File-top comment per test file (what it covers, key fixture/hook).
+- [x] 11.6 Guardrails: full `uv run pytest` green + `uv run ruff check .`, move to `simple-done.md`, commit.
 
 ### Phase 12 - Frontend API layer
 
