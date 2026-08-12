@@ -1,8 +1,23 @@
+/**
+ * Shared test helpers for rendering components under React Query.
+ *
+ * ``renderWithClient`` / ``withClient`` wrap a component in a fresh
+ * QueryClientProvider whose queries have retries disabled and the cache kept
+ * alive (``gcTime: Infinity``), so tests get deterministic, single-shot query
+ * behavior. Tests that additionally need routing or toasts layer their own
+ * wrappers on top (e.g. RunPage.test.tsx). ``stubMatchMedia`` replaces
+ * ``window.matchMedia`` with a controllable stub used by the theme tests to
+ * simulate OS light/dark changes.
+ */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderResult } from '@testing-library/react'
 import type { ReactElement, ReactNode } from 'react'
 import { vi } from 'vitest'
 
+/**
+ * Build a QueryClient tuned for tests: no retries and an infinite cache so
+ * queries never keep retrying or get garbage-collected mid-test.
+ */
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
@@ -14,6 +29,7 @@ export function createTestQueryClient(): QueryClient {
   })
 }
 
+/** Wrap children in a ``QueryClientProvider`` using the given client. */
 export function withClient(
   queryClient: QueryClient,
   children: ReactNode,
@@ -23,6 +39,10 @@ export function withClient(
   )
 }
 
+/**
+ * Render a component inside a fresh QueryClientProvider (defaults to
+ * ``createTestQueryClient`` unless one is passed).
+ */
 export function renderWithClient(
   ui: ReactElement,
   queryClient: QueryClient = createTestQueryClient(),
@@ -30,6 +50,13 @@ export function renderWithClient(
   return render(withClient(queryClient, ui))
 }
 
+/**
+ * Stub ``window.matchMedia`` for jsdom with a controllable media object.
+ *
+ * Starts in the ``matches`` state given by ``dark`` and fires registered
+ * ``change`` listeners when ``setDark`` is called, letting theme tests simulate
+ * an OS color-scheme flip.
+ */
 export function stubMatchMedia(dark = false) {
   const listeners = new Set<EventListener>()
   const media = {
