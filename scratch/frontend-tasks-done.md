@@ -1,6 +1,6 @@
 # Frontend Implementation — Completed Tasks
 
-Archive of tasks from `frontend-tasks.md` as they are completed. See [frontend-tasks.md](frontend-tasks.md) for the full breakdown and [frontend-plan.md](frontend-plan.md) for the overall plan.
+Archive of tasks from `frontend-tasks.md` as they are completed. See [frontend-tasks.md](../frontend-tasks.md) for the full breakdown and [frontend-plan.md](frontend-plan.md) for the overall plan.
 
 ## Overview
 

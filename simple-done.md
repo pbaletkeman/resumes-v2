@@ -3124,3 +3124,36 @@ touched, so `pytest`/`ruff`/`pyright`/`tsc`/`npm test` are unaffected. `git
 diff` confirms changes are limited to the six markdown files above.
 
 **Commit:** `simplify: phase 19 - classify root scratch notes as archive vs actionable (19.4)`
+
+---
+
+## Phase 19 - Follow-up: archives moved to `scratch/` (user-approved)
+
+**Approved by the user** (the "Recommended follow-up (not executed)" above).
+The eight archived notes were moved out of the repo root into `scratch/` with
+`git mv` (history preserved); the actionable `frontend-tasks.md` remains in the
+root. No file was deleted.
+
+- Moved: `bots.md`, `frontend-plan.md`, `frontend-tasks-done.md`,
+  `resume-done.md`, `resume-todo.md`, `resume-verify.md`,
+  `resume-web-todo.md`, `web-files-todo.md` → `scratch/`.
+- **Reference fixes** (so no link points at a moved path):
+  - `frontend-tasks.md` (root) — `frontend-tasks-done.md` / `frontend-plan.md`
+    → `scratch/`-prefixed.
+  - `scratch/frontend-tasks-done.md` — link back to root
+    `frontend-tasks.md` → `../frontend-tasks.md`.
+  - `README.md` — 4 scratch-note rows → `scratch/`-prefixed.
+  - `AGENTS.md` — `resume-done.md` / `resume-todo.md` → `scratch/`-prefixed.
+  - `docs/agents.md`, `docs/architecture.md` — `resume-done.md` / `bots.md` →
+    `scratch/`-prefixed.
+  - `simple.md` — inventory table notes the `scratch/` move; 19.4 line gains an
+    "Update (user OK'd)" note.
+- Cross-references *within* `scratch/` (e.g. `resume-todo.md` →
+  `resume-done.md`) still resolve as relative links — no changes needed.
+
+**Behavior verification:** documentation-only move — no Python/TS source
+touched; `pytest`/`ruff`/`pyright`/`tsc`/`npm test` unaffected. Root file map
+is now: `AGENTS.md`, `README.md`, `simple.md`, `simple-done.md`, `frontend-tasks.md`
+(plus code) — the archived scratch notes live under `scratch/`.
+
+**Commit:** `simplify: phase 19 - move archived root scratch notes to scratch/ (19.4 follow-up)`

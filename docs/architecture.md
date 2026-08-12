@@ -150,5 +150,5 @@ When `candidate_name` is empty, rendering is skipped and `output_files` is `{}`.
 - `config/agents.py` — environment-driven agent-to-model selection.
 - `client/agents/` — the dedicated agent classes (`jd_parsing.py`, `resume_parsing.py`, `gap_analysis.py`, `resume_rewrite.py`, `ats_compliance.py`, `tone_polishing.py`, `cover_letter.py`).
 - `pipeline.py` — `AgentRunner`, `run_resume_pipeline`, `_run_pipeline_core`, `create_runner_from_config`, `DEFAULT_AGENT_CLASSES`, sample run.
-- `docs/logging-info.md` logging setup; `resume-done.md` completed work; `bots.md` pipeline description.
+- `docs/logging-info.md` logging setup; `scratch/resume-done.md` completed work; `scratch/bots.md` pipeline description.
 - `app/main.py` — FastAPI web layer exposing the same core pipeline.

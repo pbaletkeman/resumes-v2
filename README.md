@@ -276,10 +276,10 @@ app/                       # FastAPI web API layer
 - `docs/agents.md` - Agent-by-agent reference (prompts, input/output schemas, fallbacks)
 - `docs/usage.md` - Quickstart, model configuration, adding custom agents
 - `docs/api.md` - API reference (`ModelClient`, agents, `ResumeRenderer`, formatters)
-- `resume-done.md` - Completed work archive (all phases 1-10 complete)
-- `resume-todo.md` - Remaining work (project complete - pointer to `resume-done.md`)
-- `resume-web-todo.md` - Web API (FastAPI) work log
-- `web-files-todo.md` - File-management endpoint work log
+- `scratch/resume-done.md` - Completed work archive (all phases 1-10 complete)
+- `scratch/resume-todo.md` - Remaining work (project complete - pointer to `resume-done.md`)
+- `scratch/resume-web-todo.md` - Web API (FastAPI) work log
+- `scratch/web-files-todo.md` - File-management endpoint work log
 
 ## Test coverage
 

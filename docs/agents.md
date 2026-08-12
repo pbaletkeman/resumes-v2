@@ -374,4 +374,4 @@ Triggers when: empty input, both LLM attempts failed, or the letter was rejected
 - `client/json_utils.py` — `parse_json_response`, `load_json_safe`, `model_to_json_schema`.
 - `client/templates/` (Jinja2 templates) and `client/templates/renderer.py` (`ResumeRenderer`) — turn the agent outputs into files.
 - `pipeline.py` — `_run_pipeline_core` orchestrates the chain (see `docs/architecture.md`).
-- `docs/architecture.md` — system overview + data flow. `resume-done.md` — completed work.
+- `docs/architecture.md` — system overview + data flow. `scratch/resume-done.md` — completed work.
