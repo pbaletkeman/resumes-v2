@@ -738,7 +738,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 10.5 `tasks.py`: thread/loop-safety notes; `schemas.py`: field descriptions. ✅ See `simple-done.md`.
 - [x] 10.6 Guardrails (watch all `test_web_*.py`), move to `simple-done.md`, commit. ✅ See `simple-done.md`.
 
-### Phase 11 - Backend tests & scratch scripts
+### Phase 11 - Backend tests & scratch scripts ✅ COMPLETED
 
 - [x] 11.1 `tests/conftest.py` (190): fixture names read clearly, documented.
 - [x] 11.2 Audit per-agent contract tests assert behavior over implementation.
@@ -747,7 +747,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 11.5 File-top comment per test file (what it covers, key fixture/hook).
 - [x] 11.6 Guardrails: full `uv run pytest` green + `uv run ruff check .`, move to `simple-done.md`, commit.
 
-### Phase 12 - Frontend API layer
+### Phase 12 - Frontend API layer ✅ COMPLETED
 
 - [x] 12.1 `client.ts`: extract `_detailString(detail)` / `_detailArray(detail)` from `parseErrorDetail` with JSDoc.
 - [x] 12.2 `hooks.ts`: document polling lifecycle, why files query invalidates, when `onDone` fires, `refetchInterval` predicate.
@@ -755,14 +755,14 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 12.4 `download.ts`: document the URL it builds.
 - [x] 12.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `api/client.test.ts`, `api/hooks.test.ts`).
 
-### Phase 13 - Result data coercion + shared result parts
+### Phase 13 - Result data coercion + shared result parts ✅ COMPLETED
 
 - [x] 13.1 `coerce.ts`: one-line JSDoc on every export (what it tolerates/returns); expand dense `pick*` one-liners.
 - [x] 13.2 `parts.tsx`: document props/behavior of each shared renderer.
 - [x] 13.3 Module header: "backend result dicts are loosely typed; these helpers coerce unknown shapes safely".
 - [x] 13.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
 
-### Phase 14 - Results tabs (8 components)
+### Phase 14 - Results tabs (8 components) ✅ COMPLETED
 
 - [x] 14.1 `ResultsTabView.tsx`: comment tying `TAB_KEYS` to the 7-agent output keys/order.
 - [x] 14.2 Each tab: one-line header (what it shows + which pipeline field); consistent use of `coerce.ts` helpers.
@@ -770,7 +770,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 14.4 Extract repeated row/label markup into `parts.tsx` when it appears in 2+ tabs.
 - [x] 14.5 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `ATSTab.test.tsx`, `DownloadsRow.test.tsx`).
 
-### Phase 15 - Run page & form helpers
+### Phase 15 - Run page & form helpers ✅ COMPLETED
 
 - [x] 15.1 Extract `isTaskActive(status)` and reuse in button `disabled`/`label`, status panel, etc.
 - [x] 15.2 Extract `taskStatusLabel` + status-severity map next to `STATUS_SEVERITY`.
@@ -779,14 +779,14 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 15.5 `runForm.ts`: JSDoc on `validateRunInputs`/`buildRunFormData`; document "text wins over file" matches backend `_read_text_input`.
 - [x] 15.6 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `RunPage.test.tsx`).
 
-### Phase 16 - Files page
+### Phase 16 - Files page ✅ COMPLETED
 
 - [x] 16.1 Split into named sections (file-table config, filter bar, delete selection, toolbar) via banner comments or a `FileTable` component.
 - [x] 16.2 Name state by intent (`selectedKeys`, `fileTypeFilter`, `searchQuery`, `page`).
 - [x] 16.3 Header comment: generated-vs-uploaded toggle; how downloads/delete map to the two listing kinds.
 - [x] 16.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `FilesPage.test.tsx`).
 
-### Phase 17 - Models page, App shell, theme, toast, entry
+### Phase 17 - Models page, App shell, theme, toast, entry ✅ COMPLETED
 
 - [x] 17.1 `App.tsx`: header comment walking the routing tree (Shell + nav + routes).
 - [x] 17.2 `ModelsPage.tsx`: header comment.
@@ -796,7 +796,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 17.6 `test/setup.ts` + `test/utils.tsx`: document the shared render helper (router/provider wrappers).
 - [x] 17.7 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
 
-### Phase 18 - Frontend tests
+### Phase 18 - Frontend tests ✅ COMPLETED
 
 - [x] 18.1 File-top comment per test file stating the unit under test.
 - [x] 18.2 Extract repeated setup (mocked fetch, wrapped renders) into `test/utils.tsx` where it appears in 2+ files.
