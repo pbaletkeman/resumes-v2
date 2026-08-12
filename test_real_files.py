@@ -224,7 +224,7 @@ def _assert_output_files(result: dict[str, Any]) -> None:
         exists = path.is_file()
         non_empty = exists and path.stat().st_size > 0
         _check(f"{key} written non-empty", exists and non_empty, str(path))
-    pattern = re.compile(r"^\d{8}_\d{4}_[a-z0-9-]+_[a-z0-9-]+_(resume|cover_letter)\.")
+    pattern = re.compile(r"^\d{8}_\d{4}_[a-z0-9-]+_[a-z0-9-]+_(resume|cover[-_]letter)\.")
     _check(
         "output filename pattern",
         all(pattern.search(path.name) for path in files.values()),

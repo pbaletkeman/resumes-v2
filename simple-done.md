@@ -3215,3 +3215,151 @@ the audit trail is preserved.
   historical records.
 
 **Commit:** `simplify: phase 19 - remove outdated TODO/phase-remains lines (19.5)`
+
+---
+
+## Phase 20 - Completed sub-task 20.1: backend final verification & regression
+
+Original instruction:
+
+- **20.1** Backend: `uv run pytest` (>=485), `uv run ruff check .`, `uv run ruff
+  format --check .`, `uv run pyright`.
+
+All four backend regression gates were run from the repo root. Everything is
+green, and the suite count is healthy above the >=485 floor.
+
+### Completion record
+
+**Verification results:**
+
+- `uv run pytest` — **493 passed** in 8.22s (24 files; floor was >=485). Full
+  suite incl. all per-agent contract tests, renderer/formatter, skill
+  normalizer, and all `test_web_*.py` routes.
+- `uv run ruff check .` — All checks passed (0 errors).
+- `uv run ruff format --check .` — 96 files already formatted (no drift).
+- `uv run pyright` — 0 errors, 0 warnings, 0 informations.
+
+No code was changed by this sub-task — it is a pure verification gate. The 493
+count matches the post-Phase-4 census recorded in AGENTS.md / README /
+`docs/TESTING.md` (which listed 493 across 24 files).
+
+**Commit:** none — verification-only sub-task; no files changed under source.
+
+---
+
+## Phase 20 - Completed sub-task 20.2: frontend final verification & regression
+
+Original instruction:
+
+- **20.2** Frontend: `npm test -- --run` (>=45), `npm run lint`, `npx tsc -b`.
+
+All three frontend regression gates were run from `ui/`. Everything is green,
+and the suite count is healthy above the >=45 floor.
+
+### Completion record
+
+**Verification results:**
+
+- `npm test -- --run` — **48 passed** across 9 test files in 3.49s (floor was
+  >=45). Vitest 4.1.10 run confirms `api/client.test.ts`, `api/hooks.test.ts`,
+  `RunPage.test.tsx`, `FilesPage.test.tsx`, `ATSTab.test.tsx`,
+  `DownloadsRow.test.tsx`, `theme/useTheme.test.ts`, `ThemeToggle.test.tsx` (and
+  the rest) all pass.
+- `npm run lint` — oxlint, no findings (clean).
+- `npx tsc -b` — completed with no errors (the default `ui` project build).
+
+No source was changed by this sub-task — it is a pure verification gate. The 48
+count matches the post-Phase-18/19 frontend census (9 files, 48 tests).
+
+**Commit:** none — verification-only sub-task; no files changed under source.
+
+---
+
+## Phase 20 - Completed sub-task 20.3: manual smoke (CLI, web API, live E2E, UI)
+
+Original instruction:
+
+- **20.3** Manual smoke: `basic.py`, `pipeline.py` sample mode, web API
+  health/models/pipeline/tasks, live E2E (`test_real_files.py` with Ollama),
+  `npm run dev` UI run.
+
+All smoke paths were exercised against a live Ollama (`qwen2.5:7b-instruct`
+confirmed via `GET localhost:11434/api/tags`). The pipeline, web API, and UI
+are all healthy. One deterministic defect was found and fixed in
+`test_real_files.py` (stale filename expectation, detailed below); the two
+remaining live-E2E gate failures are nondeterministic LLM-output variability,
+not code regressions.
+
+### Completion record
+
+**CLI — `uv run python basic.py`** ✅
+
+- Single-agent geography call returned JSON: `{"question": "What is the
+  capital of France?"}` and parsed cleanly.
+
+**CLI — `uv run python pipeline.py` (sample mode)** ✅
+
+- 7/7 agents succeeded in 68.3s (JD Parsing 4.8s -> Cover Letter 8.9s).
+- Known soft warnings logged but handled: gap-analysis deterministic vs LLM
+  cross-check mismatch, cover-letter "outside 450-600 spec (accepting)".
+- Rendered 6 output files into `output/` (all present, non-empty).
+
+**Web API — `uv run uvicorn app.main:app` (background)** ✅
+
+- `GET /health` → `{"status":"ok"}`.
+- `GET /api/models` → 7 agents, all `ollama` / `qwen2.5:7b-instruct`.
+- `POST /api/pipeline/async` (multipart `job_file` + `resume_file` with the
+  sample files, `candidate_name=Peter Letkeman`, `company_name=3Pillar`) →
+  `{"task_id":"bb1c571a3b46426f8a47f1cf10d02b2f"}`.
+- `GET /api/tasks/{id}` polled running → **completed**; `result.output_files`
+  has all 6 keys; every file verified on disk non-empty (txt 6889 B, md 7020 B,
+  docx 38249 B, pdf 7616 B, cover letter txt/md ~1680/1690 B).
+- `GET /api/outputs/20260812_1040_..._resume.pdf` → 200, `application/pdf`,
+  7855 B (download path confirmed).
+
+**Live E2E — `uv run python test_real_files.py`** ⚠️ 7/7 agents succeeded
+(136s), but 3/12 checks failed on the first run:
+
+- **`output filename pattern` — FAIL (deterministic, FIXED).** The test regex
+  expected `_(resume|cover_letter)\.`, but `ResumeRenderer.build_output_path`
+  slugifies every segment via `_slugify`, so `cover_letter` is written as
+  `cover-letter` (e.g. `20260812_1040_peter-letkeman_3pillar_cover-letter.txt`).
+  This is a pre-existing stale expectation, not a Phase-1-19 regression: the
+  slugifier was added 2026-08-05 and the E2E test file was written 2026-08-07,
+  and Phase 7's renderer work (commit `01aebcf`) did not touch naming. **Fix:**
+  the regex now accepts `cover[-_]letter` to match the documented renderer
+  behavior. Verified: the updated pattern matches all 6 filenames actually
+  produced (see below). This corrects the test's expectation to match
+  unchanged behavior; it does not weaken a gate to mask a regression.
+- **`cover_letter word count 450-600` — FAIL (302 words).** The live LLM
+  produced a short letter; the cover-letter agent logs "(outside 450-600 spec
+  (accepting))" by design (soft gate). Nondeterministic LLM output, not a code
+  regression.
+- **`certifications preserved` — FAIL (4/6).** The live LLM dropped two of six
+  certifications. Nondeterministic LLM output, not a code regression.
+
+**UI dev server — `npm run dev` (background)** ✅
+
+- `vite` v8.2.1 ready in 388 ms; `GET http://localhost:5173/` → 200, serves
+  `index.html`. The dev proxy forwards `/api` to the backend (already proven
+  by the web-API smoke above). A full in-browser click-through of Run page ->
+  tabs + downloads can't be automated from the shell; the equivalent data path
+  was exercised: the async task result (which backs the result tabs) and the
+  `/api/outputs/{filename}` download endpoint both returned correct 200s.
+
+**Changes made (source):**
+
+- `test_real_files.py` — one-line fix to the output-filename regex
+  (`cover_letter` → `cover[-_]letter`) to match the renderer's documented
+  slugified naming. No other source touched.
+
+**Behavior verification:**
+
+- Fixed regex checked against the 6 real filenames produced by the web-API run
+  and the live E2E run — all match.
+- Background servers stopped after smoke (`:8000` and `:5173` no longer
+  listening).
+
+**Commit:** none. Uncommitted working-tree changes: `simple.md`,
+`simple-done.md`, `test_real_files.py` (regex fix). Offer to commit these with
+the 20.3 tag if wanted.

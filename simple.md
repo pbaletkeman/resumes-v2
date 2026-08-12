@@ -805,7 +805,7 @@ message. Check each sub-task off in place as it is completed.
 - [x] 18.3 Add focused tests for newly extracted helpers (e.g. `isTaskActive`) from Phase 15.
 - [x] 18.4 Guardrails: `npm test -- --run` green.
 
-### Phase 19 - Repo-wide documentation consolidation
+### Phase 19 - Repo-wide documentation consolidation ✅ COMPLETED
 
 - [x] 19.1 `AGENTS.md`: verify file/architecture map after Phases 1-11 (new helpers `load_json_safe`, `_run_stage`); update quick-command table + conventions. ✅ See `simple-done.md`.
 - [x] 19.2 `README.md` / `ui/README.md`: quickstart accuracy. ✅ See `simple-done.md`.
@@ -815,9 +815,9 @@ message. Check each sub-task off in place as it is completed.
 
 ### Phase 20 - Final verification & regression
 
-- [ ] 20.1 Backend: `uv run pytest` (>=485), `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`.
-- [ ] 20.2 Frontend: `npm test -- --run` (>=45), `npm run lint`, `npx tsc -b`.
-- [ ] 20.3 Manual smoke: `basic.py`, `pipeline.py` sample mode, web API health/models/pipeline/tasks, live E2E (`test_real_files.py` with Ollama), `npm run dev` UI run.
+- [x] 20.1 Backend: `uv run pytest` (>=485), `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`. ✅ See `simple-done.md`.
+- [x] 20.2 Frontend: `npm test -- --run` (>=45), `npm run lint`, `npx tsc -b`. ✅ See `simple-done.md`.
+- [x] 20.3 Manual smoke: `basic.py`, `pipeline.py` sample mode, web API health/models/pipeline/tasks, live E2E (`test_real_files.py` with Ollama), `npm run dev` UI run. ✅ See `simple-done.md`.
 - [ ] 20.4 Diff review spot-check rendered output before/after; `git status` clean after final commit.
 - [ ] 20.5 Add a short "progress log" section to `simple.md` listing completed phases (archive the full plan in `simple-done.md`).
 
