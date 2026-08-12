@@ -2796,3 +2796,63 @@ Phase 18 - frontend tests and the Part C closing phases remain).
   clear + OS re-follow, override-supersedes-OS, toggle options + selection)
 
 **Commit:** `simplify: phase 17 - App shell/theme/toast/entry/test helper docs (17.1-17.6)`
+
+---
+
+## Phase 18 - Completed sub-tasks 18.1-18.4: frontend tests
+
+Original instructions:
+
+- **18.1** File-top comment per test file stating the unit under test.
+- **18.2** Extract repeated setup (mocked fetch, wrapped renders) into `test/utils.tsx` where it appears in 2+ files.
+- **18.3** Add focused tests for newly extracted helpers (e.g. `isTaskActive`) from Phase 15.
+- **18.4** Guardrails: `npm test -- --run` green (45 passed).
+
+This closes Phase 18. Every frontend test file is now self-describing, the one
+fetch-mock setup duplicated across two files lives in `test/utils.tsx`, and the
+Phase 15 status helpers have direct unit coverage. Test count rose from 45 to
+**48** (three new focused tests in 18.3), the only intentional behavior change
+to the suite.
+
+### Completion record
+
+**Changes made:**
+
+- **18.1 (file-top comments)** — added a header comment to all 9 test files
+  stating the unit under test and key setup:
+  - `api/client.test.ts` (runForm builders, client fetch wrappers, download URL helpers)
+  - `api/hooks.test.ts` (useModels / useFiles / useDeleteFiles under a test QueryClient)
+  - `pages/RunPage.test.tsx` (form flow + the Phase 15 status helpers)
+  - `pages/FilesPage.test.tsx` (row rendering + delete flow)
+  - `pages/ModelsPage.test.tsx` (rows + failure/empty states)
+  - `pages/results/DownloadsRow.test.tsx` (per-key download links)
+  - `pages/results/ATSTab.test.tsx` (score severity bands + missing score)
+  - `theme/useTheme.test.ts` (resolveTheme + persistence/system-follow behavior)
+  - `theme/ThemeToggle.test.tsx` (mode options, persistence, System override removal)
+- **18.2 (shared setup extraction)** — added `stubFetch(handler)` to
+  `test/utils.tsx`: a handler-driven `window.fetch` mock that resolves
+  `ok:true`/`status 200` and returns per-URL JSON, exactly the setup that was
+  duplicated verbatim in `FilesPage.test.tsx` (`stubFetch`) and
+  `api/hooks.test.ts` (local `fetchMock`, which did not even stub the global —
+  the call site did). Both files now import and use the shared helper;
+  `hooks.test.ts` deleted its local copy and its call-site
+  `vi.stubGlobal('fetch', mock)`.
+- **18.3 (focused tests for extracted helpers)** — the Phase 15 status helpers
+  `isTaskActive` + `taskStatusLabel` (plus `STATUS_SEVERITY` /
+  `TASK_STATUS_LABEL`) moved out of `RunPage.tsx` into a new pure module
+  `ui/src/pages/runStatus.ts` (mirrors `runForm.ts` and keeps the component file
+  free of non-component exports, which also satisfies oxlint's
+  `react(only-export-components)` rule). `RunPage.tsx` imports them from there.
+  Added two focused `describe` blocks in `RunPage.test.tsx` (4 assertions each):
+  `isTaskActive` (unknown/pending/running true; completed/failed false) and
+  `taskStatusLabel` (Pending/Running/Completed/Failed; unknown -> "Pending").
+- Test bodies otherwise unchanged; only comments, imports, and the helper move.
+
+**Behavior verification (18.4):**
+
+- `npm test -- --run` — **48 passed** across 9 test files (45 baseline + 3 new)
+- `npx vitest run src/pages/RunPage.test.tsx src/pages/FilesPage.test.tsx src/api/hooks.test.ts` — 11 passed
+- `npm run lint` (oxlint) — pass (no warnings)
+- `npx tsc -b` — pass (0 errors)
+
+**Commit:** `simplify: phase 18 - frontend test headers + shared stubFetch + status helper tests (18.1-18.3)`

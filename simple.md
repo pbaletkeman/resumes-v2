@@ -798,10 +798,10 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 18 - Frontend tests
 
-- [ ] 18.1 File-top comment per test file stating the unit under test.
-- [ ] 18.2 Extract repeated setup (mocked fetch, wrapped renders) into `test/utils.tsx` where it appears in 2+ files.
-- [ ] 18.3 Add focused tests for newly extracted helpers (e.g. `isTaskActive`) from Phase 15.
-- [ ] 18.4 Guardrails: `npm test -- --run` green (45 passed).
+- [x] 18.1 File-top comment per test file stating the unit under test.
+- [x] 18.2 Extract repeated setup (mocked fetch, wrapped renders) into `test/utils.tsx` where it appears in 2+ files.
+- [x] 18.3 Add focused tests for newly extracted helpers (e.g. `isTaskActive`) from Phase 15.
+- [x] 18.4 Guardrails: `npm test -- --run` green.
 
 ### Phase 19 - Repo-wide documentation consolidation
 
