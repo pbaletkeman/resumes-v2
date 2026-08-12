@@ -3474,6 +3474,49 @@ verbatim into this file (section "Archive: Full Simplification Plan" below).
 
 ---
 
+## Phase 21 - Completed sub-task 21.1: root README < 500 lines + 10-minute quickstart
+
+Original instruction:
+
+- **21.1** Root README.md needs to be less than 500 lines with a quickstart
+  section that explains how to get started in 10 minutes or less and links to
+  a detailed README.md file.
+
+### Completion record
+
+**Changes made (markdown only, no source touched):**
+
+- `README.md` was already 308 lines (well under the 500-line cap); it was
+  restructured, not shortened for size alone, so the quickstart is now the
+  focal entry point. Final length: **335 lines**.
+- Added a pointer bockquote right after the intro: "Looking for the full
+  guide? ... **[docs/README.md](docs/README.md)**" — the forward link to the
+  detailed README that 21.2 creates in `docs/`. Also linked again from the new
+  quickstart's closing "Done? Keep going" block.
+- Replaced the old two-line "Quick start" with **"Quickstart — up and running
+  in 10 minutes or less"**: five numbered, time-boxed steps —
+  1. Prerequisites (0-5 min): Python 3.14+, uv, Ollama on `localhost:11434` +
+     `ollama pull qwen2.5:7b-instruct`, `curl` verify;
+  2. Install dependencies (1 min): `uv sync`;
+  3. Run the sample pipeline (1-2 min): `uv run python pipeline.py`;
+  4. Run it on your own resume (1-2 min): `--resume`/`--job-description`
+     (plus `--candidate-name`/`--company-name`/`--jd` behaviour folded in);
+  5. Try the web UI (2-3 min): `uvicorn app.main:app --reload` + `npm run dev`.
+- Kept the deep-dive sections (Usage table, Web API + routes, pipeline Mermaid
+  diagram, Architecture tree, Configuration, Project structure, Test coverage)
+  below the quickstart, so everything reachable from one page while the full
+  reference moves to `docs/README.md` in 21.2.
+
+**Behavior verification:**
+
+- Documentation-only change — no Python/TS source touched.
+- `README.md` line count confirmed **335** (< 500).
+- `git diff --stat` limited to `README.md` + the two plan-tracker files.
+
+**Commit:** `simplify: phase 21 - root README quickstart restructure + docs link (21.1)`
+
+---
+
 # Archive: Full Simplification Plan (from simple.md)
 
 The original full plan (title, guiding rules, file inventory, phase specs, and

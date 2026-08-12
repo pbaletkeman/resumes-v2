@@ -2,6 +2,10 @@
 
 Multi-agent resume optimization pipeline. 7 sequential agents transform a job description + resume into an ATS-optimized resume and tailored cover letter. The pipeline is also exposed as a FastAPI web API (`app/`) with sync/async runs plus file listing and management.
 
+> **Looking for the full guide?** Deep-dive installation, every CLI flag, common
+> issues, and the complete API reference live in
+> **[docs/README.md](docs/README.md)**. This page is the lean quickstart.
+
 ## Prerequisites
 
 - Python 3.14+
@@ -9,17 +13,42 @@ Multi-agent resume optimization pipeline. 7 sequential agents transform a job de
 - [Ollama](https://ollama.com/) running on `localhost:11434`
 - Model pulled: `ollama pull qwen2.5:7b-instruct`
 
-## Quick start
+## Quickstart — up and running in 10 minutes or less
+
+**Total: ~10 minutes**, most of it waiting on `uv sync` and the first model
+pull. Steps 1-2 set the environment; steps 3-5 are the fun part.
+
+### 1. Prerequisites (0-5 min)
+
+- **Python 3.14+**
+- **[uv](https://docs.astral.sh/uv/)** installed
+- **[Ollama](https://ollama.com/)** running on `localhost:11434` with the model
+  pulled:
+
+  ```bash
+  ollama pull qwen2.5:7b-instruct
+  ```
+
+  Verify Ollama answers: `curl http://localhost:11434/api/tags` should list
+  `qwen2.5:7b-instruct`.
+
+### 2. Install dependencies (1 min)
 
 ```bash
 uv sync
+```
+
+### 3. Run the sample pipeline (1-2 min)
+
+```bash
 uv run python pipeline.py
 ```
 
-### Run with your own files from the command line
+This runs all 7 agents (JD parsing -> resume parsing -> gap analysis ->
+rewrite -> ATS -> polish -> cover letter) on the bundled sample files and
+prints the polished resume and cover letter to stdout.
 
-`pipeline.py` accepts the resume and job-description file paths as arguments
-(no need to edit placeholder text in the code):
+### 4. Run it on your own resume (1-2 min)
 
 ```bash
 uv run python pipeline.py \
@@ -27,22 +56,12 @@ uv run python pipeline.py \
   --job-description sample/jobs/3Pillar.txt
 ```
 
-Optional arguments:
+Passing `--candidate-name "Peter Letkeman"` (optional `--company-name "3Pillar"`)
+also renders `.txt`/`.md`/`.docx`/`.pdf` files into `output/`. `--jd` is
+shorthand for `--job-description`. File mode requires both `--resume` and
+`--job-description`; the no-argument form still runs the sample demo.
 
-- `--candidate-name "Peter Letkeman"` — enables rendering output files
-  (written to `output/`); also used in rendered headers.
-- `--company-name "3Pillar"` — used in rendered output filenames.
-- `--jd` — shorthand for `--job-description`; `-h`/`--help` prints usage.
-
-The pipeline prints the polished resume and cover letter to stdout. When
-`--candidate-name` is supplied it also renders files into `output/` and lists
-them. File-mode requires both `--resume` and `--job-description`; the
-no-argument form still runs the placeholder `sample_run()` demo.
-
-### Run with the web UI
-
-The repo ships a React frontend in `ui/`. It proxies `/api` and `/health` to
-the backend during development. Two-terminal quickstart (from the repo root):
+### 5. Try the web UI (2-3 min)
 
 ```bash
 # terminal 1 — backend
@@ -54,7 +73,15 @@ npm install
 npm run dev
 ```
 
-Then open the Vite URL. See `ui/README.md` for the full frontend guide.
+Open the Vite URL shown in terminal 2, run a pipeline on the Run page, watch
+the result tabs, then download the rendered files. FastAPI docs live at
+`http://localhost:8000/docs`. See `ui/README.md` for the frontend guide.
+
+### Done? Keep going
+
+- Full command reference, model config, per-agent deep dives, troubleshooting,
+  and API docs: **[docs/README.md](docs/README.md)**.
+- The 7-agent flow and repo layout are summarised in the sections below.
 
 ## Usage
 

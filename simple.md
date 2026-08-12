@@ -41,7 +41,7 @@ clean.
 
 ### Phase 21 - Documentation Cleanup
 
-- [ ] 21.1 Root README.md needs to be less than 500 lines with a quickstart section that explains to to get started in 10 minutes or less and links to detailed README.md file
+- [x] 21.1 Root README.md needs to be less than 500 lines with a quickstart section that explains to to get started in 10 minutes or less and links to detailed README.md file ✅ See `simple-done.md`.
 - [ ] 21.2 Create a more expansive/detailed README.md in the docs directory which contains:
   - [ ] 21.2.1 Detailed instructions on how to get started
   - [ ] 21.2.2 Detailed examples on all command line switches/options
