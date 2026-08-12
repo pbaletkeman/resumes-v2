@@ -13,6 +13,13 @@ import { useToast } from '../toast/ToastContext'
 
 type FileKind = 'generated' | 'uploaded'
 
+// ---------------------------------------------------------------------------
+// File listing configuration
+// ---------------------------------------------------------------------------
+// The listing-kind toggle, the search/type/sort filter choices, and the
+// page-size options offered by the lazy DataTable paginator. All four drive
+// the query params passed to `useFiles(kind, params)`.
+
 const KIND_OPTIONS: { label: string; value: FileKind }[] = [
   { label: 'Generated', value: 'generated' },
   { label: 'Uploaded', value: 'uploaded' },
@@ -40,6 +47,19 @@ const SORT_OPTIONS = [
   { label: 'Name Z-A', value: 'name_desc' },
 ]
 
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a byte count as a human-readable size ("512 B", "2.0 KB", "1.5 MB").
+ *
+ * Args:
+ *   bytes: The file size in bytes (non-negative).
+ *
+ * Returns:
+ *   The formatted size string.
+ */
 function formatSize(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`
@@ -51,20 +71,44 @@ function formatSize(bytes: number): string {
   return `${(kb / 1024).toFixed(1)} MB`
 }
 
+/**
+ * The Files page: browse generated outputs and uploaded source files.
+ *
+ * The TabMenu toggles the listing kind: 'generated' queries
+ * ``GET /api/files/generated``, 'uploaded' queries ``GET /api/files/uploaded``
+ * (both via `useFiles`). Rows are filtered by search text / file type / sort
+ * on the backend, with the lazy paginator fetching one page at a time.
+ *
+ * Downloads use `fileDownloadUrl(row.path)` (``GET /api/outputs/{basename}``);
+ * deletions send the selected row paths to ``DELETE /api/files``. Both work
+ * the same for the two kinds, and the delete mutation invalidates the
+ * listings so the table reflects the change. Switching kinds resets the page
+ * and clears the selection.
+ */
 function FilesPage() {
+  // --- state -----------------------------------------------------------------
+
   const [kind, setKind] = useState<FileKind>('generated')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [q, setQ] = useState<{ value: string; applied: string }>({ value: '', applied: '' })
-  const [fileType, setFileType] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState<{ value: string; applied: string }>({
+    value: '',
+    applied: '',
+  })
+  const [fileTypeFilter, setFileTypeFilter] = useState<string | null>(null)
   const [sort, setSort] = useState('newest')
-  const [selected, setSelected] = useState<FileMeta[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<FileMeta[]>([])
   const [confirmVisible, setConfirmVisible] = useState(false)
   const { show } = useToast()
 
+  // --- data queries ----------------------------------------------------------
+
+  // Lazy listing for the current kind. The search box keeps the typed `value`
+  // separate from the `applied` text so only an explicit search (button or
+  // Enter key) triggers a new request against the backend.
   const query = useFiles(kind, {
-    q: q.applied || undefined,
-    file_type: fileType ?? undefined,
+    q: searchQuery.applied || undefined,
+    file_type: fileTypeFilter ?? undefined,
     page,
     page_size: pageSize,
     sort,
@@ -74,11 +118,18 @@ function FilesPage() {
 
   const files: FileMeta[] = query.data?.items ?? []
 
+  // --- event handlers --------------------------------------------------------
+
+  /** Commit the typed search text and reset to the first page. */
   function applySearch() {
     setPage(1)
-    setQ((prev) => ({ ...prev, applied: prev.value.trim() }))
+    setSearchQuery((prev) => ({ ...prev, applied: prev.value.trim() }))
   }
 
+  /**
+   * Handle a DataTable paginator change: remember the page size when it
+   * changes and derive the 1-based page number from the first-row offset.
+   */
   function handlePage(event: { first: number; rows: number }) {
     if (event.rows !== pageSize) {
       setPageSize(event.rows)
@@ -86,15 +137,21 @@ function FilesPage() {
     setPage(event.first / event.rows + 1)
   }
 
+  /** Open the delete confirmation dialog for the selected files. */
   function confirmDelete() {
     setConfirmVisible(true)
   }
 
+  /**
+   * Execute the deletion of the selected files, close the dialog, and report
+   * the result: a success toast for the deleted count and a warn toast for any
+   * paths the backend reported missing.
+   */
   function handleDeleteAccept() {
-    const paths = selected.map((file) => file.path)
+    const paths = selectedFiles.map((file) => file.path)
     deleteMutation.mutate(paths, {
       onSuccess: (result) => {
-        setSelected([])
+        setSelectedFiles([])
         setConfirmVisible(false)
         if (result.deleted.length > 0) {
           show({
@@ -118,6 +175,9 @@ function FilesPage() {
     })
   }
 
+  // --- column renderers ------------------------------------------------------
+
+  // Download link: goes to the shared outputs route via the row path.
   const linkBody = (row: FileMeta) => (
     <a className="p-button p-button-sm p-button-secondary p-button-text" href={fileDownloadUrl(row.path)}>
       <span className="pi pi-download p-button-icon" />
@@ -133,9 +193,13 @@ function FilesPage() {
     <span className="files-size">{formatSize(row.size)}</span>
   )
 
+  // --- render ----------------------------------------------------------------
+
   return (
     <section className="files-page">
       <h1>Files</h1>
+
+      {/* Toolbar: listing-kind toggle plus search / type / sort filters */}
       <div className="files-toolbar">
         <TabMenu
           model={KIND_OPTIONS.map((option) => ({
@@ -146,15 +210,15 @@ function FilesPage() {
           onTabChange={(event) => {
             setKind(KIND_OPTIONS[event.index]?.value ?? 'generated')
             setPage(1)
-            setSelected([])
+            setSelectedFiles([])
           }}
         />
         <div className="files-filters">
           <span className="p-input-icon-left">
             <i className="pi pi-search" />
             <InputText
-              value={q.value}
-              onChange={(event) => setQ((prev) => ({ ...prev, value: event.target.value }))}
+              value={searchQuery.value}
+              onChange={(event) => setSearchQuery((prev) => ({ ...prev, value: event.target.value }))}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   applySearch()
@@ -164,10 +228,10 @@ function FilesPage() {
             />
           </span>
           <Dropdown
-            value={fileType}
+            value={fileTypeFilter}
             options={FILE_TYPE_OPTIONS}
             onChange={(event) => {
-              setFileType(event.value as string | null)
+              setFileTypeFilter(event.value as string | null)
               setPage(1)
             }}
             placeholder="Type"
@@ -185,22 +249,26 @@ function FilesPage() {
           />
         </div>
       </div>
+
+      {/* Delete action: enabled only while rows are selected */}
       <div className="files-actions">
         <Button
           type="button"
           icon="pi pi-trash"
-          label={selected.length > 0 ? `Delete selected (${selected.length})` : 'Delete selected'}
+          label={selectedFiles.length > 0 ? `Delete selected (${selectedFiles.length})` : 'Delete selected'}
           severity="danger"
           outlined
-          disabled={selected.length === 0 || deleteMutation.isPending}
+          disabled={selectedFiles.length === 0 || deleteMutation.isPending}
           onClick={confirmDelete}
         />
       </div>
+
+      {/* Table: lazy, paginated listing of the current kind */}
       <DataTable
         value={files}
         dataKey="path"
-        selection={selected}
-        onSelectionChange={(event) => setSelected(event.value as FileMeta[])}
+        selection={selectedFiles}
+        onSelectionChange={(event) => setSelectedFiles(event.value as FileMeta[])}
         selectionMode="checkbox"
         selectionPageOnly
         lazy
@@ -220,10 +288,12 @@ function FilesPage() {
         <Column header="Size" body={sizeBody} />
         <Column header="Link" body={linkBody} />
       </DataTable>
+
+      {/* Delete confirmation dialog */}
       <ConfirmDialog
         visible={confirmVisible}
         onHide={() => setConfirmVisible(false)}
-        message={`Delete ${selected.length} selected file(s)? This cannot be undone.`}
+        message={`Delete ${selectedFiles.length} selected file(s)? This cannot be undone.`}
         header="Confirm deletion"
         acceptLabel="Delete"
         rejectLabel="Cancel"
