@@ -2723,3 +2723,76 @@ This closes Phase 16 (Files page was the last remaining page-level phase before
   formatting; delete mutation with selected paths + result toasts)
 
 **Commit:** `simplify: phase 16 - files page sections + state naming + header docs (16.1-16.3)`
+
+---
+
+## Phase 17 - Completed sub-tasks 17.1-17.7: models page, App shell, theme, toast, entry, test helpers
+
+Original instructions:
+
+- **17.1** `App.tsx`: header comment walking the routing tree (Shell + nav + routes).
+- **17.2** `ModelsPage.tsx`: header comment.
+- **17.3** `theme/useTheme.ts` + `ThemeToggle.tsx`: document storage key + initial-state fallback.
+- **17.4** `toast/ToastProvider.tsx` + `ToastContext.ts`: document the `show` contract.
+- **17.5** `main.tsx`: document PrimeReact theme import + stylesheet dependency.
+- **17.6** `test/setup.ts` + `test/utils.tsx`: document the shared render helper (router/provider wrappers).
+- **17.7** Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
+
+This closes Phase 17 (all page/component/tooling files are now documented; only
+Phase 18 - frontend tests and the Part C closing phases remain).
+
+### Completion record
+
+**Changes made (documentation only, no behavior change):**
+
+- **17.1** `ui/src/App.tsx` — module docstring walking the nested render tree
+  (QueryClientProvider -> BrowserRouter -> ToastProvider -> Routes with the
+  `Shell` layout route and the Run /files /models children), plus a note on how
+  `NAV_ITEMS` drives the Menubar `NavLink`s (active highlighting via the
+  menuitem-link-active class; `end` only on "/" so other routes highlight their
+  own paths). JSDoc added to `NAV_ITEMS`, `Shell`, and `App`.
+- **17.2** `ui/src/pages/ModelsPage.tsx` — file header explaining the per-agent
+  model summary table (`useModels` -> `GET /api/models`), the provider-to-Tag
+  severity map (openai=info, ollama=success, unknown=warning), and that the
+  paginator only appears above 10 rows. JSDoc on `PROVIDER_SEVERITY`.
+- **17.3** `ui/src/theme/useTheme.ts` — module docstring documenting the
+  ``theme`` localStorage key, the initial-state fallback (valid stored value
+  wins, else ``'system'``), how the resolved scheme is applied via
+  ``document.documentElement.dataset.theme`` (the attribute vite.config.ts
+  scopes the dark PrimeReact stylesheet to), and that OS color-scheme changes
+  are followed only in ``'system'`` mode. JSDoc on `STORAGE_KEY`, `DARK_QUERY`,
+  `getSystemTheme`, `getStoredTheme` (returns null for absent/invalid stored
+  values), `resolveTheme`, and `useTheme`.
+  `ui/src/theme/ThemeToggle.tsx` — header comment (SelectButton bound to
+  `useTheme`; picking a mode persists to localStorage + applies the attribute)
+  and JSDoc on `OPTIONS`.
+- **17.4** `ui/src/toast/ToastContext.ts` — module docstring defining the
+  ``show`` contract (single `ToastMessage` or array, each fully formatted with
+  its own severity/summary) and ``clear`` (dismiss all), plus why `useToast`
+  throws outside the provider. JSDoc on `ToastApi` and `useToast`.
+  `ui/src/toast/ToastProvider.tsx` — header comment (renders the singleton
+  PrimeReact Toast and exposes show/clear via context; wrapped around routes
+  in App.tsx).
+- **17.5** `ui/src/main.tsx` — header comment documenting the PrimeReact
+  dependency: the lara-light-blue + lara-dark-blue theme stylesheets (dark one
+  scoped to `html[data-theme='dark']` by vite.config.ts and flipped at runtime
+  by useTheme), primereact.min.css, the primeicons font, and index.css; notes
+  the imports must stay before the render.
+- **17.6** `ui/src/test/setup.ts` — header comment (loaded via
+  vite.config.ts `test.setupFiles`; registers jest-dom matchers for every test
+  file). `ui/src/test/utils.tsx` — module docstring (render under a fresh
+  QueryClientProvider with retries disabled + `gcTime: Infinity`; tests add
+  their own router/toast wrappers on top; `stubMatchMedia` simulates OS
+  light/dark flips) and JSDoc on `createTestQueryClient`, `withClient`,
+  `renderWithClient`, and `stubMatchMedia`. All code bodies unchanged.
+
+**Behavior verification (17.7):**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files
+- `npx vitest run src/theme/useTheme.test.ts src/theme/ThemeToggle.test.tsx` —
+  9 passed (resolveTheme, initial fallback, stored override, persistence,
+  clear + OS re-follow, override-supersedes-OS, toggle options + selection)
+
+**Commit:** `simplify: phase 17 - App shell/theme/toast/entry/test helper docs (17.1-17.6)`

@@ -788,13 +788,13 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 17 - Models page, App shell, theme, toast, entry
 
-- [ ] 17.1 `App.tsx`: header comment walking the routing tree (Shell + nav + routes).
-- [ ] 17.2 `ModelsPage.tsx`: header comment.
-- [ ] 17.3 `theme/useTheme.ts` + `ThemeToggle.tsx`: document storage key + initial-state fallback.
-- [ ] 17.4 `toast/ToastProvider.tsx` + `ToastContext.ts`: document the `show` contract.
-- [ ] 17.5 `main.tsx`: document PrimeReact theme import + stylesheet dependency.
-- [ ] 17.6 `test/setup.ts` + `test/utils.tsx`: document the shared render helper (router/provider wrappers).
-- [ ] 17.7 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
+- [x] 17.1 `App.tsx`: header comment walking the routing tree (Shell + nav + routes).
+- [x] 17.2 `ModelsPage.tsx`: header comment.
+- [x] 17.3 `theme/useTheme.ts` + `ThemeToggle.tsx`: document storage key + initial-state fallback.
+- [x] 17.4 `toast/ToastProvider.tsx` + `ToastContext.ts`: document the `show` contract.
+- [x] 17.5 `main.tsx`: document PrimeReact theme import + stylesheet dependency.
+- [x] 17.6 `test/setup.ts` + `test/utils.tsx`: document the shared render helper (router/provider wrappers).
+- [x] 17.7 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`.
 
 ### Phase 18 - Frontend tests
 
