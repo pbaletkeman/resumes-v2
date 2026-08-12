@@ -2919,3 +2919,65 @@ table row points to.
   (unchanged by this doc-only phase)
 
 **Commit:** `simplify: phase 19 - AGENTS.md architecture map + conventions after phases 1-11 (19.1)`
+
+---
+
+## Phase 19 - Completed sub-task 19.2: README.md / ui/README.md quickstart accuracy
+
+Original instruction:
+
+- **19.2** `README.md` / `ui/README.md`: quickstart accuracy.
+
+Both readmes were verified against the running code and the actual repo tree.
+Every command in the quickstart, the usage table, and the web-API section was
+spot-checked; the route table matches `app/main.py`, sample paths exist
+(`sample/resume/Peter-Letkeman-Resume.txt`, `sample/jobs/3Pillar.txt`), the
+`--jd` shorthand and `--candidate-name`-enables-rendering claims match
+`pipeline.py`'s argparse, and the `output/`/`uploads/` git-ignore claim holds
+(`git check-ignore` returns both).
+
+### Completion record
+
+**Changes made (documentation only, no behavior/markdown-command change):**
+
+- **`README.md`** — fixed two drift spots in the architecture test listing
+  (both dates to after Phase 4/Phase 3 re-counts):
+  - `test_json_utils.py`: count corrected 15 -> **23** and the description now
+    names the Phase 4 `load_json_safe` helper.
+  - Added the previously omitted `test_web_spa.py` (8 tests, built-SPA mount +
+    catch-all fallback) so the `tests/` block lists all 24 files.
+  - Everything else verified accurate and left unchanged: quickstart commands
+    (`uv sync`, `pipeline.py`, two-terminal web-UI start), optional `--jd`
+    /`--candidate-name`/`--company-name` behavior, the 9-route API table vs.
+    `app/main.py`, the pipeline-flow diagram, the config env vars
+    (`MODEL_PROVIDER`/`MODEL_NAME`/per-agent overrides/`LOG_LEVEL`), and the
+    coverage commands (`pyproject.toml` `[tool.coverage.*]`).
+- **`ui/README.md`** — this was the untouched Vite scaffolding file (generic
+  "React + TypeScript + Vite" boilerplate with React-Compiler/Oxlint notes). The
+  root `README.md` points to it ("See `ui/README.md` for the full frontend
+  guide"), so it was **replaced** with a real frontend guide covering: what the
+  app does; the two-terminal quickstart (backend `uvicorn app.main:app` +
+  `npm run dev` dev proxy for `/api` and `/health`, confirmed in
+  `vite.config.ts`); production serving (FastAPI mounts `ui/dist` and falls back
+  to `index.html` for non-API routes when `ui/dist/index.html` exists, per
+  `app/main.py`); the command table (`npm run dev`/`build`/`lint`/`test`,
+  `test:watch`, `npx tsc -b`); the page/route table (`/` Run, `/files` Files,
+  `/models` Models, wired in `src/App.tsx`); the `src/` source layout with
+  one-line descriptions (api/ hooks + download, pages/, results/ tabs +
+  `TAB_KEYS` (the 7-agent tab order), theme localStorage `"theme"` key, toast,
+  test helpers); and
+  the dark-theme scoping note (`vite.config.ts` scopes `lara-dark-blue` to
+  `html[data-theme='dark']`). All claims cross-checked against the matching
+  source files (`App.tsx`, `main.tsx`, `useTheme.ts`, `download.ts`,
+  `runStatus.ts`/`runForm.ts`, `vite.config.ts`).
+
+**Behavior verification:**
+
+- `uv run pytest` — 493 passed (24 files)
+- `uv run ruff check .` — pass (no Python touched)
+- `ui/`: `npm test` — 48 passed across 9 files; `npm run lint`, `npx tsc -b` —
+  pass (docs-only change)
+- Manual re-read of each README section against the referenced module/route —
+  no remaining drift in the quickstart paths.
+
+**Commit:** `simplify: phase 19 - README + ui/README quickstart accuracy (19.2)`

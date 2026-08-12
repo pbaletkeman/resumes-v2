@@ -217,7 +217,7 @@ tests/
   test_resume_rewrite_validation.py # Resume Rewrite post-validation tests (63 tests)
   test_cover_letter_validation.py  # Cover Letter post-validation tests (109 tests)
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
-  test_json_utils.py               # shared parser + JSON Schema helper tests (15 tests)
+  test_json_utils.py               # shared parser + load_json_safe + JSON Schema helper tests (23 tests)
   test_formatter.py                # format_* helpers (41 tests)
   test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (43 tests)
   test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
@@ -235,6 +235,7 @@ tests/
   test_web_outputs.py              # Output file serving (3 tests)
   test_web_files.py                # File listing + deletion (11 tests)
   test_web_upload.py               # Text extraction unit (9 tests)
+  test_web_spa.py                  # Built-SPA mount + catch-all fallback (8 tests)
 test_real_files.py                 # Live 7-agent E2E test (requires Ollama)
 wip_testing/
   test_job_description.py  # JD Parsing Agent test
