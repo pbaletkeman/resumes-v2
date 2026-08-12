@@ -827,5 +827,8 @@ phase-tagged message. Check each sub-task off in place as it is completed.
   - [ ] 21.3.1 Detailed instructions on how to get started
   - [ ] 21.3.2 Detailed examples on all command line switches/options
   - [ ] 21.3.3 Common issues and fixes
-- [ ] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link to the
-- [ ] 21.5 No markdown linting errros in any of the markdown files
+- [ ] 21.4 Make sure that there is a README.md in the root UI/frontend directory
+- [ ] 21.5 Make sure that there is a README.md in the root directory
+- [ ] 21.6 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
+- [ ] 21.7 Ensure all markdown files are up to date.
+- [ ] 21.8 No markdown linting errros in any of the markdown files

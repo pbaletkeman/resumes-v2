@@ -30,7 +30,7 @@ uv run python pipeline.py \
 Optional arguments:
 
 - `--candidate-name "Peter Letkeman"` — enables rendering output files
-  (output as `output/`); also used in rendered headers.
+  (written to `output/`); also used in rendered headers.
 - `--company-name "3Pillar"` — used in rendered output filenames.
 - `--jd` — shorthand for `--job-description`; `-h`/`--help` prints usage.
 
@@ -38,6 +38,23 @@ The pipeline prints the polished resume and cover letter to stdout. When
 `--candidate-name` is supplied it also renders files into `output/` and lists
 them. File-mode requires both `--resume` and `--job-description`; the
 no-argument form still runs the placeholder `sample_run()` demo.
+
+### Run with the web UI
+
+The repo ships a React frontend in `ui/`. It proxies `/api` and `/health` to
+the backend during development. Two-terminal quickstart (from the repo root):
+
+```bash
+# terminal 1 — backend
+uv run uvicorn app.main:app --reload
+
+# terminal 2 — frontend
+cd ui
+npm install
+npm run dev
+```
+
+Then open the Vite URL. See `ui/README.md` for the full frontend guide.
 
 ## Usage
 
