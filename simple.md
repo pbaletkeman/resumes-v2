@@ -649,11 +649,13 @@ These three are the "input parsers" shared by the pipeline and the regex fallbac
 
 ---
 
-## Remaining Work Breakdown (Phases 4-20)
+## Work Breakdown Checklists (Phases 4-21)
 
-Phases 1-3 are complete (records in `simple-done.md`). The remaining work is
-split into sub-tasks below. Work one phase at a time; commit per phase with a
-phase-tagged message. Check each sub-task off in place as it is completed.
+Phases 1-19 are complete (records in `simple-done.md`). The checklists below
+are retained so the working record stays intact. The only remaining work is
+**Phase 20 - Final verification & regression** and **Phase 21 - Documentation
+cleanup**. Work one phase at a time; commit per phase with a phase-tagged
+message. Check each sub-task off in place as it is completed.
 
 ### Phase 4 - LLM-only agents + shared validation cleanup ✅ COMPLETED
 
@@ -809,7 +811,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 19.2 `README.md` / `ui/README.md`: quickstart accuracy. ✅ See `simple-done.md`.
 - [x] 19.3 Cross-check `docs/*.md` (8 guides) against code; fix drift found during Phases 1-18. ✅ See `simple-done.md`.
 - [x] 19.4 Root scratch notes: classify archive vs actionable; recommend `scratch/` move or "completed" note (no deletion without user OK). ✅ See `simple-done.md`. **Recommendation:** eight of the nine root scratch notes are fully-completed archives (`bots.md`, `frontend-plan.md`, `frontend-tasks-done.md`, `resume-done.md`, `resume-todo.md`, `resume-verify.md`, `resume-web-todo.md`, `web-files-todo.md`) - suggested move to `scratch/` (awaiting user OK). Only `frontend-tasks.md` is actionable (§7.3 Manual E2E). **Update (user OK'd):** the eight archives were moved to `scratch/` (git mv) and docs references updated; `frontend-tasks.md` stays in root.
-- [ ] 19.5 Remove outdated "TODO/Phase X remains" lines for completed work.
+- [x] 19.5 Remove outdated "TODO/Phase X remains" lines for completed work. ✅ See `simple-done.md`.
 
 ### Phase 20 - Final verification & regression
 

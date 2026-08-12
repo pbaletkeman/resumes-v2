@@ -3157,3 +3157,61 @@ is now: `AGENTS.md`, `README.md`, `simple.md`, `simple-done.md`, `frontend-tasks
 (plus code) — the archived scratch notes live under `scratch/`.
 
 **Commit:** `simplify: phase 19 - move archived root scratch notes to scratch/ (19.4 follow-up)`
+
+---
+
+## Phase 19 - Completed sub-task 19.5: remove outdated "TODO/Phase X remains" lines
+
+Original instructions:
+
+- **19.5** Remove outdated "TODO/Phase X remains" lines for completed work.
+
+Swept every active markdown doc (`AGENTS.md`, `README.md`, `ui/README.md`,
+`docs/*.md`, `simple.md`) for lines claiming work was still pending in a phase
+that is now complete, and fixed the two stale spots found. Historical records
+(`scratch/` archives and `simple-done.md` completion notes) were left intact so
+the audit trail is preserved.
+
+### Completion record
+
+**Changes made (documentation only, no behavior/markdown-command change):**
+
+- **`simple.md`** — the "Remaining Work Breakdown (Phases 4-20)" heading + intro
+  claimed only "Phases 1-3 are complete ... The remaining work is split into
+  sub-tasks below", contradicting the checkboxes below it (Phases 4-18 all
+  checked off, 19.1-19.4 checked off). Retitled the section to
+  "Work Breakdown Checklists (Phases 4-21)" and rewrote the intro to state
+  "Phases 1-19 are complete (records in `simple-done.md`)" with the only
+  remaining work being Phase 20 and Phase 21. Marked check item 19.5 itself as
+  done (✅ See `simple-done.md`).
+- **`README.md`** — the file-map row for `scratch/resume-todo.md` said "Remaining
+  work (project complete...)" while the note's own header reads
+  "Status: ✅ ALL DONE". Updated to "Completed-work log (all done; pointer to
+  `resume-done.md`)".
+
+**Verified non-issues (not changed):**
+
+- `AGENTS.md` — Status section references phases only as completed work; no
+  "phase remains" claims.
+- `docs/*.md` (8 guides) — the only "future work" mention is
+  `docs/logging-info.md`'s "Not in scope (future work)" list, which is
+  genuinely out-of-scope tooling (structlog, log-to-file, etc.), not a claim
+  that a plan phase remains.
+- `frontend-tasks.md` (root, still-actionable) — its "one item left"
+  (§7.3 Manual E2E) banner is accurate and unchanged.
+- `scratch/` archives (8 files) — historical records of completed work; left
+  untouched (their "remaining" phrasing describes the point-in-time state and
+  many already carry `✅ ALL DONE` / `ARCHIVED` headers).
+- `simple-done.md` — completion records referencing "later phases" describe
+  historical sequencing, not pending work.
+
+**Behavior verification:**
+
+- Documentation-only change — no Python/TS source touched, so
+  `pytest`/`ruff`/`pyright`/`tsc`/`npm test` are unaffected.
+- `git diff` confirms changes are limited to `simple.md` and `README.md`.
+- Re-grep for `Remaining Work|Phases 1-3|Phase.*remains` across active docs
+  returns only the updated `simple.md` intro and `simple-done.md`/`scratch/`
+  historical records.
+
+**Commit:** `simplify: phase 19 - remove outdated TODO/phase-remains lines (19.5)`
