@@ -805,7 +805,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 19 - Repo-wide documentation consolidation
 
-- [ ] 19.1 `AGENTS.md`: verify file/architecture map after Phases 1-11 (new helpers `load_json_safe`, `_run_stage`); update quick-command table + conventions.
+- [x] 19.1 `AGENTS.md`: verify file/architecture map after Phases 1-11 (new helpers `load_json_safe`, `_run_stage`); update quick-command table + conventions. ✅ See `simple-done.md`.
 - [ ] 19.2 `README.md` / `ui/README.md`: quickstart accuracy.
 - [ ] 19.3 Cross-check `docs/*.md` (8 guides) against code; fix drift found during Phases 1-18.
 - [ ] 19.4 Root scratch notes: classify archive vs actionable; recommend `scratch/` move or "completed" note (no deletion without user OK).

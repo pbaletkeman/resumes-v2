@@ -2856,3 +2856,66 @@ to the suite.
 - `npx tsc -b` — pass (0 errors)
 
 **Commit:** `simplify: phase 18 - frontend test headers + shared stubFetch + status helper tests (18.1-18.3)`
+
+---
+
+## Phase 19 - Completed sub-task 19.1: AGENTS.md file/architecture map + conventions
+
+Original instructions:
+
+- **19.1** `AGENTS.md`: verify file/architecture map after Phases 1-11 (new helpers
+  `load_json_safe`, `_run_stage`); update quick-command table + conventions.
+
+AGENTS.md was verified line-by-line against the actual tree. All previously
+added helpers are now present and the stale counts/claims from before Phases
+1-11 were corrected. No command in the quick-command tables was changed (each
+was spot-checked against the repo: `uv sync`, `basic.py`, `pipeline.py
+--resume/--job-description`, `uvicorn app.main:app`, the `get_model_summary`
+one-liner, `ruff`, `pyright`, `pytest`, and the `ui/` set all still resolve);
+`docs/TESTING.md` still has its section-2 regex-parsing guide that the "no LLM"
+table row points to.
+
+### Completion record
+
+**Changes made (documentation only, no behavior/markdown-command change):**
+
+- **Architecture map** —
+  - `pipeline.py` entry now lists the Phase 9 `_run_stage` helper next to
+    `AgentRunner` / `PipelineAgent` / `run_resume_pipeline`.
+  - `client/json_utils.py` entry now names the Phase 4 `load_json_safe` helper
+    alongside `parse_json_response` and `model_to_json_schema`.
+  - `client/agents/` block now includes the two shared helper modules that
+    Phases 3-4 introduced: `_validation.py` (shared `chat_and_validate()`
+    scaffold) and `_retry.py` (shared `retry_llm_then_fallback()` loop).
+  - `tests/` block: corrected `test_json_utils.py` count (15 -> 23, matching
+    the load_json_safe tests added in Phase 4) and added the previously
+    omitted `test_web_spa.py` (8 tests, built-SPA mount).
+- **"Agent class pattern" convention** was expanded to name
+  the parsing-agent retry loop `client/agents/_retry.py:
+  retry_llm_then_fallback()` (it previously only mentioned the LLM-only-agent
+  scaffolding through `_validation.py`).
+- **New "Pipeline stage helper" convention** documents `pipeline.py:
+  _run_stage(runner, agent_name, *, prompt, output, rules, fields, **context)`
+  and that `_run_pipeline_core()` calls it seven times (`# 1. JD Parsing` ...
+  `# 7. Cover Letter`) on a single event loop.
+- **"Shared JSON parsing" convention** now documents `load_json_safe()` as the
+  guarded `json.loads` used by post-validation helpers (fence-stripping,
+  returns `None` instead of raising), next to the existing `parse_json_response`
+  wrapper description.
+- **Status section** — the `_run_pipeline_core()` line reference was updated
+  from `pipeline.py:324` to `pipeline.py:404` (the function moved during Phase
+  9); `run_resume_pipeline()` at `pipeline.py:313` is still correct.
+- **Testing + Status sections** — test totals updated from "477 tests across
+  23 files" to "**493 tests across 24 files**" (Phase 4 added 8 JSON-utils
+  tests; `test_web_spa.py`'s 8 tests were previously uncounted in the sweep).
+
+**Behavior verification:**
+
+- `uv run pytest` — 493 passed (confirms the new map counts)
+- `uv run ruff check .` — pass
+- `uv run ruff format --check .` — pass (all 96 files already formatted)
+- `uv run pyright` — 0 errors, 0 warnings
+- `ui/`: `npm test -- --run` — 48 passed; `npm run lint`, `npx tsc -b` — pass
+  (unchanged by this doc-only phase)
+
+**Commit:** `simplify: phase 19 - AGENTS.md architecture map + conventions after phases 1-11 (19.1)`
