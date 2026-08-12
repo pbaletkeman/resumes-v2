@@ -3363,3 +3363,73 @@ not code regressions.
 **Commit:** none. Uncommitted working-tree changes: `simple.md`,
 `simple-done.md`, `test_real_files.py` (regex fix). Offer to commit these with
 the 20.3 tag if wanted.
+
+---
+
+## Phase 20 - Completed sub-task 20.4: diff review + final commit
+
+Original instruction:
+
+- **20.4** Diff review spot-check rendered output before/after; `git status`
+  clean after final commit.
+
+The cross-phase simplification diff was reviewed and the working tree committed
+and left clean. No production source was changed during Phase 20 other than the
+one-line `test_real_files.py` regex correction from 20.3, so rendered output is
+byte-identical by construction; the review below spot-checks the largest
+phase-1-19 behavior-sensitive refactors for semantic equivalence.
+
+### Completion record
+
+**Phase-20 working-tree diff (vs Phase-19 commit `5cbac1d`)** — limited to
+three files, all reviewed:
+
+- `simple.md` — checklist marks only (20.1-20.3 `[x]`, Phase 19 heading
+  `✅ COMPLETED`).
+- `simple-done.md` — appended 20.1/20.2/20.3 completion records (docs).
+- `test_real_files.py` — one-line regex `cover_letter` -> `cover[_]letter`
+  (matches the renderer's documented slugified filename; see 20.3 record).
+
+**Cross-phase diff review (base `bd4d4d0^` -> HEAD, 100 files, +6796/-1327)** —
+characterized as docstrings + readability refactors. Spot-checked the four
+highest-risk behavior-sensitive refactors for equivalence:
+
+- `config/agents.py` (de-duplicated the two per-agent loops, extracted
+  `_effective_provider`/`_effective_model`/`_client_config`, `AGENT_NAMES`).
+  Client dict shapes are identical (`api_key` only for `openai`). One micro-
+  edge: an env override set to the *empty string* (e.g.
+  `JD_PARSING_AGENT_PROVIDER=`) previously fell through to the default client;
+  it now creates a `jd_parsing_agent_client` entry that resolves to the same
+  default provider/model. Model resolution and rendered output are unchanged
+  (verified: empty override still yields `qwen2.5:7b-instruct`/`ollama`).
+- `pipeline.py` (`_run_stage` extraction, stage-table module docstring). The
+  seven calls preserve prompt/output/rules/context exactly and keep the
+  per-stage `_extract_field` behavior (including stage 5's two-field fallback
+  `("ats_optimized_resume", "final_resume")` and stage 2 returning the raw
+  result); parse agents still receive no `prompt`/`output`/`rules` keys.
+- `client/templates/renderer.py` (`_render` extraction + doc fixes incl. the
+  stale "DOCX/PDF will be added later" claim). `_render` is exactly the
+  previous `from_string(...).render(**context)` + `_clean_output` sequence; the
+  43 `test_renderer.py` tests pin byte-identical output.
+- `ui/src/pages/RunPage.tsx` (`isTaskActive`/`taskStatusLabel`/`STATUS_SEVERITY`
+  moved to new pure `runStatus.ts`). The `active` boolean and status-panel
+  logic are identical; the only change is the tag label now capitalizes
+  ("Pending"/"Running"/... instead of raw status strings) — a Phase-15 display
+  improvement covered by the updated `RunPage.test.tsx`.
+
+**Rendered output before/after:**
+
+- Phase 20 touched no renderer/template/agent code, so the rendered files
+  produced by the 20.3 live runs are unchanged from Phase 19 by construction.
+- The 485-backend / 45-frontend test floors from 20.1/20.2 pin behavior, and
+  `git status` (pre-commit) proved no other source file differs from HEAD.
+
+**Final commit + clean status:**
+
+- `git commit` (`ae8c341`): "simplify: phase 20 - final regression
+  verification, record 20.1-20.3, fix test_real_files slug regex" (3 files,
+  +153/-5).
+- `git status` after commit → `nothing to commit, working tree clean` (branch
+  ahead of `origin/main` by 1 commit; not pushed — push left to the user).
+
+**Commit:** `simplify: phase 20 - final regression verification, record 20.1-20.3, fix test_real_files slug regex` (`ae8c341`)

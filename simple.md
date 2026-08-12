@@ -818,7 +818,7 @@ message. Check each sub-task off in place as it is completed.
 - [x] 20.1 Backend: `uv run pytest` (>=485), `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`. ✅ See `simple-done.md`.
 - [x] 20.2 Frontend: `npm test -- --run` (>=45), `npm run lint`, `npx tsc -b`. ✅ See `simple-done.md`.
 - [x] 20.3 Manual smoke: `basic.py`, `pipeline.py` sample mode, web API health/models/pipeline/tasks, live E2E (`test_real_files.py` with Ollama), `npm run dev` UI run. ✅ See `simple-done.md`.
-- [ ] 20.4 Diff review spot-check rendered output before/after; `git status` clean after final commit.
+- [x] 20.4 Diff review spot-check rendered output before/after; `git status` clean after final commit. ✅ See `simple-done.md`.
 - [ ] 20.5 Add a short "progress log" section to `simple.md` listing completed phases (archive the full plan in `simple-done.md`).
 
 ### Phase 21 - Documentation Cleanup
