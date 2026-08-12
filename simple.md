@@ -48,4 +48,4 @@ clean.
   - [ ] 21.2.3 Common issues and fixes
 - [ ] 21.3 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
 - [ ] 21.4 Ensure all markdown files are up to date.
-- [ ] 21.5 No markdown linting errros in any of the markdown files
+- [ ] 21.5 No markdown linting errors in any of the markdown files
