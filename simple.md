@@ -773,11 +773,11 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 ### Phase 15 - Run page & form helpers
 
 - [x] 15.1 Extract `isTaskActive(status)` and reuse in button `disabled`/`label`, status panel, etc.
-- [ ] 15.2 Extract `taskStatusLabel` + status-severity map next to `STATUS_SEVERITY`.
-- [ ] 15.3 Expand `handleSubmit` into 2-3 obvious steps with comments (validate -> toast -> mutate -> capture task id).
-- [ ] 15.4 `FileChosen`: document `customUpload` behavior; header comments for the page flow (submit -> poll -> results + downloads).
-- [ ] 15.5 `runForm.ts`: JSDoc on `validateRunInputs`/`buildRunFormData`; document "text wins over file" matches backend `_read_text_input`.
-- [ ] 15.6 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `RunPage.test.tsx`).
+- [x] 15.2 Extract `taskStatusLabel` + status-severity map next to `STATUS_SEVERITY`.
+- [x] 15.3 Expand `handleSubmit` into 2-3 obvious steps with comments (validate -> toast -> mutate -> capture task id).
+- [x] 15.4 `FileChosen`: document `customUpload` behavior; header comments for the page flow (submit -> poll -> results + downloads).
+- [x] 15.5 `runForm.ts`: JSDoc on `validateRunInputs`/`buildRunFormData`; document "text wins over file" matches backend `_read_text_input`.
+- [x] 15.6 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `RunPage.test.tsx`).
 
 ### Phase 16 - Files page
 

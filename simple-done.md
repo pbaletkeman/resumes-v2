@@ -2620,3 +2620,40 @@ invert the dependency direction.  Out of scope for 15.1.
 - Refactor-only; identical behavior (same boolean logic, single source of truth).
 
 **Commit:** `simplify: phase 15 - extract isTaskActive helper in RunPage (15.1)`
+
+---
+
+## Phase 15 - Completed sub-tasks 15.2-15.6: task labels, handleSubmit steps, form docs, guardrails
+
+Original instructions:
+
+- **15.2** Extract `taskStatusLabel` + status-severity map next to `STATUS_SEVERITY`.
+- **15.3** Expand `handleSubmit` into 2-3 obvious steps with comments (validate -> toast -> mutate -> capture task id).
+- **15.4** `FileChosen`: document `customUpload` behavior; header comments for the page flow (submit -> poll -> results + downloads).
+- **15.5** `runForm.ts`: JSDoc on `validateRunInputs`/`buildRunFormData`; document "text wins over file" matches backend `_read_text_input`.
+- **15.6** Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `RunPage.test.tsx`).
+
+This closes Phase 15 (Phases 1-14 already moved here; Phase 15's last four sub-tasks land now).
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/RunPage.tsx`**:
+  - **15.2** — the `TASK_STATUS_LABEL` map and `taskStatusLabel(status)` helper (extracted next to `STATUS_SEVERITY` / `isTaskActive`) are now wired into both branches of the status-panel `Tag`: `value={taskStatusLabel(status)}` renders the human-readable label ("Pending"/"Running"/"Completed"/"Failed", unknown status -> "Pending") and both branches pull severity from the `STATUS_SEVERITY` map (`status ?? 'pending'` in the active branch, `status ?? 'completed'` in the terminal branch) instead of the previous hard-coded `severity="info"` + raw status string. Active states still resolve to `info`, so only the displayed label text changed.
+  - **15.3** — `handleSubmit` body is now three numbered steps with comments: `// Step 1.` gather + validate, `// Step 2.` warn-toast on invalid input and return, `// Step 3.` mutate with onSuccess capture of the task id and onError toast. Logic unchanged.
+  - **15.4** — `FileChosen` got a header docstring explaining the `customUpload` PrimeReact behavior (browser never sends the file; `onSelect` hands the File to the parent via `onChange` so it lands in the multipart FormData) and the chosen-file/remove toggle. `RunPage` got a header docstring describing the page flow (submit -> capture task id -> poll -> results + downloads; Reset clears the task id).
+- **`ui/src/pages/runForm.ts`**:
+  - **15.5** — module-top comment documenting the file role + the "pasted text wins over uploaded file" precedence rule and that it mirrors the backend resolver `app.main._read_text_input` (text returned whenever non-empty, file only as fallback) so frontend and backend never disagree. JSDoc on `RunInputs`, `validateRunInputs` (Args/Returns; each required input counts as supplied when text is non-empty OR a file is chosen), and `buildRunFormData` (text-wins-over-file per field; optional candidate/company names appended only when non-empty).
+  - The two functions' bodies are byte-for-byte identical to before — documentation only.
+
+**Behavior note:** the only user-visible change is the status `Tag` value now showing the capitalized label ("Running" instead of "running") as intended by 15.2; severity color and the rest are unchanged. `RunPage.test.tsx` asserts on button `name`/`disabled` and form data, not the status label, so it is unaffected.
+
+**Behavior verification (15.6):**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files
+- `npx vitest run src/pages/RunPage.test.tsx` — 3 passed (text-wins-over-file submit, disabled-while-active, empty-input warn toast)
+
+**Commit:** `simplify: phase 15 - run page task labels + handleSubmit steps + form docs (15.2-15.5)`
