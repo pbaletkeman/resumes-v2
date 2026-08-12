@@ -781,10 +781,10 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 
 ### Phase 16 - Files page
 
-- [ ] 16.1 Split into named sections (file-table config, filter bar, delete selection, toolbar) via banner comments or a `FileTable` component.
-- [ ] 16.2 Name state by intent (`selectedKeys`, `fileTypeFilter`, `searchQuery`, `page`).
-- [ ] 16.3 Header comment: generated-vs-uploaded toggle; how downloads/delete map to the two listing kinds.
-- [ ] 16.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `FilesPage.test.tsx`).
+- [x] 16.1 Split into named sections (file-table config, filter bar, delete selection, toolbar) via banner comments or a `FileTable` component.
+- [x] 16.2 Name state by intent (`selectedKeys`, `fileTypeFilter`, `searchQuery`, `page`).
+- [x] 16.3 Header comment: generated-vs-uploaded toggle; how downloads/delete map to the two listing kinds.
+- [x] 16.4 Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run` (watch `FilesPage.test.tsx`).
 
 ### Phase 17 - Models page, App shell, theme, toast, entry
 

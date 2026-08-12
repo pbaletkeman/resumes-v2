@@ -2657,3 +2657,69 @@ This closes Phase 15 (Phases 1-14 already moved here; Phase 15's last four sub-t
 - `npx vitest run src/pages/RunPage.test.tsx` — 3 passed (text-wins-over-file submit, disabled-while-active, empty-input warn toast)
 
 **Commit:** `simplify: phase 15 - run page task labels + handleSubmit steps + form docs (15.2-15.5)`
+
+---
+
+## Phase 16 - Completed sub-tasks 16.1-16.4: Files page sections, state naming, header docs, guardrails
+
+Original instructions:
+
+- **16.1** Split into named sections (file-table config, filter bar, delete
+  selection, toolbar) via banner comments or a `FileTable` component.
+- **16.2** Name state by intent (`selectedKeys`, `fileTypeFilter`,
+  `searchQuery`, `page`).
+- **16.3** Header comment: generated-vs-uploaded toggle; how downloads/delete
+  map to the two listing kinds.
+- **16.4** Guardrails: `npx tsc -b`, `npm run lint`, `npm test -- --run`
+  (watch `FilesPage.test.tsx`).
+
+This closes Phase 16 (Files page was the last remaining page-level phase before
+17 - models/App shell/theme/toast/entry and the closing phases).
+
+### Completion record
+
+**Changes made:**
+
+- **`ui/src/pages/FilesPage.tsx`**:
+  - **16.1 (sections)** — added banner comments breaking the file into named
+    sections and JSDoc on every helper/callback:
+    - Module level: `File listing configuration` (the `KIND_OPTIONS` /
+      `PAGE_SIZE_OPTIONS` / `FILE_TYPE_OPTIONS` / `SORT_OPTIONS` tables) and
+      `Formatting helpers` (`formatSize`, with args/returns JSDoc).
+    - Component: `state`, `data queries`, `event handlers` (`applySearch`,
+      `handlePage`, `confirmDelete`, `handleDeleteAccept` — each now has a
+      one-line JSDoc), `column renderers` (with a note tying the download link
+      to the shared outputs route), and `render`.
+    - JSX: `{/* Toolbar: ... */}` / `{/* Delete action: ... */}` / `{/* Table:
+      lazy, paginated listing ... */}` / `{/* Delete confirmation dialog */}`
+      banner comments before each block.
+  - **16.2 (state naming)** — renamed the state variables by intent:
+    - `q` / `setQ` -> `searchQuery` / `setSearchQuery` (the `{ value, applied }`
+      search object; the new `data queries` section comment explains why the
+      two fields are kept separate).
+    - `fileType` / `setFileType` -> `fileTypeFilter` / `setFileTypeFilter`
+      (query param key stays `file_type`).
+    - `selected` / `setSelected` -> `selectedFiles` / `setSelectedFiles`
+      (holds selected `FileMeta[]` rows, so "files" is more accurate than
+      "keys"; the phase's `selectedKeys` hint was adapted to the actual value).
+    - `page`, `pageSize`, `kind`, `sort`, `confirmVisible` were already
+      intent-named and left unchanged.
+  - **16.3 (header comment)** — `FilesPage` now has a header docstring
+    explaining the generated-vs-uploaded TabMenu toggle (each maps to
+    `GET /api/files/generated` vs `GET /api/files/uploaded` via `useFiles`),
+    that downloads use `fileDownloadUrl(row.path)` -> `GET /api/outputs/{basename}`
+    and deletions POST the selected paths to `DELETE /api/files`, that both
+    behave the same for the two kinds, that the delete mutation invalidates
+    the listings, and that switching kinds resets the page and clears the
+    selection.
+  - No behavior changes — pure restructuring, renaming, and documentation.
+
+**Behavior verification (16.4):**
+
+- `npx tsc -b` — pass (0 errors)
+- `npm run lint` (oxlint) — pass
+- `npm test -- --run` — 45 passed across 9 test files
+- `npx vitest run src/pages/FilesPage.test.tsx` — 2 passed (file rows + size
+  formatting; delete mutation with selected paths + result toasts)
+
+**Commit:** `simplify: phase 16 - files page sections + state naming + header docs (16.1-16.3)`
