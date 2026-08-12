@@ -18,6 +18,15 @@ interface FileChosenProps {
   onChange: (file: File | null) => void
 }
 
+/**
+ * One job-description / resume file picker on the Run page.
+ *
+ * Uses PrimeReact FileUpload in `customUpload` mode: the browser never sends
+ * the file itself. `onSelect` hands the chosen File to the parent via
+ * `onChange`, and the parent includes it in the multipart FormData sent with
+ * the pipeline request. While a file is chosen we show its name with a remove
+ * button that clears the FileUpload component and resets the parent state.
+ */
 function FileChosen({ file, onChange }: FileChosenProps) {
   const fileUploadRef = useRef<FileUpload>(null)
 
@@ -64,6 +73,14 @@ const STATUS_SEVERITY: Record<TaskStatus['status'], 'info' | 'success' | 'danger
   failed: 'danger',
 }
 
+/** Human-readable label per task status, shown on the status tag. */
+const TASK_STATUS_LABEL: Record<TaskStatus['status'], string> = {
+  pending: 'Pending',
+  running: 'Running',
+  completed: 'Completed',
+  failed: 'Failed',
+}
+
 /**
  * True while a task has not yet reached a terminal state: no status is known
  * yet (task created but not polled), pending, or running.
@@ -72,6 +89,19 @@ function isTaskActive(status: TaskStatusName | undefined): boolean {
   return status === undefined || status === 'pending' || status === 'running'
 }
 
+/** Human-readable label; treats an unknown status as "Pending" (not polled yet). */
+function taskStatusLabel(status: TaskStatusName | undefined): string {
+  return status === undefined ? 'Pending' : TASK_STATUS_LABEL[status]
+}
+
+/**
+ * The Run Pipeline page.
+ *
+ * Flow: the user enters the job description + resume as pasted text and/or
+ * uploaded files, submits, we capture the returned task id, poll until the
+ * task settles, then render the result tabs plus download links. Reset clears
+ * the task id so the form can be submitted again.
+ */
 function RunPage() {
   const [jobDescription, setJobDescription] = useState('')
   const [resume, setResume] = useState('')
@@ -107,12 +137,20 @@ function RunPage() {
   }
 
   function handleSubmit() {
+    // Step 1. Gather the raw inputs and validate that the user supplied a job
+    // description and a resume (pasted text and/or an uploaded file each).
     const inputs = { jobDescription, resume, jobFile, resumeFile, candidateName, companyName }
     const invalid = validateRunInputs(inputs)
+
+    // Step 2. On invalid input, surface the first problem via a toast and do
+    // not submit.
     if (invalid !== null) {
       show({ severity: 'warn', summary: 'Missing input', detail: invalid })
       return
     }
+
+    // Step 3. Submit the run. On success we capture the task id so the page
+    // can poll for completion; on failure we show an error toast.
     invokePipeline.mutate(
       buildRunFormData(inputs),
       {
@@ -204,11 +242,14 @@ function RunPage() {
           {isTaskActive(status) ? (
             <div className="run-status-active">
               <ProgressSpinner style={{ width: '2rem', height: '2rem' }} strokeWidth="4" />
-              <Tag value={status ?? 'pending'} severity="info" />
+              <Tag value={taskStatusLabel(status)} severity={STATUS_SEVERITY[status ?? 'pending']} />
             </div>
           ) : (
             <div className="run-status-active">
-              <Tag value={status ?? 'completed'} severity={STATUS_SEVERITY[status ?? 'completed']} />
+              <Tag
+                value={taskStatusLabel(status)}
+                severity={STATUS_SEVERITY[status ?? 'completed']}
+              />
             </div>
           )}
           {status === 'failed' && taskError && (
