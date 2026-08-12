@@ -818,3 +818,14 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [ ] 20.3 Manual smoke: `basic.py`, `pipeline.py` sample mode, web API health/models/pipeline/tasks, live E2E (`test_real_files.py` with Ollama), `npm run dev` UI run.
 - [ ] 20.4 Diff review spot-check rendered output before/after; `git status` clean after final commit.
 - [ ] 20.5 Add a short "progress log" section to `simple.md` listing completed phases (archive the full plan in `simple-done.md`).
+
+### Phase 21 - Documentation Cleanup
+
+- [ ] 21.1 Move all markdown files to a single directory named docs
+- [ ] 21.2 Root README.md needs to be less than 500 lines with a quickstart section that explains to to get started in 10 minutes or less and links to detailed README.md file
+- [ ] 21.3 Create a more expansive/detailed README.md in the docs directory which contains:
+  - [ ] 21.3.1 Detailed instructions on how to get started
+  - [ ] 21.3.2 Detailed examples on all command line switches/options
+  - [ ] 21.3.3 Common issues and fixes
+- [ ] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link to the
+- [ ] 21.5 No markdown linting errros in any of the markdown files
