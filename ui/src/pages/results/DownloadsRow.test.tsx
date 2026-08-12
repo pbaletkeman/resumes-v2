@@ -1,3 +1,8 @@
+/**
+ * Unit tests for the downloads row (``results/DownloadsRow.tsx``): renders one
+ * link per known ``output_files`` key on ``/api/outputs/...`` URLs, and
+ * nothing when there are no known keys.
+ */
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import DownloadsRow from './DownloadsRow'

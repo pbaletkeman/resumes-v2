@@ -6,8 +6,9 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Tag } from 'primereact/tag'
 import { useInvokePipeline, usePollTask } from '../api/hooks'
-import type { TaskStatus, TaskStatusName } from '../api/types'
+import type { TaskStatus } from '../api/types'
 import { useToast } from '../toast/ToastContext'
+import { isTaskActive, STATUS_SEVERITY, taskStatusLabel } from './runStatus'
 import { buildRunFormData, validateRunInputs } from './runForm'
 import { asStringMap } from './results/coerce'
 import DownloadsRow from './results/DownloadsRow'
@@ -64,34 +65,6 @@ function FileChosen({ file, onChange }: FileChosenProps) {
       )}
     </div>
   )
-}
-
-const STATUS_SEVERITY: Record<TaskStatus['status'], 'info' | 'success' | 'danger'> = {
-  pending: 'info',
-  running: 'info',
-  completed: 'success',
-  failed: 'danger',
-}
-
-/** Human-readable label per task status, shown on the status tag. */
-const TASK_STATUS_LABEL: Record<TaskStatus['status'], string> = {
-  pending: 'Pending',
-  running: 'Running',
-  completed: 'Completed',
-  failed: 'Failed',
-}
-
-/**
- * True while a task has not yet reached a terminal state: no status is known
- * yet (task created but not polled), pending, or running.
- */
-function isTaskActive(status: TaskStatusName | undefined): boolean {
-  return status === undefined || status === 'pending' || status === 'running'
-}
-
-/** Human-readable label; treats an unknown status as "Pending" (not polled yet). */
-function taskStatusLabel(status: TaskStatusName | undefined): string {
-  return status === undefined ? 'Pending' : TASK_STATUS_LABEL[status]
 }
 
 /**

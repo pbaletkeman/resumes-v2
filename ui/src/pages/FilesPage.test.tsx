@@ -1,7 +1,14 @@
+/**
+ * Unit tests for the Files page (``FilesPage.tsx``): rendering file rows from
+ * the backend ``PagedFile`` response, and the delete flow (select a row ->
+ * confirmation dialog -> ``DELETE /api/files`` with the selected paths ->
+ * result toast). Uses the shared ``stubFetch`` for the fetch mock and
+ * ``renderWithClient`` for the React Query wrapper.
+ */
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PagedFile } from '../api/types'
-import { renderWithClient } from '../test/utils'
+import { renderWithClient, stubFetch } from '../test/utils'
 
 const toast = vi.hoisted(() => ({ show: vi.fn(), clear: vi.fn() }))
 
@@ -32,19 +39,6 @@ const INPUT: PagedFile = {
   page_size: 20,
   total: 2,
   total_pages: 1,
-}
-
-function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
-  const mock = vi.fn(
-    (url: string, init?: RequestInit) =>
-      Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => handler(url, init),
-      }) as unknown as Response,
-  )
-  vi.stubGlobal('fetch', mock)
-  return mock
 }
 
 afterEach(() => {

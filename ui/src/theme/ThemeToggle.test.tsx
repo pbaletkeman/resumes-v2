@@ -1,3 +1,9 @@
+/**
+ * Unit tests for the color-scheme toggle (``theme/ThemeToggle.tsx``): the
+ * three mode options render, selecting one persists it to the ``theme``
+ * localStorage key and applies the ``data-theme`` attribute, and selecting
+ * System removes the stored override.
+ */
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stubMatchMedia } from '../test/utils'

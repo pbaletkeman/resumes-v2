@@ -1,3 +1,8 @@
+/**
+ * Unit tests for the ATS tab (``results/ATSTab.tsx``): the score tag's
+ * severity bands (danger < 50, warning [50, 80), success 80+) and the absence
+ * of a tag when ``ats_score`` is missing.
+ */
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import ATSTab from './ATSTab'

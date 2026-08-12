@@ -1,3 +1,10 @@
+/**
+ * Unit tests for the React Query hooks (``hooks.ts``): ``useModels`` fetches
+ * the model summary, ``useFiles`` passes params through and keeps previous
+ * data while refetching, and ``useDeleteFiles`` invalidates the file queries
+ * on success. Renders hooks under a fresh test ``QueryClient`` and drives
+ * ``window.fetch`` via the shared ``stubFetch``.
+ */
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,7 +13,7 @@ import {
   useFiles,
   useModels,
 } from './hooks'
-import { createTestQueryClient, withClient } from '../test/utils'
+import { createTestQueryClient, stubFetch, withClient } from '../test/utils'
 import type { PagedFile } from './types'
 
 function makePaged(items: PagedFile['items'], page: number): PagedFile {
@@ -17,17 +24,6 @@ function makePaged(items: PagedFile['items'], page: number): PagedFile {
     total: items.length,
     total_pages: 1,
   }
-}
-
-function fetchMock(handler: (url: string, init?: RequestInit) => unknown) {
-  return vi.fn(
-    (url: string, init?: RequestInit) =>
-      Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => handler(url, init),
-      }) as unknown as Response,
-  )
 }
 
 describe('useModels', () => {
@@ -67,7 +63,7 @@ describe('useFiles', () => {
 
   it('passes params through and keeps previous data while refetching', async () => {
     const calls: string[] = []
-    const mock = fetchMock((url) => {
+    stubFetch((url) => {
       calls.push(url)
       if (url.includes('page=3')) {
         return makePaged(
@@ -80,7 +76,6 @@ describe('useFiles', () => {
         2,
       )
     })
-    vi.stubGlobal('fetch', mock)
 
     const queryClient = createTestQueryClient()
     const wrapper = ({ children }: { children?: ReactNode }) =>

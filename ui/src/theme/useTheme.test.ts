@@ -1,3 +1,10 @@
+/**
+ * Unit tests for the theme hook (``theme/useTheme.ts``): ``resolveTheme``
+ * passes light/dark through and falls back to the OS scheme for null/system,
+ * and ``useTheme`` covers the ``theme`` localStorage persistence, the
+ * system-mode default, stored overrides, clearing, and re-following OS
+ * changes only while in system mode.
+ */
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveTheme, useTheme } from './useTheme'

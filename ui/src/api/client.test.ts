@@ -1,3 +1,9 @@
+/**
+ * Unit tests for the API layer: the ``runForm.ts`` pure form builders
+ * (text-over-file precedence, validation), the ``client.ts`` fetch wrappers
+ * (endpoints, query-string building, error-detail parsing), and the
+ * ``download.ts`` URL helpers.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   buildRunFormData,

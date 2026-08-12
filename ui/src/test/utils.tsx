@@ -7,7 +7,8 @@
  * behavior. Tests that additionally need routing or toasts layer their own
  * wrappers on top (e.g. RunPage.test.tsx). ``stubMatchMedia`` replaces
  * ``window.matchMedia`` with a controllable stub used by the theme tests to
- * simulate OS light/dark changes.
+ * simulate OS light/dark changes. ``stubFetch`` installs a handler-driven
+ * ``window.fetch`` mock shared by the API and page tests.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderResult } from '@testing-library/react'
@@ -77,4 +78,25 @@ export function stubMatchMedia(dark = false) {
   }
   window.matchMedia = vi.fn().mockReturnValue(media)
   return media
+}
+
+/**
+ * Stub ``window.fetch`` with a handler-driven mock.
+ *
+ * Every call resolves with ``ok: true`` / ``status 200`` and produces its JSON
+ * body by invoking ``handler(url, init)``, so a test can return different
+ * payloads per URL in one stub. Returns the mock so tests can assert on the
+ * exact calls made.
+ */
+export function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
+  const mock = vi.fn(
+    (url: string, init?: RequestInit) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => handler(url, init),
+      }) as unknown as Response,
+  )
+  vi.stubGlobal('fetch', mock)
+  return mock
 }

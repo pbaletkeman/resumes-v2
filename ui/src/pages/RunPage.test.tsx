@@ -1,3 +1,9 @@
+/**
+ * Unit tests for the Run page (``RunPage.tsx``): the form flow (pasted text
+ * wins over an uploaded file, empty-input warn toast, disabled-while-active
+ * button) plus focused tests for the status helpers extracted in Phase 15
+ * (``isTaskActive`` and ``taskStatusLabel``) and the page-flow header.
+ */
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TaskStatus } from '../api/types'
@@ -39,6 +45,7 @@ vi.mock('primereact/fileupload', async () => {
 })
 
 import RunPage from './RunPage'
+import { isTaskActive, taskStatusLabel } from './runStatus'
 
 const JOB_TEXT = 'Company needs a senior frontend engineer. React, TypeScript.'
 const RESUME_TEXT = 'React developer with three years of TypeScript experience.'
@@ -92,5 +99,28 @@ describe('RunPage form', () => {
         detail: expect.stringMatching(/job description/i),
       }),
     )
+  })
+})
+
+describe('isTaskActive', () => {
+  it('is true while a task has not reached a terminal state', () => {
+    expect(isTaskActive(undefined)).toBe(true)
+    expect(isTaskActive('pending')).toBe(true)
+    expect(isTaskActive('running')).toBe(true)
+  })
+
+  it('is false once a task has settled', () => {
+    expect(isTaskActive('completed')).toBe(false)
+    expect(isTaskActive('failed')).toBe(false)
+  })
+})
+
+describe('taskStatusLabel', () => {
+  it('renders a human-readable label per status', () => {
+    expect(taskStatusLabel(undefined)).toBe('Pending')
+    expect(taskStatusLabel('pending')).toBe('Pending')
+    expect(taskStatusLabel('running')).toBe('Running')
+    expect(taskStatusLabel('completed')).toBe('Completed')
+    expect(taskStatusLabel('failed')).toBe('Failed')
   })
 })

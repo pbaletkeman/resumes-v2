@@ -1,3 +1,9 @@
+/**
+ * Unit tests for the Models page (``ModelsPage.tsx``): rendering one row per
+ * agent/model from ``GET /api/models``, plus the failure and empty states.
+ * Uses ``renderWithClient`` for the React Query wrapper and stubs
+ * ``window.fetch`` per test.
+ */
 import { screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithClient } from '../test/utils'
