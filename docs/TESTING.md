@@ -226,14 +226,14 @@ uv run pytest --cov --cov-report=xml
 Artifacts: `.coverage` (data file) and `htmlcov/` (HTML report); both are
 git-ignored.
 
-Currently **477 tests across 23 files** (deterministic, no live LLM required):
+Currently **493 tests across 24 files** (deterministic, no live LLM required):
 
 - `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
 - `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
 - `tests/test_resume_rewrite_validation.py` — 63 tests (rewrite post-validation + skill tailoring + fallback logging)
 - `tests/test_cover_letter_validation.py` — 109 tests (cover letter post-validation + fallback builder + fallback logging + contact-info post-processing)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
-- `tests/test_json_utils.py` — 15 tests (shared parser + JSON Schema helpers)
+- `tests/test_json_utils.py` — 23 tests (shared parser + `load_json_safe` + JSON Schema helpers)
 - `tests/test_formatter.py` — 41 tests (format_* helpers)
 - `tests/test_renderer.py` — 43 tests (ResumeRenderer plaintext/markdown/docx/pdf/render_all + contact-line rendering)
 - `tests/test_skill_normalizer.py` — 15 tests (SkillNormalizer canonical taxonomy)
@@ -251,6 +251,7 @@ Currently **477 tests across 23 files** (deterministic, no live LLM required):
 - `tests/test_web_outputs.py` — 3 tests (output file serving)
 - `tests/test_web_files.py` — 11 tests (file listing + deletion)
 - `tests/test_web_upload.py` — 9 tests (text extraction unit)
+- `tests/test_web_spa.py` — 8 tests (built-SPA mount + catch-all fallback)
 
 ---
 

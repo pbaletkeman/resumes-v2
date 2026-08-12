@@ -109,7 +109,7 @@ Entry points that drive this flow:
 
 ## Agent Chain & Transition Contracts
 
-Each stage reads exactly the inputs named below and returns a single validated Pydantic model. The orchestrator (`_run_pipeline_core` in `pipeline.py:324`) is responsible for serializing models to JSON string before handing them to the next agent.
+Each stage reads exactly the inputs named below and returns a single validated Pydantic model. The orchestrator (`_run_pipeline_core` in `pipeline.py:404`) runs the chain via `_run_stage` calls and is responsible for serializing models to JSON string before handing them to the next agent.
 
 **1 → 2 — Splitting the raw sources.**
 

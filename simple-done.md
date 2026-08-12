@@ -2981,3 +2981,88 @@ spot-checked; the route table matches `app/main.py`, sample paths exist
   no remaining drift in the quickstart paths.
 
 **Commit:** `simplify: phase 19 - README + ui/README quickstart accuracy (19.2)`
+
+---
+
+## Phase 19 - Completed sub-task 19.3: cross-check `docs/*.md` (8 guides) against code
+
+Original instruction:
+
+- **19.3** Cross-check `docs/*.md` (8 guides) against code; fix drift found during
+  Phases 1-18.
+
+All 8 guides (`architecture.md`, `agents.md`, `api.md`, `usage.md`, `models.md`,
+`TESTING.md`, `logging-info.md`, `skill-taxonomy.md`) were re-read against the
+post-Phase-18 code. Every named helper, class, schema, prompt, fallback, and
+command was spot-checked against the tree (see verification below). Most guides
+were already accurate — earlier phases had cross-checked `agents.md` (5.6, 6.5),
+`skill-taxonomy.md` (8.3), `README.md`/`ui/README.md` (19.2) — so the fixes below
+are the remaining drift that Phases 1-18 introduced or left stale.
+
+### Completion record
+
+**Changes made (documentation only, no behavior/markdown-command change):**
+
+- **`docs/architecture.md`** — corrected the `_run_pipeline_core` line reference
+  from `pipeline.py:324` to `pipeline.py:404` (the function moved during Phase 9
+  when `run_resume_pipeline`/`_to_rewrite_output`/`_run_stage` were added), and
+  noted that the stage chain now runs via `_run_stage` calls.
+- **`docs/usage.md`** —
+  - Removed the stale `DEFAULT_PROVIDER` row from the "Global overrides" table:
+    `config/agents.py` never reads `DEFAULT_PROVIDER` (only `MODEL_PROVIDER` +
+    `MODEL_NAME` + `OPENAI_API_KEY`), and Phase 1 already fixed the same stale
+    claim in the code's docstrings and AGENTS.md.
+  - Updated the `uv run pytest` quickstart row: "477 tests" -> "493 tests across
+    24 files" (matches the post-Phase-4 count and the Phase 4 `load_json_safe`
+    tests).
+- **`docs/TESTING.md`** — fixed the stale test census left over from before
+  Phases 1-18:
+  - "Currently **477 tests across 23 files**" -> **493 across 24 files**.
+  - `test_json_utils.py`: count corrected 15 -> 23 and description now names the
+    Phase 4 `load_json_safe` helper.
+  - Added the previously omitted `test_web_spa.py` (8 tests, built-SPA mount +
+    catch-all fallback).
+- **`docs/logging-info.md`** — corrected the verify-command example `uv run
+  pyright .` -> `uv run pyright` (passing `.` makes pyright recurse into `.venv/`
+  and spew third-party errors; AGENTS.md Toolchain quirks).
+- **`docs/api.md`** — the "Implementations" note now names the shared Phase 1
+  `build_task_prompt()` helper in `client/model_client.py` as the single prompt
+  builder both clients use; the `client/json_utils.py` reference line gained
+  `load_json_safe`.
+- **`docs/agents.md`** — `client/json_utils.py` reference line gained
+  `load_json_safe` (keeps the "shared JSON parsing" story consistent with
+  AGENTS.md).
+- **No changes needed** in `docs/models.md` (validator/coercer names unchanged by
+  Phase 2 — `_coerce_str_list`/`_coerce_experience_list` and the two
+  `_coerce_*_list`-named class validators all still exist) and
+  `docs/skill-taxonomy.md` (already verified clean in 8.3).
+
+**Behavior verification:**
+
+- Re-read each doc section against the matching module; no remaining drift:
+  - `config/agents.py` reads only `MODEL_PROVIDER`/`MODEL_NAME`/`OPENAI_API_KEY`
+    + per-agent overrides (confirmed by grep); `get_agent_config()`/`build_registry()`
+    shape matches `usage.md` section 2.
+  - `pipeline.py:404` = `async def _run_pipeline_core`, `pipeline.py:291` =
+    `_to_rewrite_output`, `pipeline.py:354` = `_run_stage` (confirmed by grep).
+  - `client/json_utils.py` has `parse_json_response` (line 34), `load_json_safe`
+    (line 75), `model_to_json_schema` (line 114) (confirmed by grep).
+  - `client/agents/jd_parsing.py` regex fallback calls `FormatDetector` +
+    `_extract_company_name` + `_NORMALIZER.normalize_list` exactly as `agents.md`
+    section 1 describes (confirmed by read).
+  - `client/open_ai_client.py` `_schema_name`/`_response_format_value` and the
+    90 s timeout match `api.md`; `client/ollama_client.py` `format="json"` /
+    schema-dict behavior matches.
+  - `client/templates/renderer.py` `_DEFAULT_EXTENSIONS` / `_default_extension` /
+    `_split_paragraphs` / `build_output_path` / `contact_line` all match `api.md`
+    section 3.
+  - `FormatDetector.__init__(client=None)` regex-only default matches the
+    `TESTING.md` section 2 examples.
+- `uv run pytest` — 493 passed (confirms the corrected census)
+- `uv run ruff check .` — pass (no Python touched)
+- `uv run ruff format --check .` — pass (md files not formatter targets)
+- `uv run pyright` — unaffected (no Python changed); skip-safe for a docs-only
+  edit.
+- `ui/`: no source touched by this sub-task (docs-only).
+
+**Commit:** `simplify: phase 19 - docs guides cross-check vs code after phases 1-18 (19.3)`

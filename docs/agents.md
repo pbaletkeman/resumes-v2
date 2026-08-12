@@ -371,7 +371,7 @@ Triggers when: empty input, both LLM attempts failed, or the letter was rejected
 - `client/agents/cover_letter.py` — company/name/contact post-processing + `_build_fallback_cover_letter`.
 - `client/format_detector.py` — regex parsing used by agents 1–2.
 - `client/skills/normalizer.py` — canonical `SkillNormalizer` used across agents.
-- `client/json_utils.py` — `parse_json_response`, `model_to_json_schema`.
+- `client/json_utils.py` — `parse_json_response`, `load_json_safe`, `model_to_json_schema`.
 - `client/templates/` (Jinja2 templates) and `client/templates/renderer.py` (`ResumeRenderer`) — turn the agent outputs into files.
 - `pipeline.py` — `_run_pipeline_core` orchestrates the chain (see `docs/architecture.md`).
 - `docs/architecture.md` — system overview + data flow. `resume-done.md` — completed work.

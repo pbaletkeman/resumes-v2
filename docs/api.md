@@ -39,7 +39,7 @@ Returns the model's text response (`str`).
 
 ### Implementations
 
-Both concrete clients build a compact, newline-delimited prompt (`Task: ... | Output format: ... | Rules: ... | Input: ...`) and send it as a `system` + `user` message pair. Both wrap provider errors into the [`client/errors.py`](client/errors.py) hierarchy: `LLMConnectionError`, `LLMResponseError`, `LLMTimeoutError`.
+Both concrete clients build a compact, newline-delimited prompt via the shared `build_task_prompt()` helper in `client/model_client.py` (`Task: ... | Output format: ... | Rules: ... | Input: ...`) and send it as a `system` + `user` message pair. Both wrap provider errors into the [`client/errors.py`](client/errors.py) hierarchy: `LLMConnectionError`, `LLMResponseError`, `LLMTimeoutError`.
 
 #### `OllamaClient` — `client/ollama_client.py`
 
@@ -317,7 +317,7 @@ Accepts a `CoverLetterOutput` or a raw string, strips surrounding whitespace, fi
 - `client/open_ai_client.py` — `OpenAIClient` implementation.
 - `client/model_registry.py` — `ModelClientRegistry` per-agent client resolution.
 - `client/errors.py` — `LLMConnectionError` / `LLMResponseError` / `LLMTimeoutError`.
-- `client/json_utils.py` — `parse_json_response`, `model_to_json_schema`.
+- `client/json_utils.py` — `parse_json_response`, `load_json_safe`, `model_to_json_schema`.
 - `pipeline.py` — `Agent`, `PipelineAgent`, `AgentRunner`, `run_resume_pipeline`, `_run_pipeline_core`, `create_runner_from_config`, `DEFAULT_AGENT_CLASSES`.
 - `client/templates/renderer.py` — `ResumeRenderer` and module-level helpers (`_default_extension`, `_split_paragraphs`, ...).
 - `client/formatter.py` — `format_resume_markdown`, `format_resume_plain`, `format_cover_letter`.
