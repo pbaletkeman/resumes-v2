@@ -9,7 +9,7 @@
 ## Progress log
 
 | Phase | Status | Record |
-|---|---|---|
+| --- | --- | --- |
 | 1 — Foundation: config, logging, errors, LLM clients, JSON utils | ✅ Completed | `simple-done.md` |
 | 2 — Pydantic models & coercion | ✅ Completed | `simple-done.md` |
 | 3 — Parsing agents & the format detector | ✅ Completed | `simple-done.md` |
