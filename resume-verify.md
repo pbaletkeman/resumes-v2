@@ -1,5 +1,12 @@
 # Resume Pipeline - Verification Plan (resume-verify.md)
 
+> **STATUS: ARCHIVED — completed verification record, no longer actionable.**
+> Ran 2026-08-06: every tracker row below is resolved and a summary + results
+> are appended in **Verification Results (2026-08-06)** (which also records the
+> two `pipeline.py` bugs found and fixed: the per-agent event-loop lifecycle and
+> `_extract_field` model handling). Superseded by `resume-done.md`, the `docs/`
+> guides, and the test suite. Kept for the verification history.
+
 Purpose: systematically confirm that **every claim in resume-done.md** is actually
 true in the codebase, and fix or re-archive anything that is not. Each item below
 has a **Verify** step (how to check) and a **Fix** step (what to do if it fails).

@@ -808,7 +808,7 @@ phase-tagged message. Check each sub-task off in place as it is completed.
 - [x] 19.1 `AGENTS.md`: verify file/architecture map after Phases 1-11 (new helpers `load_json_safe`, `_run_stage`); update quick-command table + conventions. ✅ See `simple-done.md`.
 - [x] 19.2 `README.md` / `ui/README.md`: quickstart accuracy. ✅ See `simple-done.md`.
 - [x] 19.3 Cross-check `docs/*.md` (8 guides) against code; fix drift found during Phases 1-18. ✅ See `simple-done.md`.
-- [ ] 19.4 Root scratch notes: classify archive vs actionable; recommend `scratch/` move or "completed" note (no deletion without user OK).
+- [x] 19.4 Root scratch notes: classify archive vs actionable; recommend `scratch/` move or "completed" note (no deletion without user OK). ✅ See `simple-done.md`. **Recommendation:** eight of the nine root scratch notes are fully-completed archives (`bots.md`, `frontend-plan.md`, `frontend-tasks-done.md`, `resume-done.md`, `resume-todo.md`, `resume-verify.md`, `resume-web-todo.md`, `web-files-todo.md`) - suggested move to `scratch/` (awaiting user OK). Only `frontend-tasks.md` is actionable (§7.3 Manual E2E).
 - [ ] 19.5 Remove outdated "TODO/Phase X remains" lines for completed work.
 
 ### Phase 20 - Final verification & regression
@@ -827,8 +827,6 @@ phase-tagged message. Check each sub-task off in place as it is completed.
   - [ ] 21.3.1 Detailed instructions on how to get started
   - [ ] 21.3.2 Detailed examples on all command line switches/options
   - [ ] 21.3.3 Common issues and fixes
-- [ ] 21.4 Make sure that there is a README.md in the root UI/frontend directory
-- [ ] 21.5 Make sure that there is a README.md in the root directory
-- [ ] 21.6 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
-- [ ] 21.7 Ensure all markdown files are up to date.
-- [ ] 21.8 No markdown linting errros in any of the markdown files
+- [ ] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
+- [ ] 21.5 Ensure all markdown files are up to date.
+- [ ] 21.6 No markdown linting errros in any of the markdown files

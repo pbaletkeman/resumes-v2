@@ -1,5 +1,11 @@
 # 🧩 Full Agent Pipeline (7 agents)
 
+> **STATUS: ARCHIVED — historical design spec, no longer actionable.** This is
+> the original 7-agent design document (per-agent prompts + output fields). The
+> pipeline it describes is implemented as dedicated classes in `client/agents/`;
+> the authoritative, maintained reference is `docs/agents.md` (and the pipeline
+> flow in `AGENTS.md`). Kept in the repo for provenance only.
+
 ## 1. JD Parsing Agent
 
 **Extracts**:

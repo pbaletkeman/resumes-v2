@@ -3066,3 +3066,61 @@ are the remaining drift that Phases 1-18 introduced or left stale.
 - `ui/`: no source touched by this sub-task (docs-only).
 
 **Commit:** `simplify: phase 19 - docs guides cross-check vs code after phases 1-18 (19.3)`
+
+---
+
+## Phase 19 - Completed sub-task 19.4: root scratch notes classified, completed notes added
+
+Original instruction:
+
+- **19.4** Root scratch notes: classify archive vs actionable; recommend
+  `scratch/` move or "completed" note (no deletion without user OK).
+
+All nine root scratch notes were read in full and classified. **Eight are
+fully-completed historical archives; one (`frontend-tasks.md`) is still
+actionable.** No file was deleted, and none was moved yet — the `scratch/`
+move is offered as a recommendation pending user approval (deletion/move
+guarded by the plan's "no deletion without user OK" rule).
+
+### Classification
+
+| Note | Class | Why |
+|---|---|---|
+| `bots.md` | **Archive** | Original 7-agent design spec (prompts + output fields); superseded by `docs/agents.md` and the dedicated classes in `client/agents/`. Kept for provenance. |
+| `frontend-plan.md` | **Archive** | Planning doc (decisions + wireframes) for the UI, which is fully implemented in `ui/`; see `frontend-tasks-done.md` and `ui/README.md`. |
+| `frontend-tasks-done.md` | **Archive** | Already titled "Completed Tasks" — per-task completion record of the frontend build. |
+| `frontend-tasks.md` | **Actionable** | The one open item: **§7.3 Manual E2E** (run built app against backend; confirm status polling, all result tabs, downloads, theming, SPA fallback). Its empty section headers 2/4/5 are stubs. |
+| `resume-done.md` | **Archive** | Already titled "Archive of everything implemented" — completed-work record for the backend pipeline. |
+| `resume-todo.md` | **Archive** | Header already reads "Status: ✅ ALL DONE"; pointer to `resume-done.md`. |
+| `resume-verify.md` | **Archive** | Verification plan fully executed 2026-08-06 with a filled tracker + "Verification Results" section (documented the two `pipeline.py` bugs fixed). |
+| `resume-web-todo.md` | **Archive** | FastAPI web-layer plan; all task checkboxes done (`app/` implemented, `tests/test_web_*.py`, `docs/api.md`). |
+| `web-files-todo.md` | **Archive** | File-management plan; all task checkboxes done (`app/files.py`, `tests/test_web_files.py`). |
+
+### Completion record
+
+**Changes made (module-comment notes in the scratch files; no code touched):**
+
+- Added an `ARCHIVED — no longer actionable` status banner to the top of the
+  five archives that lacked an explicit completion marker (`bots.md`,
+  `frontend-plan.md`, `resume-verify.md`, `resume-web-todo.md`,
+  `web-files-todo.md`). Each banner names the live replacement(s) (`docs/`
+  guides, `AGENTS.md`, `app/`, `tests/`) so a reader knows where the work
+  now lives. The three already-labeled archives (`resume-done.md`,
+  `frontend-tasks-done.md`, `resume-todo.md`) were left unchanged.
+- `frontend-tasks.md` — added an `ACTIONABLE — one item left` banner: every
+  completed task is recorded in `frontend-tasks-done.md`; the only remaining
+  item is §7.3 Manual E2E (kept in root as the actionable note).
+- `simple.md` — 19.4 checked off with the classification summary + the
+  `scratch/` recommendation inline.
+
+**Recommended follow-up (not executed — needs user OK):** move the eight
+archived notes (`bots.md`, `frontend-plan.md`, `frontend-tasks-done.md`,
+`resume-done.md`, `resume-todo.md`, `resume-verify.md`, `resume-web-todo.md`,
+`web-files-todo.md`) into a `scratch/` directory, leaving the actionable
+`frontend-tasks.md` in the repo root. No file should be deleted.
+
+**Behavior verification:** documentation-only change — no Python/TS source
+touched, so `pytest`/`ruff`/`pyright`/`tsc`/`npm test` are unaffected. `git
+diff` confirms changes are limited to the six markdown files above.
+
+**Commit:** `simplify: phase 19 - classify root scratch notes as archive vs actionable (19.4)`

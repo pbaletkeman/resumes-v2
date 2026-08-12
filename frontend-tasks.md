@@ -1,5 +1,12 @@
 # Frontend Implementation Tasks
 
+> **STATUS: ACTIONABLE — one item left.** This is the only still-open root
+> scratch note. Every completed task lives in `frontend-tasks-done.md`
+> (sections 1.1-2.5, 5.x, 6, 7.1/7.2, 8.1 are all done; the empty section
+> headers 2/4/5 below are stubs pointing there). The single remaining item is
+> **§7.3 Manual E2E** below: run the built app against the backend and confirm
+> status polling, all result tabs, downloads, theming, and the SPA fallback.
+
 Detailed breakdown of `frontend-plan.md` into actionable, verifiable tasks. Each task lists the deliverable, its acceptance check(s), and how to verify. Assumed environment: Node v24/npm on Windows, backend on `localhost:8000` (`uv run uvicorn app.main:app --reload`).
 
 Conventions:

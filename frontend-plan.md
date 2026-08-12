@@ -1,5 +1,11 @@
 # Frontend Plan: React + PrimeReact UI for the Resume API
 
+> **STATUS: ARCHIVED — completed planning doc, no longer actionable.** The UI
+> described here (Vite + React + PrimeReact + TanStack Query, tabbed results,
+> files/models pages) is implemented in `ui/`. Live references: `ui/README.md`
+> (quickstart + source layout), `AGENTS.md` UI section, and task-by-task
+> completion in `frontend-tasks-done.md`. Kept for the decisions + wireframes.
+
 Decisions locked in:
 
 - TypeScript (Vite `react-ts` template)

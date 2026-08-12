@@ -1,5 +1,12 @@
 # Resume Web API — Plan (FastAPI)
 
+> **STATUS: ARCHIVED — completed plan, no longer actionable.** The FastAPI web
+> layer described here is implemented in `app/` (`main.py`, `schemas.py`,
+> `tasks.py`, `upload.py`); every task checkbox below is done. Coverage lives in
+> `tests/test_web_*.py`; docs in `docs/api.md`; quickstart in `README.md`. Kept
+> for the architectural-constraint rationale (`_run_pipeline_core` vs
+> `run_resume_pipeline`).
+
 Turn the existing 7-agent CLI pipeline into a FastAPI application. **API layer only** in this pass — no API tests, no `test_pipeline.py`, no Phase 7 docs, no `AGENTS.md`/`docs/` edits.
 
 ## Key architectural constraint

@@ -1,5 +1,11 @@
 # File Management Endpoints — Plan (FastAPI)
 
+> **STATUS: ARCHIVED — completed plan, no longer actionable.** The
+> file-management endpoints described here are implemented in `app/files.py` +
+> `app/main.py`; every task checkbox below is done. Coverage lives in
+> `tests/test_web_files.py` + `tests/test_web_upload.py`; docs in `docs/api.md`.
+> Kept for the listing/delete design rationale (safe-path guard, paging).
+
 Add file-management capabilities to the existing FastAPI app in `app/`:
 
 1. **List generated files** (from the `output/` dir) with metadata + filtering + paging.
