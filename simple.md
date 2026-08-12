@@ -46,6 +46,7 @@ clean.
   - [ ] 21.2.1 Detailed instructions on how to get started
   - [ ] 21.2.2 Detailed examples on all command line switches/options
   - [ ] 21.2.3 Common issues and fixes
-- [ ] 21.3 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
-- [ ] 21.4 Ensure all markdown files are up to date.
-- [ ] 21.5 No markdown linting errors in any of the markdown files
+- [ ] 21.3 Replace all ASCII diagrams with Mermaid Markdown diagrams
+- [ ] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
+- [ ] 21.5 Ensure all markdown files are up to date.
+- [ ] 21.6 No markdown linting errors in any of the markdown files
