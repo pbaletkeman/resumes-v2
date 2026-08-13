@@ -96,3 +96,35 @@ class DeleteFilesResponse(BaseModel):
 
     deleted: list[str] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)
+
+
+class ModelSummaryRow(BaseModel):
+    """One agent's model configuration as shown on the Models page.
+
+    Mirrors one row of ``config.agents.get_model_summary()``: the effective
+    provider/model (after any persisted override), the environment defaults
+    the agent would fall back to, and whether a persisted override is active.
+    """
+
+    agent: str = Field(description="Pipeline agent name, e.g. cover_letter_agent.")
+    provider: str = Field(description="Effective provider (ollama or openai).")
+    model: str = Field(description="Effective model name.")
+    default_provider: str = Field(
+        description="Provider without any persisted override."
+    )
+    default_model: str = Field(description="Model without any persisted override.")
+    is_overridden: bool = Field(
+        description="Whether a persisted provider/model override is active."
+    )
+
+
+class AgentOverrideUpdate(BaseModel):
+    """Body for ``PATCH /api/models/{agent}``: edit provider and/or model."""
+
+    provider: str | None = Field(
+        default=None,
+        description="Provider name (ollama or openai); None leaves it unchanged.",
+    )
+    model: str | None = Field(
+        default=None, description="Model name; None leaves it unchanged."
+    )

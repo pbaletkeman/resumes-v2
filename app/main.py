@@ -3,6 +3,8 @@
 Routes:
     GET  /health                       service liveness probe
     GET  /api/models                   per-agent model summary
+    PATCH /api/models/{agent}          edit an agent's model/provider
+    DELETE /api/models/{agent}         reset an agent's model/provider to defaults
     POST /api/pipeline                 run the pipeline synchronously (multipart)
     POST /api/pipeline/async           launch a background pipeline run
     GET  /api/tasks/{task_id}          poll a background task
@@ -16,6 +18,11 @@ Routes:
 parallel: identical query params (``file_type``, ``q``, ``page``,
 ``page_size``, ``sort``), differing only in the directory they list
 (``OUTPUT_DIR`` vs ``UPLOADS_DIR``).  Both delegate to ``app.files.list_files``.
+
+Model edits (``PATCH``/``DELETE /api/models/{agent}``) are persisted in a
+SQLite database (``app.model_store.ModelStore``) and, on each change, the
+shared ``AgentRunner`` is rebuilt from the environment defaults plus the
+persisted overrides so the running pipeline picks up the new model/provider.
 """
 
 from __future__ import annotations
@@ -31,11 +38,15 @@ from typing import Annotated, Any, cast
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from openai import OpenAIError
 
 from app.files import list_files, safe_delete_path
+from app.model_store import ModelStore
 from app.schemas import (
+    AgentOverrideUpdate,
     DeleteFilesRequest,
     DeleteFilesResponse,
+    ModelSummaryRow,
     PagedFile,
     PipelineRunResponse,
     TaskCreated,
@@ -43,7 +54,7 @@ from app.schemas import (
 )
 from app.tasks import TaskRegistry
 from app.upload import extract_text
-from config.agents import get_model_summary
+from config.agents import AGENT_NAMES, get_model_summary
 from pipeline import (
     _run_pipeline_core,  # pyright: ignore[reportPrivateUsage]
     create_runner_from_config,
@@ -92,10 +103,17 @@ def mount_spa(app_instance: FastAPI, ui_dist: Path) -> None:
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
-    """Build one shared AgentRunner on the app loop at startup."""
+    """Build one shared AgentRunner on the app loop at startup.
+
+    Creates the SQLite ``ModelStore`` and builds the runner from the
+    environment defaults plus any persisted model/provider overrides, so a
+    restart keeps the model choices made on the Models page.
+    """
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    runner = create_runner_from_config()
+    store = ModelStore()
+    app_instance.state.model_store = store
+    runner = create_runner_from_config(overrides=store.all_overrides())
     app_instance.state.runner = runner
     logger.info("Agent runner built; agents: %s", ", ".join(runner.agents))
     yield
@@ -122,6 +140,52 @@ def _require_runner() -> Any:
     if runner is None:
         raise HTTPException(status_code=503, detail="Pipeline runner not initialized")
     return runner
+
+
+def _require_store() -> ModelStore:
+    """Return the lifespan-built ``ModelStore`` for the model routes.
+
+    Returns:
+        The shared ``ModelStore`` instance.
+
+    Raises:
+        HTTPException(503): when the app is not fully started (no store).
+    """
+    store = getattr(app.state, "model_store", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Model store not initialized")
+    return store
+
+
+def _rebuild_runner() -> None:
+    """Rebuild ``app.state.runner`` from the persisted model overrides.
+
+    Called after every model edit so the running pipeline uses the new
+    provider/model.  The rebuilt ``AgentRunner`` starts with agent *classes*
+    again, which are lazily instantiated on the current event loop on first
+    dispatch (see ``AgentRunner.run_agent_async``), so the new clients bind
+    cleanly to the app loop.
+    """
+    store = _require_store()
+    overrides = store.all_overrides()
+    app.state.runner = create_runner_from_config(overrides=overrides)
+    logger.info("Rebuilt agent runner with %d model override(s)", len(overrides))
+
+
+def _agent_or_404(agent: str) -> None:
+    """Reject requests for an unknown agent name with a 404."""
+    if agent not in AGENT_NAMES:
+        raise HTTPException(status_code=404, detail=f"Unknown agent '{agent}'")
+
+
+def _summary_row(agent: str) -> dict[str, Any]:
+    """Return the summary row for one agent, matching ``GET /api/models``."""
+    _agent_or_404(agent)
+    rows = get_model_summary(_require_store().all_overrides())
+    for row in rows:
+        if row["agent"] == agent:
+            return cast(dict[str, Any], row)
+    raise HTTPException(status_code=404, detail=f"Unknown agent '{agent}'")
 
 
 def _mime_for(filename: str) -> str:
@@ -221,9 +285,92 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/models")
-async def list_models() -> list[dict[str, str]]:
-    return get_model_summary()
+@app.get("/api/models", response_model=list[ModelSummaryRow])
+async def list_models() -> list[dict[str, Any]]:
+    """List the effective provider/model for each agent.
+
+    Rows report the effective values after any persisted override, plus the
+    environment defaults the agent would fall back to (see
+    ``config.agents.get_model_summary``).
+    """
+    return get_model_summary(_require_store().all_overrides())
+
+
+@app.patch("/api/models/{agent}", response_model=ModelSummaryRow)
+async def update_agent_model(agent: str, body: AgentOverrideUpdate) -> dict[str, Any]:
+    """Edit the model and/or provider used by one agent.
+
+    Persists the override in SQLite and rebuilds the shared runner so the
+    change takes effect on the next pipeline run.  A ``None`` field leaves
+    that dimension inheriting the environment default.  When the rebuild
+    fails (e.g. switching to OpenAI without an API key set) the change is
+    rolled back and a 400 is returned.
+
+    Raises:
+        HTTPException(400): when both fields are unset, the provider is
+            unknown, the model is empty, or the runner cannot be rebuilt.
+        HTTPException(404): when the agent name is unknown.
+    """
+    _agent_or_404(agent)
+    if body.provider is None and body.model is None:
+        raise HTTPException(
+            status_code=400, detail="Provide at least one of provider or model."
+        )
+    if body.provider is not None and body.provider not in ("ollama", "openai"):
+        raise HTTPException(
+            status_code=400,
+            detail="Unknown provider. Supported: ollama, openai",
+        )
+    model = body.model.strip() if body.model is not None else None
+    if body.model is not None and not model:
+        raise HTTPException(status_code=400, detail="Model must not be empty.")
+
+    store = _require_store()
+    store.set_override(agent, body.provider, model)
+    try:
+        _rebuild_runner()
+    except Exception as exc:  # noqa: BLE001
+        store.clear(agent)
+        logger.error(
+            "Runner rebuild failed after model update for %s; change rolled back",
+            agent,
+            exc_info=True,
+        )
+        if isinstance(exc, OpenAIError):
+            raise HTTPException(
+                status_code=400,
+                detail="Switching an agent to OpenAI requires OPENAI_API_KEY "
+                "to be set in the server environment.",
+            ) from exc
+        raise HTTPException(
+            status_code=400, detail=f"Could not apply the model change: {exc}"
+        ) from exc
+
+    logger.info(
+        "Updated model config for %s: provider=%s model=%s",
+        agent,
+        body.provider,
+        model,
+    )
+    return _summary_row(agent)
+
+
+@app.delete("/api/models/{agent}", response_model=ModelSummaryRow)
+async def reset_agent_model(agent: str) -> dict[str, Any]:
+    """Reset one agent's model and provider back to the environment defaults.
+
+    Removes the persisted override (SQLite row) and rebuilds the shared
+    runner so the next pipeline run uses the default configuration.
+
+    Raises:
+        HTTPException(404): when the agent name is unknown.
+    """
+    _agent_or_404(agent)
+    store = _require_store()
+    store.clear(agent)
+    _rebuild_runner()
+    logger.info("Reset model config for %s to defaults", agent)
+    return _summary_row(agent)
 
 
 @app.post("/api/pipeline", response_model=PipelineRunResponse)

@@ -531,6 +531,7 @@ async def _run_pipeline_core(
 
 def create_runner_from_config(
     agent_classes: dict[str, Any] | None = None,
+    overrides: Mapping[str, Mapping[str, str | None]] | None = None,
 ) -> AgentRunner:
     """Create an ``AgentRunner`` using environment-based configuration.
 
@@ -541,6 +542,10 @@ def create_runner_from_config(
         agent_classes: Optional mapping of agent names to agent classes.
             When ``None``, all 7 dedicated pipeline agents are wired up
             (see :data:`DEFAULT_AGENT_CLASSES`).
+        overrides: Optional persisted (database) provider/model overrides
+            keyed by agent name; passed through to ``config.agents`` so they
+            win over the environment-var configuration.  Used by the web API
+            (``app/main.py``) so model edits survive restarts.
 
     Returns:
         A configured ``AgentRunner`` with the registry attached.
@@ -552,7 +557,7 @@ def create_runner_from_config(
         runner = create_runner_from_config()
         results = run_resume_pipeline(runner, jd_text, resume_text)
     """
-    registry = build_registry()
+    registry = build_registry(overrides=overrides)
     return AgentRunner(agent_classes or DEFAULT_AGENT_CLASSES, registry=registry)
 
 

@@ -30,6 +30,8 @@
 | 18 — Frontend tests | ✅ Completed | `simple-done.md` |
 | 19 — Repo-wide documentation consolidation | ✅ Completed | `simple-done.md` |
 | 20 — Final verification & regression (20.1-20.5) | ✅ Completed | `simple-done.md` |
+| 22 — Model editing (SQLite overrides + Models page editing) | ✅ Completed | `simple-done.md` |
+| 23 — Formatting (23.1 cover letter DOCX/PDF, 23.2 markdown line breaks done) | 🔄 In progress | `simple-done.md` |
 
 Phase 20 verification: backend green (`pytest` 493 passed, `ruff check .`,
 `ruff format --check .`, `pyright` 0 errors/warnings), frontend green
@@ -37,22 +39,26 @@ Phase 20 verification: backend green (`pytest` 493 passed, `ruff check .`,
 live E2E smoke passed, and the diff review / final commit left the working tree
 clean.
 
+Phase 22 verification: backend green (`pytest` 518 passed, `ruff check .`,
+`ruff format --check .`, `pyright` 0 errors/warnings), frontend green
+(`npm test` 57 passed, `npm run lint`, `npm run build`).
+
+Phase 23.1 verification: backend green (`pytest` 520 passed, `ruff check .`,
+`ruff format --check .`, `pyright` 0 errors/warnings), frontend green
+(`npm test` 57 passed, `npm run lint`, `npm run build`).
+
+Phase 23.2 verification: backend green (`pytest` 526 passed, `ruff check .`,
+`ruff format --check .`, `pyright` 0 errors/warnings). Backend-only change
+(renderer templates + tests), no frontend impact.
+
 ## Remaining work
 
-### Phase 24 - Model editing
+### Phase 23 - Formatting
 
-- [ ] 24.1 Provide a way to edit the model used per an agent via the web API (backend), using SQLite as the database
-- [ ] 24.2 Update the model view to allow for changing the model used for the agent (frontend)
-- [ ] 24.3 Provide a way to edit the provide used per an agent via the web API (backend), using SQLite as the database
-- [ ] 24.4 Update the model view to allow for changing the provider used for the agent (frontend)
-- [ ] 24.5 Provide a way to reset to defaults for both the model and the provider
-
-### Phase 25 - Formatting
-
-- [ ] 25.1 The Cover letter is never transformed into a DOCX file or a PDF file.
-- [ ] 25.2 The line breaks in the generated files are not correct. In Markdown you need two line breaks in a row to have one of then display correctly.
-- [ ] 25.3 Provide a way to generate all three layout formats of the resume templates or at least provide a way to select which template is being used.
-- [ ] 25.4 The closing salulation for the cover letters is repeated.
+- [x] 23.1 The Cover letter is never transformed into a DOCX file or a PDF file. ✅ See `simple-done.md`.
+- [x] 23.2 The line breaks in the generated files are not correct. In Markdown you need two line breaks in a row to have one of then display correctly. ✅ See `simple-done.md`.
+- [ ] 23.3 Provide a way to generate all three layout formats of the resume templates.
+- [ ] 23.4 The closing salulation for the cover letters is repeated.
 
 ### Phase 21 - Documentation Cleanup
 

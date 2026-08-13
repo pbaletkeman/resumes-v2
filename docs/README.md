@@ -243,7 +243,7 @@ uv run python pipeline.py --resume resume.txt --jd jd.txt
 | `uv run python wip_testing/test_tone_polishing.py` | Tone Polishing Agent demo (chains 1-6). |
 | `uv run python wip_testing/test_cover_letter.py` | Cover Letter Agent demo (chains 1-7). |
 | `uv run python wip_testing/test_parsing.py` | Regex + LLM `FormatDetector` parsing demo. |
-| `uv run pytest` | Unit suite (`tests/`, 493 tests, no LLM). |
+| `uv run pytest` | Unit suite (`tests/`, 518 tests, no LLM). |
 | `uv run pytest -v` / `--cov` / `--cov-report=html` | Verbose / coverage / HTML coverage report. |
 | `uv run pytest tests/test_<name>.py` | Run one test file. |
 | `uv run ruff check .` | Lint. |
@@ -327,6 +327,8 @@ routes when `ui/dist/index.html` exists.
 |---|---|---|
 | `GET` | `/health` | Liveness check. |
 | `GET` | `/api/models` | List configured model per agent. |
+| `PATCH` | `/api/models/{agent}` | Edit an agent's provider and/or model (SQLite-persisted). |
+| `DELETE` | `/api/models/{agent}` | Reset an agent's provider/model to defaults. |
 | `POST` | `/api/pipeline` | Run the full pipeline synchronously (multipart). |
 | `POST` | `/api/pipeline/async` | Launch a background run; returns `task_id`. |
 | `GET` | `/api/tasks/{task_id}` | Poll a task's status/result. |
@@ -353,6 +355,18 @@ GET {{base}}/health
 
 ### List configured models
 GET {{base}}/api/models
+
+### Edit an agent's model + provider (NULL/omitted = inherit defaults)
+PATCH {{base}}/api/models/cover_letter_agent
+Content-Type: application/json
+
+{
+  "provider": "openai",
+  "model": "gpt-4o"
+}
+
+### Reset an agent to defaults
+DELETE {{base}}/api/models/cover_letter_agent
 
 ### Launch an async pipeline run
 POST {{base}}/api/pipeline/async
@@ -397,6 +411,8 @@ Jinja2 templates (`client/templates/`: `modern`, `classic`, `minimal`,
 | `resume_pdf` | `.pdf` |
 | `cover_letter_plaintext` | `.txt` (only when the letter is non-empty) |
 | `cover_letter_markdown` | `.md` (only when the letter is non-empty) |
+| `cover_letter_docx` | `.docx` (only when the letter is non-empty) |
+| `cover_letter_pdf` | `.pdf` (only when the letter is non-empty) |
 
 Filenames follow `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}`
 with every segment slugified (e.g. `cover_letter` → `cover-letter`), so the

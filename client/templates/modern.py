@@ -18,7 +18,7 @@ MODERN_RESUME = {
     "plaintext": """\
 {{ name }}
 
-{{ title }}
+{% if title %}{{ title }}{% endif %}
 
 SUMMARY
 {{ summary }}
@@ -53,7 +53,7 @@ EDUCATION
     "markdown": """\
 # {{ name }}
 
-**{{ title }}**
+{% if title %}**{{ title }}**{% endif %}
 
 ## Summary
 

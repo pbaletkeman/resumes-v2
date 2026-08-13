@@ -16,7 +16,9 @@ import {
   fetchModels,
   getTask,
   listFiles,
+  resetAgentModel,
   runPipelineAsync,
+  updateAgentModel,
 } from './client'
 import type { FileListParams } from './client'
 
@@ -135,6 +137,61 @@ describe('api client', () => {
     fetchMock.mockResolvedValue(makeResponse(models))
     await expect(fetchModels()).resolves.toEqual(models)
     expect(fetchMock).toHaveBeenCalledWith('/api/models', undefined)
+  })
+
+  it('updateAgentModel PATCHes the agent override as JSON', async () => {
+    const row = {
+      agent: 'jd_parsing_agent',
+      provider: 'openai',
+      model: 'gpt-4o',
+      default_provider: 'ollama',
+      default_model: 'qwen',
+      is_overridden: true,
+    }
+    fetchMock.mockResolvedValue(makeResponse(row))
+    await expect(
+      updateAgentModel('jd_parsing_agent', { provider: 'openai', model: 'gpt-4o' }),
+    ).resolves.toEqual(row)
+    expect(fetchMock).toHaveBeenCalledWith('/api/models/jd_parsing_agent', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'openai', model: 'gpt-4o' }),
+    })
+  })
+
+  it('updateAgentModel sends only the provided fields', async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({
+        agent: 'gap_analysis_agent',
+        provider: 'ollama',
+        model: 'llama3.1',
+        default_provider: 'ollama',
+        default_model: 'qwen',
+        is_overridden: true,
+      }),
+    )
+    await updateAgentModel('gap_analysis_agent', { model: 'llama3.1' })
+    expect(fetchMock).toHaveBeenCalledWith('/api/models/gap_analysis_agent', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama3.1' }),
+    })
+  })
+
+  it('resetAgentModel DELETEs the agent override', async () => {
+    const row = {
+      agent: 'jd_parsing_agent',
+      provider: 'ollama',
+      model: 'qwen',
+      default_provider: 'ollama',
+      default_model: 'qwen',
+      is_overridden: false,
+    }
+    fetchMock.mockResolvedValue(makeResponse(row))
+    await expect(resetAgentModel('jd_parsing_agent')).resolves.toEqual(row)
+    expect(fetchMock).toHaveBeenCalledWith('/api/models/jd_parsing_agent', {
+      method: 'DELETE',
+    })
   })
 
   it('runPipelineAsync POSTs the FormData to /api/pipeline/async', async () => {

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from typing import Any
 
 from client.model_registry import ModelClientRegistry
@@ -107,7 +108,9 @@ def _client_config(provider: str, model: str, api_key: str) -> dict[str, str]:
     return {"provider": provider, "model": model}
 
 
-def get_agent_config() -> dict[str, Any]:
+def get_agent_config(
+    overrides: Mapping[str, Mapping[str, str | None]] | None = None,
+) -> dict[str, Any]:
     """Return the agent-to-model configuration.
 
     Reads the environment and produces the config dict consumed by
@@ -126,12 +129,21 @@ def get_agent_config() -> dict[str, Any]:
     in ``"agents"``) is only created when that agent has a provider or
     model override.  Agents without an override fall back to ``"default"``.
 
+    Args:
+        overrides: Optional persisted (database) overrides keyed by agent
+            name, each ``{"provider": ..., "model": ...}`` with ``None`` for
+            unset dimensions.  A persisted override wins over the matching
+            environment-var override; the env override then acts as the
+            fallback for the dimension the database does not set.  ``None``
+            (or an empty dict) keeps the pure environment behavior.
+
     Returns:
         Configuration dictionary ready for ``ModelClientRegistry.from_config()``.
     """
     default_provider = os.getenv("MODEL_PROVIDER", "ollama")
     default_model = os.getenv("MODEL_NAME", "qwen2.5:7b-instruct")
     api_key = os.getenv("OPENAI_API_KEY", "")
+    overrides = overrides or {}
 
     logger.debug(
         "Agent config: provider=%s model=%s has_api_key=%s",
@@ -153,11 +165,18 @@ def get_agent_config() -> dict[str, Any]:
         agent_provider = os.getenv(f"{env_prefix}_PROVIDER")
         agent_model = os.getenv(f"{env_prefix}_MODEL")
 
-        if agent_provider is None and agent_model is None:
+        # A persisted (database) override wins over the env-var override; the
+        # env-var override is the fallback for the dimension the database
+        # leaves unset.
+        agent_override = overrides.get(agent_name, {})
+        provider_override = agent_override.get("provider") or agent_provider
+        model_override = agent_override.get("model") or agent_model
+
+        if provider_override is None and model_override is None:
             continue
 
-        provider = _effective_provider(agent_provider, default_provider)
-        model = _effective_model(agent_model, default_model)
+        provider = _effective_provider(provider_override, default_provider)
+        model = _effective_model(model_override, default_model)
         client_name = f"{agent_name}_client"
         clients[client_name] = _client_config(provider, model, api_key)
         agents[agent_name] = client_name
@@ -172,13 +191,20 @@ def get_agent_config() -> dict[str, Any]:
     }
 
 
-def build_registry() -> ModelClientRegistry:
+def build_registry(
+    overrides: Mapping[str, Mapping[str, str | None]] | None = None,
+) -> ModelClientRegistry:
     """Build a ``ModelClientRegistry`` from the current environment.
+
+    Args:
+        overrides: Optional persisted (database) overrides, passed through to
+            :func:`get_agent_config`.  ``None`` uses environment variables
+            only.
 
     Returns:
         A configured ``ModelClientRegistry`` with all clients registered.
     """
-    config = get_agent_config()
+    config = get_agent_config(overrides=overrides)
     registry = ModelClientRegistry()
     registry.from_config(config)
     logger.info(
@@ -189,27 +215,52 @@ def build_registry() -> ModelClientRegistry:
     return registry
 
 
-def get_model_summary() -> list[dict[str, str]]:
+def get_model_summary(
+    overrides: Mapping[str, Mapping[str, str | None]] | None = None,
+) -> list[dict[str, str | bool]]:
     """Return a summary of which model each agent uses.
 
+    Each row reports the *effective* provider/model (after the persisted
+    overrides) alongside the environment *defaults* the agent would fall back
+    to, and whether a persisted override is active.  The web API uses this to
+    render the editable models table.
+
+    Args:
+        overrides: Optional persisted (database) overrides, passed through to
+            :func:`get_agent_config`.
+
     Returns:
-        List of dicts with ``agent``, ``provider``, and ``model`` keys,
+        List of dicts with ``agent``, ``provider``, ``model``,
+        ``default_provider``, ``default_model``, and ``is_overridden`` keys,
         one entry per agent in pipeline order.
     """
-    config = get_agent_config()
-    summary: list[dict[str, str]] = []
+    env_config = get_agent_config()
+    merged_config = get_agent_config(overrides=overrides)
+    overrides = overrides or {}
 
-    default_client = config["clients"].get(config["default"], {})
+    env_default_client = env_config["clients"].get(env_config["default"], {})
+    merged_default_client = merged_config["clients"].get(merged_config["default"], {})
 
+    summary: list[dict[str, str | bool]] = []
     for agent_name in AGENT_NAMES:
-        client_name = config["agents"].get(agent_name, config["default"])
-        client_cfg = config["clients"].get(client_name, default_client)
+        env_client_name = env_config["agents"].get(agent_name, env_config["default"])
+        env_cfg = env_config["clients"].get(env_client_name, env_default_client)
+
+        merged_client_name = merged_config["agents"].get(
+            agent_name, merged_config["default"]
+        )
+        merged_cfg = merged_config["clients"].get(
+            merged_client_name, merged_default_client
+        )
 
         summary.append(
             {
                 "agent": agent_name,
-                "provider": client_cfg.get("provider", "unknown"),
-                "model": client_cfg.get("model", "unknown"),
+                "provider": merged_cfg.get("provider", "unknown"),
+                "model": merged_cfg.get("model", "unknown"),
+                "default_provider": env_cfg.get("provider", "unknown"),
+                "default_model": env_cfg.get("model", "unknown"),
+                "is_overridden": agent_name in overrides,
             }
         )
 

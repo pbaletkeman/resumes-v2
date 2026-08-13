@@ -7,11 +7,28 @@
  * `client/models.py` (serialized into the pipeline response).
  */
 
-/** `GET /api/models` row — from `config/agents.py: get_model_summary()`. */
+/**
+ * `GET /api/models` row — from `config/agents.py: get_model_summary()`, mirrors
+ * `app.schemas.ModelSummaryRow`. The effective `provider`/`model` are the
+ * values after any persisted override; the `default_*` fields are the
+ * environment defaults the agent would fall back to.
+ */
 export interface ModelSummary {
   agent: string
   provider: string
   model: string
+  default_provider: string
+  default_model: string
+  is_overridden: boolean
+}
+
+/**
+ * `PATCH /api/models/{agent}` body — mirrors `app.schemas.AgentOverrideUpdate`.
+ * A `null` field leaves that dimension unchanged (inheriting the default).
+ */
+export interface AgentOverrideUpdate {
+  provider?: string | null
+  model?: string | null
 }
 
 export type TaskStatusName = 'pending' | 'running' | 'completed' | 'failed'

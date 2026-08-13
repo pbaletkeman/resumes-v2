@@ -209,9 +209,35 @@ def render_cover_letter_markdown(
     linkedin: str = "",
     github: str = "",
 ) -> str:
+
+def render_cover_letter_docx(
+    self,
+    cover_letter: CoverLetterOutput,
+    *,
+    name: str = "",
+    company: str = "",
+    phone: str = "",
+    email: str = "",
+    linkedin: str = "",
+    github: str = "",
+    output_path: str | Path | None = None,
+) -> Path:
+
+def render_cover_letter_pdf(
+    self,
+    cover_letter: CoverLetterOutput,
+    *,
+    name: str = "",
+    company: str = "",
+    phone: str = "",
+    email: str = "",
+    linkedin: str = "",
+    github: str = "",
+    output_path: str | Path | None = None,
+) -> Path:
 ```
 
-Render the letter in plaintext/Markdown. Contact fields (`phone`, `email`, `linkedin`, `github`) are joined with ` | ` into a header `contact_line`. The letter text is split on blank lines into opening / body / closing paragraphs (the template renders its own salutation and signature, so leading `Dear ...` and trailing `Sincerely, ...` blocks are stripped by `_split_paragraphs`).
+Render the letter in plaintext, Markdown, DOCX, or PDF. Contact fields (`phone`, `email`, `linkedin`, `github`) are joined with ` | ` into a header `contact_line`. The letter text is split on blank lines into opening / body / closing paragraphs (the template renders its own salutation and signature, so leading `Dear ...` and trailing `Sincerely, ...` blocks are stripped by `_split_paragraphs`). The DOCX and PDF variants mirror that layout with the same styling as the resume binary formats (letter size, 1-inch margins, name at 14pt bold) and return the written `Path` (a temp file when `output_path` is `None`).
 
 ### Binary formats
 
@@ -260,7 +286,7 @@ def render_all(
 ) -> dict[str, Path]:
 ```
 
-Writes the four resume formats (`resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`) and, when `cover_letter` is non-empty, the two letter formats (`cover_letter_plaintext`, `cover_letter_markdown`). Files land in `output_dir` under timestamped, slugified names built by `build_output_path`. Returns `dict[str, Path]` keyed by format name.
+Writes the four resume formats (`resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`) and, when `cover_letter` is non-empty, the four letter formats (`cover_letter_plaintext`, `cover_letter_markdown`, `cover_letter_docx`, `cover_letter_pdf`). Files land in `output_dir` under timestamped, slugified names built by `build_output_path`. Returns `dict[str, Path]` keyed by format name.
 
 ### Path helper
 

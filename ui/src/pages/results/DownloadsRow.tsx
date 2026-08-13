@@ -11,6 +11,8 @@ const DOWNLOAD_LABELS: Record<string, string> = {
   resume_pdf: 'Resume (pdf)',
   cover_letter_plaintext: 'Cover letter (txt)',
   cover_letter_markdown: 'Cover letter (md)',
+  cover_letter_docx: 'Cover letter (docx)',
+  cover_letter_pdf: 'Cover letter (pdf)',
 }
 
 function DownloadsRow({ outputFiles }: DownloadsRowProps) {

@@ -12,6 +12,8 @@ import {
   useDeleteFiles,
   useFiles,
   useModels,
+  useResetAgentModel,
+  useUpdateAgentModel,
 } from './hooks'
 import { createTestQueryClient, stubFetch, withClient } from '../test/utils'
 import type { PagedFile } from './types'
@@ -137,5 +139,81 @@ describe('useDeleteFiles', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['files'] })
     expect(queryClient.getQueryCache().findAll({ queryKey: ['files'] }).length).toBe(0)
+  })
+})
+
+describe('useUpdateAgentModel', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('PATCHes the override and invalidates models queries on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          agent: 'jd_parsing_agent',
+          provider: 'ollama',
+          model: 'llama3.1',
+          default_provider: 'ollama',
+          default_model: 'qwen',
+          is_overridden: true,
+        }),
+      } as unknown as Response),
+    )
+
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const wrapper = ({ children }: { children?: ReactNode }) =>
+      withClient(queryClient, children)
+
+    const { result } = renderHook(() => useUpdateAgentModel(), { wrapper })
+    await act(async () => {
+      await result.current.mutateAsync({
+        agent: 'jd_parsing_agent',
+        provider: 'ollama',
+        model: 'llama3.1',
+      })
+    })
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['models'] })
+  })
+})
+
+describe('useResetAgentModel', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('DELETEs the override and invalidates models queries on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          agent: 'jd_parsing_agent',
+          provider: 'ollama',
+          model: 'qwen',
+          default_provider: 'ollama',
+          default_model: 'qwen',
+          is_overridden: false,
+        }),
+      } as unknown as Response),
+    )
+
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const wrapper = ({ children }: { children?: ReactNode }) =>
+      withClient(queryClient, children)
+
+    const { result } = renderHook(() => useResetAgentModel(), { wrapper })
+    await act(async () => {
+      await result.current.mutateAsync('jd_parsing_agent')
+    })
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['models'] })
   })
 })

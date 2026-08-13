@@ -16,6 +16,7 @@ Fixtures (all auto-discovered by pytest via this ``conftest.py``):
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,22 @@ from client.errors import LLMConnectionError
 from client.models import CoverLetterOutput, ExperienceEntry, RewriteOutput
 
 SAMPLE_DIR = Path(__file__).resolve().parent.parent / "sample"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _isolate_model_db(  # pyright: ignore[reportUnusedFunction]
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Point the web layer's SQLite model store at a temp file for the session.
+
+    ``app.main``'s lifespan builds a ``ModelStore`` at the ``MODEL_DB_PATH``
+    path (default ``db.sqlite3``).  Without this fixture the web API tests
+    would create ``db.sqlite3`` in the repo root, so the env var is redirected
+    to a per-session temp file.  Tests that need their own store override the
+    var per-test via ``monkeypatch.setenv``.
+    """
+    db = tmp_path_factory.mktemp("model-db") / "models.db"
+    os.environ["MODEL_DB_PATH"] = str(db)
 
 
 class FakeClient:

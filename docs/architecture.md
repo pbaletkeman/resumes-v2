@@ -47,7 +47,7 @@ Which provider/model each agent uses is decided at runtime by `config/agents.py`
 Structured outputs are turned into user-facing documents by two modules:
 
 - `client/formatter.py` — pure helpers that convert `RewriteOutput` to clean Markdown / plain text (`format_resume_markdown`, `format_resume_plain`) and normalize cover-letter text (`format_cover_letter`, with Unicode→ASCII fixes).
-- `client/templates/renderer.py` — `ResumeRenderer`, a Jinja2-based renderer that renders `RewriteOutput` (and `ResumeParsingOutput`-as-`RewriteOutput`) into plaintext, Markdown, DOCX (python-docx) and PDF (ReportLab), plus plaintext/Markdown cover letters. Its `render_all()` writes the `output_files` artifact set and names files via `build_output_path()`.
+- `client/templates/renderer.py` — `ResumeRenderer`, a Jinja2-based renderer that renders `RewriteOutput` (and `ResumeParsingOutput`-as-`RewriteOutput`) into plaintext, Markdown, DOCX (python-docx) and PDF (ReportLab), plus cover letters in all four formats (plaintext, Markdown, DOCX, PDF). Its `render_all()` writes the `output_files` artifact set and names files via `build_output_path()`.
 
 ## Data Flow
 
@@ -136,7 +136,7 @@ After stage 7, `_run_pipeline_core` optionally renders files. When `candidate_na
 
 1. The structured resume data is rebuilt from the **parsed resume** (converted to `RewriteOutput` via `_to_rewrite_output`), *not* from the rewritten/polished text — the structured model preserves bullet/list structure for the Jinja2 templates.
 2. `CoverLetterOutput(cover_letter=...)` carries the stage-7 letter text.
-3. `ResumeRenderer.render_all(...)` writes up to 6 formats into `output/`: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, and (when letter text is non-empty) `cover_letter_plaintext`, `cover_letter_markdown`.
+3. `ResumeRenderer.render_all(...)` writes up to 8 formats into `output/`: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, and (when letter text is non-empty) `cover_letter_plaintext`, `cover_letter_markdown`, `cover_letter_docx`, `cover_letter_pdf`.
 
 When `candidate_name` is empty, rendering is skipped and `output_files` is `{}`.
 

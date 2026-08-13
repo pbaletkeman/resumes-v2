@@ -22,7 +22,9 @@ import {
   fetchModels,
   getTask,
   listFiles,
+  resetAgentModel,
   runPipelineAsync,
+  updateAgentModel,
   type FileListParams,
 } from './client'
 import type { ModelSummary, PagedFile, TaskStatus } from './types'
@@ -34,6 +36,41 @@ export function useModels() {
   return useQuery({
     queryKey: ['models'],
     queryFn: fetchModels,
+  })
+}
+
+/**
+ * Edit one agent's model and/or provider, then refresh the model summary.
+ * The mutation variable carries the agent name plus the full new
+ * provider/model pair (the backend treats ``null`` fields as unchanged, but
+ * the page always sends both).
+ */
+export function useUpdateAgentModel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      agent,
+      provider,
+      model,
+    }: {
+      agent: string
+      provider: string
+      model: string
+    }) => updateAgentModel(agent, { provider, model }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+    },
+  })
+}
+
+/** Reset one agent's model and provider to the defaults, then refresh. */
+export function useResetAgentModel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: resetAgentModel,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+    },
   })
 }
 

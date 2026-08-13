@@ -5,8 +5,9 @@ Template-based multi-format resume renderer.
 Renders ``RewriteOutput`` and ``CoverLetterOutput`` models against
 Jinja2 templates to produce plaintext, Markdown, DOCX (python-docx), and
 PDF (ReportLab Platypus) output.  DOCX/PDF rendering is fully supported:
-``render_docx`` / ``render_pdf`` build the documents directly from the
-same context the text templates use (see :meth:`ResumeRenderer.render_all`).
+``render_docx`` / ``render_pdf`` and ``render_cover_letter_docx`` /
+``render_cover_letter_pdf`` build the documents directly from the same
+context the text templates use (see :meth:`ResumeRenderer.render_all`).
 
 Rendering path: this is *the* template-based path.  ``ResumeRenderer``
 loads Jinja2 sources from ``client.templates`` (``TEMPLATES`` +
@@ -227,6 +228,134 @@ class ResumeRenderer:
         )
         return self._render(tpl_source, context)
 
+    def render_cover_letter_docx(
+        self,
+        cover_letter: CoverLetterOutput,
+        *,
+        name: str = "",
+        company: str = "",
+        phone: str = "",
+        email: str = "",
+        linkedin: str = "",
+        github: str = "",
+        output_path: str | Path | None = None,
+    ) -> Path:
+        """Render *cover_letter* as a professionally styled ``.docx`` document.
+
+        Letter-size pages with 1-inch margins and Calibri 11pt body text,
+        mirroring the plaintext/Markdown letter layout: name header, contact
+        line, date, salutation, body paragraphs, and signature.  When
+        *output_path* is ``None`` a temporary path is used.
+
+        Args:
+            cover_letter: Structured letter data from the Cover Letter Agent.
+            name: Candidate name for the header and signature.
+            company: Target company name (reserved for context).
+            phone: Candidate phone number for the header.
+            email: Candidate email address for the header.
+            linkedin: Candidate LinkedIn profile URL for the header.
+            github: Candidate GitHub profile URL for the header.
+            output_path: Destination file. Defaults to a temp file.
+
+        Returns:
+            The ``Path`` the document was written to.
+
+        Raises:
+            OSError: If the output directory cannot be created or the
+                document cannot be saved (disk/permission errors).
+        """
+        doc: DocumentType = create_document()
+
+        for section in doc.sections:
+            section.page_width = Inches(8.5)
+            section.page_height = Inches(11)
+            section.top_margin = Inches(1)
+            section.bottom_margin = Inches(1)
+            section.left_margin = Inches(1)
+            section.right_margin = Inches(1)
+
+        normal = cast(ParagraphStyle, doc.styles["Normal"])
+        normal.font.name = "Calibri"
+        normal.font.size = Pt(11)
+
+        context = self._build_cover_letter_context(
+            cover_letter,
+            name=name,
+            company=company,
+            phone=phone,
+            email=email,
+            linkedin=linkedin,
+            github=github,
+        )
+        self._populate_cover_letter_docx(doc, context)
+
+        path = Path(output_path) if output_path is not None else _temp_docx_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        doc.save(str(path))
+        return path
+
+    def render_cover_letter_pdf(
+        self,
+        cover_letter: CoverLetterOutput,
+        *,
+        name: str = "",
+        company: str = "",
+        phone: str = "",
+        email: str = "",
+        linkedin: str = "",
+        github: str = "",
+        output_path: str | Path | None = None,
+    ) -> Path:
+        """Render *cover_letter* as a professionally styled PDF document.
+
+        ReportLab builds the PDF directly with Platypus (no HTML/Markdown
+        intermediate), mirroring the DOCX letter layout with the shared
+        :meth:`_pdf_styles`.  When *output_path* is ``None`` a temporary
+        path is used.
+
+        Args:
+            cover_letter: Structured letter data from the Cover Letter Agent.
+            name: Candidate name for the header and signature.
+            company: Target company name (reserved for context).
+            phone: Candidate phone number for the header.
+            email: Candidate email address for the header.
+            linkedin: Candidate LinkedIn profile URL for the header.
+            github: Candidate GitHub profile URL for the header.
+            output_path: Destination file. Defaults to a temp file.
+
+        Returns:
+            The ``Path`` the document was written to.
+
+        Raises:
+            OSError: If the output directory cannot be created or the
+                PDF cannot be built (disk/permission errors).
+        """
+        path = Path(output_path) if output_path is not None else _temp_pdf_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        doc = SimpleDocTemplate(
+            str(path),
+            pagesize=letter,
+            leftMargin=inch,
+            rightMargin=inch,
+            topMargin=inch,
+            bottomMargin=inch,
+        )
+        context = self._build_cover_letter_context(
+            cover_letter,
+            name=name,
+            company=company,
+            phone=phone,
+            email=email,
+            linkedin=linkedin,
+            github=github,
+        )
+        flowables = self._populate_cover_letter_pdf_flowables(
+            context, self._pdf_styles()
+        )
+        doc.build(flowables)
+        return path
+
     def render_docx(
         self,
         resume: RewriteOutput,
@@ -341,10 +470,11 @@ class ResumeRenderer:
         """Render *resume* and, when available, *cover_letter* into formats.
 
         Produces the four resume formats (plaintext, Markdown, DOCX, PDF).
-        When *cover_letter* is provided and non-empty, the two cover letter
-        formats (plaintext, Markdown) are produced as well; otherwise they
-        are skipped.  Each file is written to *output_dir* under a
-        timestamped, slugified filename built by :meth:`build_output_path`.
+        When *cover_letter* is provided and non-empty, the four cover letter
+        formats (plaintext, Markdown, DOCX, PDF) are produced as well;
+        otherwise they are skipped.  Each file is written to *output_dir*
+        under a timestamped, slugified filename built by
+        :meth:`build_output_path`.
 
         Args:
             resume: Structured resume data from the Resume Rewrite Agent.
@@ -444,6 +574,38 @@ class ResumeRenderer:
                 linkedin=linkedin,
                 github=github,
             )
+            letter_docx = self.render_cover_letter_docx(
+                cover_letter,
+                name=candidate_name,
+                company=company_name,
+                phone=phone,
+                email=email,
+                linkedin=linkedin,
+                github=github,
+                output_path=self.build_output_path(
+                    "cover_letter",
+                    candidate_name=candidate_name,
+                    company_name=company_name,
+                    output_dir=output_dir,
+                    ext=".docx",
+                ),
+            )
+            letter_pdf = self.render_cover_letter_pdf(
+                cover_letter,
+                name=candidate_name,
+                company=company_name,
+                phone=phone,
+                email=email,
+                linkedin=linkedin,
+                github=github,
+                output_path=self.build_output_path(
+                    "cover_letter",
+                    candidate_name=candidate_name,
+                    company_name=company_name,
+                    output_dir=output_dir,
+                    ext=".pdf",
+                ),
+            )
             paths["cover_letter_plaintext"] = self._write_text(
                 letter_plain,
                 "cover_letter",
@@ -460,6 +622,8 @@ class ResumeRenderer:
                 output_dir,
                 ".md",
             )
+            paths["cover_letter_docx"] = letter_docx
+            paths["cover_letter_pdf"] = letter_pdf
 
         return paths
 
@@ -898,6 +1062,84 @@ class ResumeRenderer:
             for item in education:
                 ResumeRenderer._docx_bullet(doc, item)
 
+    @staticmethod
+    def _cover_letter_paragraphs(
+        context: dict[str, object],
+    ) -> list[tuple[str, str]]:
+        """Return the letter's ordered ``(text, kind)`` paragraphs.
+
+        Mirrors the ``COVER_LETTER`` template layout: header (candidate
+        name, contact line, date), salutation, opening/body/closing
+        paragraphs, and the closing signature (``Sincerely,`` plus the
+        candidate name).  *kind* is one of ``"name"``, ``"meta"``,
+        ``"salutation"``, ``"body"``, or ``"signature"`` so the DOCX/PDF
+        populate helpers can style each block without re-deriving the
+        letter structure.
+
+        Args:
+            context: The context dict from :meth:`_build_cover_letter_context`.
+
+        Returns:
+            Ordered ``(text, kind)`` pairs ready for DOCX/PDF rendering.
+        """
+        paragraphs: list[tuple[str, str]] = []
+        name = str(context.get("candidate_name", "")).strip()
+        contact_line = str(context.get("contact_line", "")).strip()
+        date = str(context.get("date", "")).strip()
+        hiring_manager = str(context.get("hiring_manager", "")).strip()
+
+        if name:
+            paragraphs.append((name, "name"))
+        if contact_line:
+            paragraphs.append((contact_line, "meta"))
+        if date:
+            paragraphs.append((date, "meta"))
+
+        paragraphs.append((f"Dear {hiring_manager or 'Hiring Manager'},", "salutation"))
+
+        for key in ("opening_paragraph", "body_paragraph", "closing_paragraph"):
+            text = str(context.get(key, "")).strip()
+            if text:
+                paragraphs.append((text, "body"))
+
+        paragraphs.append(("Sincerely,", "signature"))
+        if name:
+            paragraphs.append((name, "signature"))
+        return paragraphs
+
+    @staticmethod
+    def _populate_cover_letter_docx(
+        doc: DocumentType, context: dict[str, object]
+    ) -> None:
+        """Populate *doc* with the cover letter content in *context*.
+
+        *context* is the dict produced by :meth:`_build_cover_letter_context`.
+        The candidate name is rendered at 14pt bold; every other block uses
+        the document's normal style.
+        """
+        for text, kind in ResumeRenderer._cover_letter_paragraphs(context):
+            para = doc.add_paragraph()
+            run = para.add_run(text)
+            if kind == "name":
+                run.bold = True
+                run.font.size = Pt(14)
+
+    @staticmethod
+    def _populate_cover_letter_pdf_flowables(
+        context: dict[str, object], styles: dict[str, PdfParagraphStyle]
+    ) -> list[Flowable]:
+        """Build the Platypus flowables for the cover letter in *context*.
+
+        Uses :meth:`_cover_letter_paragraphs` and the shared :meth:`_pdf_styles`
+        (name header at 14pt bold, body text otherwise).  Text is XML-escaped
+        for ReportLab's ``Paragraph`` markup parser.
+        """
+        flowables: list[Flowable] = []
+        for text, kind in ResumeRenderer._cover_letter_paragraphs(context):
+            style = styles["name"] if kind == "name" else styles["body"]
+            flowables.append(Paragraph(escape(text), style))
+        return flowables
+
 
 _SALUTATION_PREFIXES = ("dear", "to whom it may concern", "hello", "hi")
 _SIGNATURE_PREFIXES = (
@@ -918,6 +1160,8 @@ _DEFAULT_EXTENSIONS: dict[str, str] = {
     "resume_pdf": ".pdf",
     "cover_letter_plaintext": ".txt",
     "cover_letter_markdown": ".md",
+    "cover_letter_docx": ".docx",
+    "cover_letter_pdf": ".pdf",
     "plaintext": ".txt",
     "markdown": ".md",
     "docx": ".docx",

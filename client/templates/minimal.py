@@ -17,7 +17,7 @@ and, through the shared context, the DOCX/PDF writers in
 MINIMAL_RESUME = {
     "plaintext": """\
 {{ name }}
-{{ title }}
+{% if title %}{{ title }}{% endif %}
 
 {{ summary }}
 
@@ -45,7 +45,7 @@ Education:
     "markdown": """\
 # {{ name }}
 
-{{ title }}
+{% if title %}{{ title }}{% endif %}
 
 {{ summary }}
 

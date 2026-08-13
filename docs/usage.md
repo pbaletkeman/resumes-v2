@@ -63,6 +63,8 @@ results = run_resume_pipeline(
   | `resume_pdf` | `.pdf` |
   | `cover_letter_plaintext` | `.txt` (only when letter text is non-empty) |
   | `cover_letter_markdown` | `.md` (only when letter text is non-empty) |
+  | `cover_letter_docx` | `.docx` (only when letter text is non-empty) |
+  | `cover_letter_pdf` | `.pdf` (only when letter text is non-empty) |
 
   Files are named with `ResumeRenderer.build_output_path()`:
   `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}` (slugs are filesystem-safe).

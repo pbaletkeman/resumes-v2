@@ -4359,3 +4359,196 @@ message. Check each sub-task off in place as it is completed.
 - [ ] 21.3 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
 - [ ] 21.4 Ensure all markdown files are up to date.
 - [ ] 21.5 No markdown linting errros in any of the markdown files
+
+---
+
+## Phase 23 - Completed sub-task 23.1: cover letter DOCX/PDF output
+
+Original instruction:
+
+- **23.1** The Cover letter is never transformed into a DOCX file or a PDF file.
+
+### What was wrong
+
+`ResumeRenderer.render_all()` produced the resume in all four formats
+(plaintext, Markdown, DOCX, PDF) but only ever rendered cover letters to
+plaintext and Markdown — the letter never became a `.docx` or `.pdf`.
+
+### Changes
+
+**`client/templates/renderer.py`**
+- Added `render_cover_letter_docx()` and `render_cover_letter_pdf()` — letter-size
+  pages, 1-inch margins, Calibri 11pt (DOCX) / Helvetica base-14 (PDF), name at 14pt
+  bold, mirroring the resume binary formats. Both accept `output_path` (temp file when
+  `None`) and return the written `Path`.
+- Added a shared `_cover_letter_paragraphs()` helper that returns the letter's ordered
+  `(text, kind)` blocks (header name / contact line / date, salutation, opening/body/
+  closing paragraphs, signature) mirroring the `COVER_LETTER` Jinja template, so the
+  DOCX and PDF populate helpers (`_populate_cover_letter_docx` /
+  `_populate_cover_letter_pdf_flowables`) style identical content without duplicating
+  letter structure.
+- `render_all()` now writes `cover_letter_docx` and `cover_letter_pdf` (in addition to
+  `cover_letter_plaintext` / `cover_letter_markdown`) when the letter text is non-empty —
+  8 output keys total.
+- `_DEFAULT_EXTENSIONS` gained `cover_letter_docx: ".docx"` and `cover_letter_pdf: ".pdf"`.
+- Module + `render_all` docstrings updated (four letter formats).
+
+**`tests/test_renderer.py`**
+- `test_render_all_returns_six_keys` → `test_render_all_returns_eight_keys` (8 keys,
+  new render methods monkeypatched).
+- `test_render_all_renders_with_empty_segments` → expects 8 keys.
+- `test_render_all_cover_letter_files_include_contact_info` → additionally asserts the
+  DOCX/PDF letter files exist and are non-empty.
+- Added smoke tests `test_render_cover_letter_docx_produces_nonempty_file` and
+  `test_render_cover_letter_pdf_produces_nonempty_file` (correct suffix + `%PDF` magic bytes).
+
+**`test_real_files.py`** — `_assert_output_files` now expects 8 keys (6 → 8) and checks
+each new key's file is written non-empty.
+
+**Frontend** — `ui/src/pages/results/DownloadsRow.tsx` `DOWNLOAD_LABELS` gained
+`cover_letter_docx` / `cover_letter_pdf`; `DownloadsRow.test.tsx` sample extended to
+assert the new links render.
+
+**Docs** — `docs/usage.md` + `docs/README.md` `output_files` tables gained the two
+letter rows; `docs/api.md` documents the two new renderer methods + updated
+`render_all`; `docs/architecture.md` updated (8 formats). `AGENTS.md` / `README.md` /
+`docs/TESTING.md` renderer test census updated 43 → 45.
+
+### Verification results
+
+- `uv run pytest` — **520 passed** (518 baseline + 2 new renderer smoke tests).
+- `uv run ruff check .` — All checks passed.
+- `uv run ruff format --check .` — 100 files already formatted (test file auto-formatted once).
+- `uv run pyright` — 0 errors, 0 warnings, 0 informations.
+- `npm test` (ui/) — **57 passed** across 9 files.
+- `npm run lint` (ui/) — oxlint clean.
+- `npm run build` (ui/) — `tsc -b && vite build` succeeded.
+
+**Commit:** none yet — awaiting user approval to commit.
+
+---
+
+## Phase 23 - Completed sub-task 23.2: markdown line breaks in generated files
+
+Original instruction:
+
+- **23.2** The line breaks in the generated files are not correct. In Markdown you need two line breaks in a row to have one of them display correctly.
+
+### What was wrong
+
+The generated `resume.md` showed a stray horizontal rule under the candidate
+name. `**{{ title }}**` with an empty title renders `****`, which CommonMark
+parses as a thematic break (`<hr>`) — a visible line where a blank line (two
+line breaks in a row) is required to keep the blocks apart when the Markdown
+is rendered. The pipeline never supplies a header title, so the bug appeared
+in every generated resume.
+
+### Changes
+
+**`client/templates/modern.py`, `client/templates/classic.py`, `client/templates/minimal.py`**
+- Wrapped every header title in a `{% if title %}` guard so an empty title
+  emits nothing instead of a bare `**`/`****` Markdown artifact:
+  - modern: markdown `**{{ title }}**` → `{% if title %}**{{ title }}**{% endif %}`
+  - classic: markdown `**{{ title }}**` → `{% if title %}**{{ title }}**{% endif %}`
+  - minimal: markdown `{{ title }}` → `{% if title %}{{ title }}{% endif %}`
+  - all three plaintext templates guard `{{ title }}` the same way for
+    consistency (blank-line collapse already handled the empty case, output
+    is unchanged for present and absent titles).
+- Non-empty titles render exactly as before (bold in modern/classic, plain
+  in minimal). Markdown blocks (headings, lists, paragraphs) were already
+  separated by blank lines in the resume templates — verified by rendering
+  modern/classic/minimal with multi-job experience.
+
+**`tests/test_renderer.py`** (45 → 51 tests)
+- `test_markdown_empty_title_no_horizontal_rule` (parametrized modern/classic/
+  minimal) — asserts no `****` in rendered Markdown.
+- `test_markdown_title_bold_when_present` (parametrized modern/classic) —
+  asserts `**Staff Engineer**` renders for a non-empty title.
+- `test_markdown_blocks_separated_by_blank_lines` — asserts the Markdown
+  blank-line rule: header→section, section→summary, skills→experience, and
+  last job bullet→next job heading are each separated by a blank line.
+
+### Verification results
+
+- `uv run pytest` — **526 passed** (520 baseline + 6 new renderer tests).
+- `uv run ruff check .` — All checks passed.
+- `uv run ruff format --check .` — 100 files already formatted.
+- `uv run pyright` — 0 errors, 0 warnings, 0 informations.
+- Backend-only change (renderer templates + tests); no frontend impact, so
+  `npm` gates were not re-run.
+
+**Commit:** none yet — awaiting user approval to commit.
+
+---
+
+## Phase 22 - Model editing (SQLite overrides + Models page editing) ✅ COMPLETED
+
+Original instruction:
+
+- **22.1** Provide a way to edit the model used per an agent via the web API (backend), using SQLite as the database.
+- **22.2** Update the model view to allow for changing the model used for the agent (frontend).
+- **22.3** Provide a way to edit the provider used per an agent via the web API (backend), using SQLite as the database.
+- **22.4** Update the model view to allow for changing the provider used for the agent (frontend).
+- **22.5** Provide a way to reset to defaults for both the model and the provider.
+
+### Design
+
+Per-agent model/provider overrides are persisted in SQLite (`app/model_store.py`, table
+`agent_model_overrides`). Semantics:
+
+- A `NULL` provider or model inherits the environment default for that agent.
+- A row whose provider and model are both NULL is deleted (= reset to defaults).
+- DB overrides win over env-var overrides when building the runner.
+- The runner is rebuilt after every `PATCH`/`DELETE` via `create_runner_from_config(overrides=...)`.
+- Patching to `provider=openai` without `OPENAI_API_KEY` returns 400 and rolls the override back
+  (constructing `AsyncOpenAI(api_key="")` raises `OpenAIError`).
+- Default DB path from `MODEL_DB_PATH` env var, else `db.sqlite3` (git-ignored).
+
+### Backend
+
+- `app/model_store.py` — new SQLite store: `ModelStore` with `get_override`/`set_override`/
+  `delete_override`/`clear`. `set_override` merges via `ON CONFLICT DO UPDATE ... COALESCE`
+  so omitting a dimension leaves the existing one intact.
+- `config/agents.py` — `get_model_summary()` now returns richer rows
+  (`agent`, `provider`, `model`, `default_provider`, `default_model`, `is_overridden`),
+  merging DB overrides over env defaults.
+- `pipeline.py` — `create_runner_from_config(overrides=...)` accepts the DB override map.
+- `app/schemas.py` — `ModelSummaryRow`, `AgentOverrideUpdate`.
+- `app/main.py` — lifespan opens the store, `_rebuild_runner()` is called after every edit;
+  routes: `GET /api/models`, `PATCH /api/models/{agent}`, `DELETE /api/models/{agent}`.
+- Frontend test fixture needs: a session-scoped autouse `MODEL_DB_PATH` fixture (writes
+  `os.environ` directly, no monkeypatch) so the store tests can't leak between files, plus a
+  `client_with_openai_key` fixture for the openai-switch tests.
+
+### Frontend
+
+- `ui/src/api/types.ts` — `ModelSummary` extended with `default_provider`, `default_model`,
+  `is_overridden`; new `AgentOverrideUpdate` (`provider?`/`model?`, nullable).
+- `ui/src/api/client.ts` — `updateAgentModel(agent, body)` (PATCH) and `resetAgentModel(agent)` (DELETE).
+- `ui/src/api/hooks.ts` — `useUpdateAgentModel` / `useResetAgentModel`, both invalidating `['models']`.
+- `ui/src/pages/ModelsPage.tsx` — inline editing: Provider Dropdown + Model InputText per row with
+  local-state cell components, Save (disabled when unchanged/pending) and Reset (disabled when
+  `!is_overridden` or pending) buttons, success/error toasts.
+- PrimeReact-in-jsdom notes (matters for the tests): the DataTable memoizes column `body` closures,
+  so row-cell handlers never see state updates — the page keeps a `draftsRef` mirror that stale
+  closures read at event time, and inputs use local-state cell components with a resync effect. The
+  Dropdown overlay opens with `display: none` in jsdom, so tests force `panel.style.display = 'block'`
+  before clicking an option.
+
+### Verification results
+
+- `uv run pytest` — **518 passed** (493 baseline + 12 `test_model_store.py` + 13
+  `test_web_models_edit.py`).
+- `uv run ruff check .` — All checks passed (fixed a pre-existing E501 in `test_real_files.py`).
+- `uv run ruff format --check .` — 100 files already formatted.
+- `uv run pyright` — 0 errors, 0 warnings, 0 informations.
+- `npm test` (ui/) — **57 passed** across 9 files (incl. reworked `ModelsPage.test.tsx`,
+  `api/client.test.ts`, `api/hooks.test.ts`).
+- `npm run lint` (ui/) — oxlint clean.
+- `npm run build` (ui/) — `tsc -b && vite build` succeeded.
+
+**Docs updated:** root `AGENTS.md` (app/ file map + test census 518 across 26 files + status note),
+`docs/README.md` (routes table + PATCH/DELETE REST-client examples, pytest count),
+`docs/TESTING.md` (new test files), `simple.md` (Phase 22 -> Completed + verification note).
+
+**Commit:** none yet — awaiting user approval to commit.

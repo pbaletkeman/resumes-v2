@@ -43,13 +43,24 @@ def test_models_returns_agent_summary(client: Any) -> None:
     response = client.get("/api/models")
 
     assert response.status_code == 200
-    payload = response.json()
+    payload: list[dict[str, Any]] = response.json()
 
     assert isinstance(payload, list)
     assert len(payload) == len(EXPECTED_AGENTS)
     agent_names = [entry["agent"] for entry in payload]
     assert agent_names == EXPECTED_AGENTS
     for entry in payload:
-        assert set(entry) == {"agent", "provider", "model"}
+        assert set(entry) == {
+            "agent",
+            "provider",
+            "model",
+            "default_provider",
+            "default_model",
+            "is_overridden",
+        }
         assert entry["provider"] in {"ollama", "openai"}
         assert entry["model"]
+        # Without any persisted override the effective values are the defaults.
+        assert entry["default_provider"] == entry["provider"]
+        assert entry["default_model"] == entry["model"]
+        assert entry["is_overridden"] is False

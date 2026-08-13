@@ -119,6 +119,51 @@ def test_markdown_unknown_template_raises(rewrite_output: RewriteOutput) -> None
         ResumeRenderer().render_markdown(rewrite_output, template="does-not-exist")
 
 
+@pytest.mark.parametrize("template", ["modern", "classic", "minimal"])
+def test_markdown_empty_title_no_horizontal_rule(
+    rewrite_output: RewriteOutput, template: str
+) -> None:
+    """An empty header title renders no ``****`` Markdown artifact.
+
+    ``**{{ title }}**`` with an empty title renders ``****``, which
+    CommonMark parses as a thematic break (a visible horizontal line).
+    """
+    rendered = ResumeRenderer().render_markdown(
+        rewrite_output, name="Jane Doe", template=template
+    )
+    assert "****" not in rendered
+
+
+@pytest.mark.parametrize("template", ["modern", "classic"])
+def test_markdown_title_bold_when_present(
+    rewrite_output: RewriteOutput, template: str
+) -> None:
+    """modern/classic render a non-empty header title as bold text."""
+    rendered = ResumeRenderer().render_markdown(
+        rewrite_output, name="Jane Doe", title="Staff Engineer", template=template
+    )
+    assert "**Staff Engineer**" in rendered
+
+
+def test_markdown_blocks_separated_by_blank_lines(
+    rewrite_output: RewriteOutput,
+) -> None:
+    """Markdown block elements are separated by blank lines.
+
+    A single newline collapses to a space when the Markdown is rendered,
+    so heading/list/paragraph blocks must be separated by blank lines
+    (two line breaks in a row) to display as distinct blocks.
+    """
+    rendered = ResumeRenderer().render_markdown(rewrite_output, name="Jane Doe")
+    assert "# Jane Doe\n\n## Summary" in rendered
+    assert "## Summary\n\nSenior engineer with 10+ years experience." in rendered
+    assert "- Kubernetes\n\n## Experience" in rendered
+    assert (
+        "- $2M annual savings\n\n### **Senior Engineer** at **Globex** (2016-2020)"
+        in rendered
+    )
+
+
 # ===================================================================
 # Template loading
 # ===================================================================
@@ -422,13 +467,13 @@ def test_build_output_path_ext_normalized(tmp_path) -> None:
 # ===================================================================
 
 
-def test_render_all_returns_six_keys(
+def test_render_all_returns_eight_keys(
     rewrite_output: RewriteOutput,
     cover_letter_output: CoverLetterOutput,
     tmp_path,
     monkeypatch,
 ) -> None:
-    """render_all returns all 6 format keys when a cover letter is present."""
+    """render_all returns all 8 format keys when a cover letter is present."""
     renderer = ResumeRenderer()
     monkeypatch.setattr(renderer, "render_plaintext", lambda *a, **k: "plain")
     monkeypatch.setattr(renderer, "render_markdown", lambda *a, **k: "md")
@@ -438,6 +483,12 @@ def test_render_all_returns_six_keys(
         renderer, "render_cover_letter_plaintext", lambda *a, **k: "clp"
     )
     monkeypatch.setattr(renderer, "render_cover_letter_markdown", lambda *a, **k: "clm")
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_docx", lambda *a, **k: Path("cl.docx")
+    )
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_pdf", lambda *a, **k: Path("cl.pdf")
+    )
 
     paths = renderer.render_all(
         rewrite_output,
@@ -453,6 +504,8 @@ def test_render_all_returns_six_keys(
         "resume_pdf",
         "cover_letter_plaintext",
         "cover_letter_markdown",
+        "cover_letter_docx",
+        "cover_letter_pdf",
     }
     assert all(isinstance(p, Path) for p in paths.values())
 
@@ -561,6 +614,16 @@ def test_render_all_renders_with_empty_segments(
     monkeypatch.setattr(renderer, "render_markdown", lambda *a, **k: "md")
     monkeypatch.setattr(renderer, "render_docx", lambda *a, **k: Path("d.docx"))
     monkeypatch.setattr(renderer, "render_pdf", lambda *a, **k: Path("d.pdf"))
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_plaintext", lambda *a, **k: "clp"
+    )
+    monkeypatch.setattr(renderer, "render_cover_letter_markdown", lambda *a, **k: "clm")
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_docx", lambda *a, **k: Path("cl.docx")
+    )
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_pdf", lambda *a, **k: Path("cl.pdf")
+    )
 
     paths = renderer.render_all(
         rewrite_output,
@@ -576,6 +639,8 @@ def test_render_all_renders_with_empty_segments(
         "resume_pdf",
         "cover_letter_plaintext",
         "cover_letter_markdown",
+        "cover_letter_docx",
+        "cover_letter_pdf",
     }
 
 
@@ -600,6 +665,9 @@ def test_render_all_cover_letter_files_include_contact_info(
     for key in ("cover_letter_plaintext", "cover_letter_markdown"):
         text = paths[key].read_text(encoding="utf-8")
         assert contact_line in text
+    for key in ("cover_letter_docx", "cover_letter_pdf"):
+        assert paths[key].is_file()
+        assert paths[key].stat().st_size > 0
 
 
 # ===================================================================
@@ -629,6 +697,36 @@ def test_render_pdf_produces_nonempty_file(
     pytest.importorskip("reportlab")
     out = tmp_path / "resume.pdf"
     path = ResumeRenderer().render_pdf(rewrite_output, name="Jane Doe", output_path=out)
+    assert path == out
+    assert out.exists()
+    assert out.stat().st_size > 0
+    assert out.read_bytes().startswith(b"%PDF")
+
+
+def test_render_cover_letter_docx_produces_nonempty_file(
+    cover_letter_output: CoverLetterOutput, tmp_path
+) -> None:
+    """render_cover_letter_docx writes a non-empty .docx file."""
+    pytest.importorskip("docx")
+    out = tmp_path / "cover_letter.docx"
+    path = ResumeRenderer().render_cover_letter_docx(
+        cover_letter_output, name="Jane Doe", company="Acme Corp", output_path=out
+    )
+    assert path == out
+    assert out.exists()
+    assert out.stat().st_size > 0
+    assert out.suffix == ".docx"
+
+
+def test_render_cover_letter_pdf_produces_nonempty_file(
+    cover_letter_output: CoverLetterOutput, tmp_path
+) -> None:
+    """render_cover_letter_pdf writes a non-empty PDF file."""
+    pytest.importorskip("reportlab")
+    out = tmp_path / "cover_letter.pdf"
+    path = ResumeRenderer().render_cover_letter_pdf(
+        cover_letter_output, name="Jane Doe", company="Acme Corp", output_path=out
+    )
     assert path == out
     assert out.exists()
     assert out.stat().st_size > 0

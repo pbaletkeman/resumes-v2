@@ -7,6 +7,7 @@
  * call these functions directly.
  */
 import type {
+  AgentOverrideUpdate,
   DeleteFilesResponse,
   ModelSummary,
   PagedFile,
@@ -88,6 +89,25 @@ async function parseErrorDetail(response: Response): Promise<string | null> {
 
 export async function fetchModels(): Promise<ModelSummary[]> {
   return apiFetch<ModelSummary[]>('/models')
+}
+
+/** Edit one agent's model and/or provider (`PATCH /api/models/{agent}`). */
+export async function updateAgentModel(
+  agent: string,
+  body: AgentOverrideUpdate,
+): Promise<ModelSummary> {
+  return apiFetch<ModelSummary>(`/models/${encodeURIComponent(agent)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+/** Reset one agent's model and provider to the defaults (`DELETE /api/models/{agent}`). */
+export async function resetAgentModel(agent: string): Promise<ModelSummary> {
+  return apiFetch<ModelSummary>(`/models/${encodeURIComponent(agent)}`, {
+    method: 'DELETE',
+  })
 }
 
 export async function runPipelineAsync(formData: FormData): Promise<TaskCreated> {

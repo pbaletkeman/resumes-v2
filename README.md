@@ -246,7 +246,7 @@ tests/
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + load_json_safe + JSON Schema helper tests (23 tests)
   test_formatter.py                # format_* helpers (41 tests)
-  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (43 tests)
+  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (45 tests)
   test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
   test_agent_jd_parsing.py         # Agent 1 contract tests (7 tests)
   test_agent_resume_parsing.py     # Agent 2 contract tests (9 tests)

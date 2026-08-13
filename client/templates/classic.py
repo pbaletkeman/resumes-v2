@@ -17,7 +17,7 @@ and, through the shared context, the DOCX/PDF writers in
 CLASSIC_RESUME = {
     "plaintext": """\
 {{ name }}
-{{ title }}
+{% if title %}{{ title }}{% endif %}
 
 --------------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ Education
     "markdown": """\
 # {{ name }}
 
-**{{ title }}**
+{% if title %}**{{ title }}**{% endif %}
 
 ---
 
