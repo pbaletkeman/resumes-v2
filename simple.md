@@ -39,6 +39,21 @@ clean.
 
 ## Remaining work
 
+### Phase 24 - Model editing
+
+- [ ] 24.1 Provide a way to edit the model used per an agent via the web API (backend), using SQLite as the database
+- [ ] 24.2 Update the model view to allow for changing the model used for the agent (frontend)
+- [ ] 24.3 Provide a way to edit the provide used per an agent via the web API (backend), using SQLite as the database
+- [ ] 24.4 Update the model view to allow for changing the provider used for the agent (frontend)
+- [ ] 24.5 Provide a way to reset to defaults for both the model and the provider
+
+### Phase 25 - Formatting
+
+- [ ] 25.1 The Cover letter is never transformed into a DOCX file or a PDF file.
+- [ ] 25.2 The line breaks in the generated files are not correct. In Markdown you need two line breaks in a row to have one of then display correctly.
+- [ ] 25.3 Provide a way to generate all three layout formats of the resume templates or at least provide a way to select which template is being used.
+- [ ] 25.4 The closing salulation for the cover letters is repeated.
+
 ### Phase 21 - Documentation Cleanup
 
 - [x] 21.1 Root README.md needs to be less than 500 lines with a quickstart section that explains to to get started in 10 minutes or less and links to detailed README.md file ✅ See `simple-done.md`.
