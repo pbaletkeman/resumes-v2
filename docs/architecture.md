@@ -136,7 +136,7 @@ After stage 7, `_run_pipeline_core` optionally renders files. When `candidate_na
 
 1. The structured resume data is rebuilt from the **parsed resume** (converted to `RewriteOutput` via `_to_rewrite_output`), *not* from the rewritten/polished text — the structured model preserves bullet/list structure for the Jinja2 templates.
 2. `CoverLetterOutput(cover_letter=...)` carries the stage-7 letter text.
-3. `ResumeRenderer.render_all(...)` writes up to 8 formats into `output/`: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, and (when letter text is non-empty) `cover_letter_plaintext`, `cover_letter_markdown`, `cover_letter_docx`, `cover_letter_pdf`.
+3. `ResumeRenderer.render_all(...)` writes up to 8 formats into `output/`: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, and (when letter text is non-empty) `cover_letter_plaintext`, `cover_letter_markdown`, `cover_letter_docx`, `cover_letter_pdf`. A single layout is rendered by default (`resume_template`); passing `resume_templates` renders each requested layout under namespaced keys (`resume_{template}_*`) with the template embedded in the filename so the layouts don't overwrite each other. The cover letter formats are shared and unaffected.
 
 When `candidate_name` is empty, rendering is skipped and `output_files` is `{}`.
 

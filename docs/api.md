@@ -131,10 +131,12 @@ def run_resume_pipeline(
     *,
     candidate_name: str = "",
     company_name: str = "",
+    resume_template: str = "modern",
+    resume_templates: str | list[str] | None = None,
 ) -> dict[str, Any]:
 ```
 
-Runs the full 7-agent chain on one event loop via `_run_pipeline_core()`. Returns 7 result keys (`parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_optimized_resume`, `polished_resume`, `cover_letter`) plus `output_files` when `candidate_name` is non-empty. See `docs/usage.md`, section 1.
+Runs the full 7-agent chain on one event loop via `_run_pipeline_core()`. Returns 7 result keys (`parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_optimized_resume`, `polished_resume`, `cover_letter`) plus `output_files` when `candidate_name` is non-empty. `resume_template` picks the rendered resume layout (`"modern"`/`"classic"`/`"minimal"`); pass `resume_templates` (a key or list of keys) to render several layouts in one run — their files are namespaced `resume_{template}_*` with the template embedded in the filename. See `docs/usage.md`, section 1.
 
 ```python
 def create_runner_from_config(
@@ -279,6 +281,7 @@ def render_all(
     company_name: str,
     output_dir: str | Path,
     resume_template: str = "modern",
+    resume_templates: str | list[str] | None = None,
     phone: str = "",
     email: str = "",
     linkedin: str = "",
@@ -287,6 +290,8 @@ def render_all(
 ```
 
 Writes the four resume formats (`resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`) and, when `cover_letter` is non-empty, the four letter formats (`cover_letter_plaintext`, `cover_letter_markdown`, `cover_letter_docx`, `cover_letter_pdf`). Files land in `output_dir` under timestamped, slugified names built by `build_output_path`. Returns `dict[str, Path]` keyed by format name.
+
+By default a single resume layout (`resume_template`, `"modern"`) is rendered. Pass `resume_templates` (a template key or list of keys) to render several layouts in one call: each layout's files are namespaced `resume_{template}_plaintext` … `resume_{template}_pdf` and the filename embeds the template (`resume-{template}.{ext}`) so layouts don't overwrite each other. The cover letter formats are shared and unaffected by the template selection.
 
 ### Path helper
 

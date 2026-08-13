@@ -190,7 +190,7 @@ See `TESTING.md` for the full manual testing guide and coverage how-to.
 ### 3.1 `pipeline.py` — all switches
 
 `uv run python pipeline.py [-h] [--resume PATH] [--job-description PATH]
-[--candidate-name NAME] [--company-name NAME]`
+[--candidate-name NAME] [--company-name NAME] [--template {modern,classic,minimal,all}]`
 
 | Flag | Alias | Default | Meaning |
 |---|---|---|---|
@@ -198,6 +198,7 @@ See `TESTING.md` for the full manual testing guide and coverage how-to.
 | `--job-description PATH` | `--jd` | (none) | Path to the plain-text job description file. |
 | `--candidate-name NAME` | — | `""` | Candidate name used in rendered outputs/headers. **Enables file rendering.** |
 | `--company-name NAME` | — | `""` | Target company name used in rendered output filenames. |
+| `--template TEMPLATE` | — | `modern` | Resume layout: `modern`, `classic`, `minimal`, or `all` (renders all three layouts in one run; files are namespaced `resume-{template}.*`). |
 | `-h` / `--help` | — | — | Print usage and exit. |
 
 **Two modes:**
@@ -227,6 +228,12 @@ uv run python pipeline.py \
 
 # Same, using the --jd shorthand and no rendering
 uv run python pipeline.py --resume resume.txt --jd jd.txt
+
+# Render the classic layout only
+uv run python pipeline.py --resume resume.txt --jd jd.txt --template classic
+
+# Render all three layouts in one run
+uv run python pipeline.py --resume resume.txt --jd jd.txt --template all
 ```
 
 ### 3.2 Other CLI commands
@@ -243,7 +250,7 @@ uv run python pipeline.py --resume resume.txt --jd jd.txt
 | `uv run python wip_testing/test_tone_polishing.py` | Tone Polishing Agent demo (chains 1-6). |
 | `uv run python wip_testing/test_cover_letter.py` | Cover Letter Agent demo (chains 1-7). |
 | `uv run python wip_testing/test_parsing.py` | Regex + LLM `FormatDetector` parsing demo. |
-| `uv run pytest` | Unit suite (`tests/`, 518 tests, no LLM). |
+| `uv run pytest` | Unit suite (`tests/`, 537 tests, no LLM). |
 | `uv run pytest -v` / `--cov` / `--cov-report=html` | Verbose / coverage / HTML coverage report. |
 | `uv run pytest tests/test_<name>.py` | Run one test file. |
 | `uv run ruff check .` | Lint. |
@@ -341,8 +348,10 @@ routes when `ui/dist/index.html` exists.
 
 Multipart fields: `job_description` / `resume` (pasted text) or
 `job_file` / `resume_file` (uploads), plus optional `candidate_name` /
-`company_name`. Exactly one of text-or-file is required per input; **text wins
-when both are supplied** (`_read_text_input` in `app/main.py`). Uploaded files
+`company_name` and `resume_template` (`modern`/`classic`/`minimal`, default
+`modern`, or `all` to render every layout). Exactly one of text-or-file is
+required per input; **text wins when both are supplied** (`_read_text_input`
+in `app/main.py`). An unknown `resume_template` returns 400. Uploaded files
 are persisted to `uploads/`, rendered outputs to `output/` (both git-ignored).
 
 ### 5.4 Example (VS Code REST Client)
@@ -413,6 +422,14 @@ Jinja2 templates (`client/templates/`: `modern`, `classic`, `minimal`,
 | `cover_letter_markdown` | `.md` (only when the letter is non-empty) |
 | `cover_letter_docx` | `.docx` (only when the letter is non-empty) |
 | `cover_letter_pdf` | `.pdf` (only when the letter is non-empty) |
+
+By default a single layout is rendered (`resume_template`, default `modern`).
+When `resume_templates` is passed (a key or list of keys — e.g. the web API's
+`resume_template=all` or the CLI's `--template all`), each layout renders its
+own namespaced keys `resume_{template}_plaintext` … `resume_{template}_pdf`
+(e.g. `resume_classic_pdf`) and the filenames embed the template
+(`resume-classic.pdf`) so the layouts never overwrite each other. The cover
+letter keys are shared and unchanged.
 
 Filenames follow `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}`
 with every segment slugified (e.g. `cover_letter` → `cover-letter`), so the

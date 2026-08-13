@@ -670,6 +670,140 @@ def test_render_all_cover_letter_files_include_contact_info(
         assert paths[key].stat().st_size > 0
 
 
+def test_render_all_multiple_templates_namespaced_keys(
+    rewrite_output: RewriteOutput,
+    cover_letter_output: CoverLetterOutput,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """render_all with resume_templates returns namespaced keys per layout."""
+    renderer = ResumeRenderer()
+    used: list[str] = []
+
+    def fake_plain(*args, **kwargs):
+        used.append(kwargs["template"])
+        return "plain"
+
+    monkeypatch.setattr(renderer, "render_plaintext", fake_plain)
+    monkeypatch.setattr(renderer, "render_markdown", lambda *a, **k: "md")
+    monkeypatch.setattr(renderer, "render_docx", lambda *a, **k: Path("d.docx"))
+    monkeypatch.setattr(renderer, "render_pdf", lambda *a, **k: Path("d.pdf"))
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_plaintext", lambda *a, **k: "clp"
+    )
+    monkeypatch.setattr(renderer, "render_cover_letter_markdown", lambda *a, **k: "clm")
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_docx", lambda *a, **k: Path("cl.docx")
+    )
+    monkeypatch.setattr(
+        renderer, "render_cover_letter_pdf", lambda *a, **k: Path("cl.pdf")
+    )
+
+    paths = renderer.render_all(
+        rewrite_output,
+        cover_letter_output,
+        candidate_name="Jane Doe",
+        company_name="Acme Corp",
+        output_dir=tmp_path,
+        resume_templates=["modern", "classic", "minimal"],
+    )
+    assert set(paths.keys()) == {
+        "resume_modern_plaintext",
+        "resume_modern_markdown",
+        "resume_modern_docx",
+        "resume_modern_pdf",
+        "resume_classic_plaintext",
+        "resume_classic_markdown",
+        "resume_classic_docx",
+        "resume_classic_pdf",
+        "resume_minimal_plaintext",
+        "resume_minimal_markdown",
+        "resume_minimal_docx",
+        "resume_minimal_pdf",
+        "cover_letter_plaintext",
+        "cover_letter_markdown",
+        "cover_letter_docx",
+        "cover_letter_pdf",
+    }
+    assert used == ["modern", "classic", "minimal"]
+
+
+def test_render_all_multiple_templates_write_distinct_files(
+    rewrite_output: RewriteOutput,
+    tmp_path,
+) -> None:
+    """Each layout writes its own files with the template in the filename."""
+    paths = ResumeRenderer().render_all(
+        rewrite_output,
+        None,
+        candidate_name="Jane Doe",
+        company_name="Acme Corp",
+        output_dir=tmp_path,
+        resume_templates=["modern", "classic", "minimal"],
+    )
+    for template in ("modern", "classic", "minimal"):
+        for fmt in ("plaintext", "markdown", "docx", "pdf"):
+            path = paths[f"resume_{template}_{fmt}"]
+            assert path.is_file(), f"missing {template} {fmt} file"
+            assert f"resume-{template}" in path.name
+    names = {
+        paths[f"resume_{t}_markdown"].name for t in ("modern", "classic", "minimal")
+    }
+    assert len(names) == 3
+
+
+def test_render_all_single_template_via_resume_templates(
+    rewrite_output: RewriteOutput,
+    tmp_path,
+) -> None:
+    """A str resume_templates renders just that layout with namespaced keys."""
+    paths = ResumeRenderer().render_all(
+        rewrite_output,
+        None,
+        candidate_name="Jane Doe",
+        company_name="Acme Corp",
+        output_dir=tmp_path,
+        resume_templates="classic",
+    )
+    assert set(paths.keys()) == {
+        "resume_classic_plaintext",
+        "resume_classic_markdown",
+        "resume_classic_docx",
+        "resume_classic_pdf",
+    }
+    assert "resume-classic" in paths["resume_classic_markdown"].name
+
+
+def test_render_all_single_template_uses_requested_layout(
+    rewrite_output: RewriteOutput,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """resume_template picks the layout while keeping the legacy keys."""
+    renderer = ResumeRenderer()
+    used: list[str] = []
+
+    def fake_plain(*args, **kwargs):
+        used.append(kwargs["template"])
+        return "plain"
+
+    monkeypatch.setattr(renderer, "render_plaintext", fake_plain)
+    monkeypatch.setattr(renderer, "render_markdown", lambda *a, **k: "md")
+    monkeypatch.setattr(renderer, "render_docx", lambda *a, **k: Path("d.docx"))
+    monkeypatch.setattr(renderer, "render_pdf", lambda *a, **k: Path("d.pdf"))
+
+    paths = renderer.render_all(
+        rewrite_output,
+        None,
+        candidate_name="Jane Doe",
+        company_name="Acme Corp",
+        output_dir=tmp_path,
+        resume_template="classic",
+    )
+    assert used == ["classic"]
+    assert "resume_plaintext" in paths
+
+
 # ===================================================================
 # DOCX / PDF smoke tests
 # ===================================================================

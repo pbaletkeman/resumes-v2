@@ -462,6 +462,7 @@ class ResumeRenderer:
         company_name: str,
         output_dir: str | Path,
         resume_template: str = "modern",
+        resume_templates: str | list[str] | None = None,
         phone: str = "",
         email: str = "",
         linkedin: str = "",
@@ -476,6 +477,15 @@ class ResumeRenderer:
         under a timestamped, slugified filename built by
         :meth:`build_output_path`.
 
+        By default a single resume template (``resume_template``, "modern")
+        is rendered and its files use the ``resume_plaintext`` ...
+        ``resume_pdf`` keys.  Pass *resume_templates* (a template key or a
+        list of keys) to render several resume layouts in one call instead;
+        their files are namespaced as ``resume_{template}_plaintext`` ...
+        ``resume_{template}_pdf`` and the filename embeds the template
+        (``resume-{template}.{ext}``) so the layouts do not overwrite each
+        other.
+
         Args:
             resume: Structured resume data from the Resume Rewrite Agent.
             cover_letter: Structured letter data from the Cover Letter Agent,
@@ -483,7 +493,13 @@ class ResumeRenderer:
             candidate_name: Candidate name for headers and filenames.
             company_name: Target company name for filenames.
             output_dir: Directory the rendered files are written to.
-            resume_template: Template key for the resume text formats.
+            resume_template: Template key for the single-template resume
+                formats, used when *resume_templates* is ``None``.
+            resume_templates: Optional template key or list of keys
+                (``"modern"``/``"classic"``/``"minimal"``) to render multiple
+                resume layouts in one call.  When provided, each layout's
+                files are namespaced with the template embedded in the key
+                and filename.
             phone: Candidate phone number for cover letter headers.
             email: Candidate email address for cover letter headers.
             linkedin: Candidate LinkedIn profile URL for cover letter headers.
@@ -493,8 +509,9 @@ class ResumeRenderer:
             Mapping of format name to the written ``Path``.
 
         Raises:
-            KeyError: If *resume_template* is not one of the built-in
-                template keys (``"modern"``, ``"classic"``, ``"minimal"``).
+            KeyError: If *resume_template*/*resume_templates* references a
+                template key that is not built in (``"modern"``,
+                ``"classic"``, ``"minimal"``).
             jinja2.UndefinedError: If a template references a variable
                 that is not provided in the built context.
             OSError: If *output_dir* cannot be created or a rendered
@@ -503,57 +520,27 @@ class ResumeRenderer:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        resume_plain = self.render_plaintext(
-            resume, name=candidate_name, template=resume_template
-        )
-        resume_md = self.render_markdown(
-            resume, name=candidate_name, template=resume_template
-        )
-        resume_docx = self.render_docx(
-            resume,
-            name=candidate_name,
-            template=resume_template,
-            output_path=self.build_output_path(
-                "resume",
-                candidate_name=candidate_name,
-                company_name=company_name,
-                output_dir=output_dir,
-                ext=".docx",
-            ),
-        )
-        resume_pdf = self.render_pdf(
-            resume,
-            name=candidate_name,
-            template=resume_template,
-            output_path=self.build_output_path(
-                "resume",
-                candidate_name=candidate_name,
-                company_name=company_name,
-                output_dir=output_dir,
-                ext=".pdf",
-            ),
-        )
+        multi = resume_templates is not None
+        if resume_templates is None:
+            templates: list[str] = [resume_template]
+        elif isinstance(resume_templates, str):
+            templates = [resume_templates]
+        else:
+            templates = list(resume_templates)
 
-        paths = {
-            "resume_plaintext": self._write_text(
-                resume_plain,
-                "resume",
-                candidate_name,
-                company_name,
-                output_dir,
-                ".txt",
-            ),
-            "resume_markdown": self._write_text(
-                resume_md,
-                "resume",
-                candidate_name,
-                company_name,
-                output_dir,
-                ".md",
-            ),
-            "resume_docx": resume_docx,
-            "resume_pdf": resume_pdf,
-        }
+        paths: dict[str, Path] = {}
+        for template in templates:
+            paths.update(
+                self._render_resume_template(
+                    resume,
+                    candidate_name=candidate_name,
+                    company_name=company_name,
+                    output_dir=output_dir,
+                    template=template,
+                    key_prefix=f"resume_{template}" if multi else "resume",
+                    document_type=f"resume-{template}" if multi else "resume",
+                )
+            )
 
         if cover_letter is not None and cover_letter.cover_letter.strip():
             letter_plain = self.render_cover_letter_plaintext(
@@ -626,6 +613,78 @@ class ResumeRenderer:
             paths["cover_letter_pdf"] = letter_pdf
 
         return paths
+
+    def _render_resume_template(
+        self,
+        resume: RewriteOutput,
+        *,
+        candidate_name: str,
+        company_name: str,
+        output_dir: Path,
+        template: str,
+        key_prefix: str,
+        document_type: str,
+    ) -> dict[str, Path]:
+        """Render *resume* in *template* into its four output formats.
+
+        The returned mapping uses the ``{key_prefix}_plaintext`` /
+        ``{key_prefix}_markdown`` / ``{key_prefix}_docx`` /
+        ``{key_prefix}_pdf`` keys.  Text files are written under
+        *document_type* so ``build_output_path`` produces distinct filenames
+        per template (e.g. ``resume-classic.md``).
+
+        Args:
+            resume: Structured resume data from the Resume Rewrite Agent.
+            candidate_name: Candidate name for headers and filenames.
+            company_name: Target company name for filenames.
+            output_dir: Directory the rendered files are written to.
+            template: Template key (``"modern"``, ``"classic"``, or
+                ``"minimal"``).
+            key_prefix: Prefix for the four output keys.
+            document_type: Document type used for the output filenames.
+
+        Returns:
+            Mapping of the four format keys to written ``Path`` values.
+
+        Raises:
+            KeyError: If *template* is not a built-in template key.
+        """
+        plain = self.render_plaintext(resume, name=candidate_name, template=template)
+        md = self.render_markdown(resume, name=candidate_name, template=template)
+        docx = self.render_docx(
+            resume,
+            name=candidate_name,
+            template=template,
+            output_path=self.build_output_path(
+                document_type,
+                candidate_name=candidate_name,
+                company_name=company_name,
+                output_dir=output_dir,
+                ext=".docx",
+            ),
+        )
+        pdf = self.render_pdf(
+            resume,
+            name=candidate_name,
+            template=template,
+            output_path=self.build_output_path(
+                document_type,
+                candidate_name=candidate_name,
+                company_name=company_name,
+                output_dir=output_dir,
+                ext=".pdf",
+            ),
+        )
+        return {
+            f"{key_prefix}_plaintext": self._write_text(
+                plain, document_type, candidate_name, company_name, output_dir, ".txt"
+            ),
+            f"{key_prefix}_markdown": self._write_text(
+                md, document_type, candidate_name, company_name, output_dir, ".md"
+            ),
+            f"{key_prefix}_docx": docx,
+            f"{key_prefix}_pdf": pdf,
+        }
 
     @staticmethod
     def _write_text(

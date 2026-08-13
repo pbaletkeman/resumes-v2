@@ -43,6 +43,7 @@ function makeRunInputs(overrides: Partial<RunInputs> = {}): RunInputs {
     resumeFile: null,
     candidateName: '',
     companyName: '',
+    resumeTemplate: 'modern',
     ...overrides,
   }
 }
@@ -97,6 +98,11 @@ describe('buildRunFormData', () => {
     expect(resume !== '').toBe(true)
     expect(formData.get('job_file')).toBeNull()
     expect(formData.get('resume_file')).toBeNull()
+  })
+
+  it('appends the resume template', () => {
+    const formData = buildRunFormData(makeRunInputs({ resumeTemplate: 'all' }))
+    expect(formData.get('resume_template')).toBe('all')
   })
 })
 

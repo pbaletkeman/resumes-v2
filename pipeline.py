@@ -317,6 +317,8 @@ def run_resume_pipeline(
     *,
     candidate_name: str = "",
     company_name: str = "",
+    resume_template: str = "modern",
+    resume_templates: str | list[str] | None = None,
 ) -> dict[str, Any]:
     """Run the full 7-agent resume optimization pipeline.
 
@@ -327,6 +329,12 @@ def run_resume_pipeline(
         candidate_name: Candidate name for rendered output headers and
             filenames.  When empty, file rendering is skipped.
         company_name: Target company name for rendered output filenames.
+        resume_template: Template key (``"modern"``/``"classic"``/
+            ``"minimal"``) for the rendered resume, used when
+            *resume_templates* is ``None``.
+        resume_templates: Optional template key or list of keys to render
+            several resume layouts in one run (keys become
+            ``resume_{template}_*`` and files are named ``resume-{template}``).
 
     Returns:
         Dictionary with keys: ``parsed_job_description``, ``parsed_resume``,
@@ -347,6 +355,8 @@ def run_resume_pipeline(
             resume,
             candidate_name=candidate_name,
             company_name=company_name,
+            resume_template=resume_template,
+            resume_templates=resume_templates,
         )
     )
 
@@ -408,8 +418,23 @@ async def _run_pipeline_core(
     *,
     candidate_name: str = "",
     company_name: str = "",
+    resume_template: str = "modern",
+    resume_templates: str | list[str] | None = None,
 ) -> dict[str, Any]:
-    """Async core of :func:`run_resume_pipeline` executed on one event loop."""
+    """Async core of :func:`run_resume_pipeline` executed on one event loop.
+
+    Args:
+        runner: An ``AgentRunner`` instance with all 7 agents registered.
+        job_description: Raw job description text.
+        resume: Raw resume text.
+        candidate_name: Candidate name for rendered output headers and
+            filenames.  When empty, file rendering is skipped.
+        company_name: Target company name for rendered output filenames.
+        resume_template: Template key for the rendered resume, used when
+            *resume_templates* is ``None``.
+        resume_templates: Optional template key or list of keys to render
+            several resume layouts in one run.
+    """
 
     total_agents = 7
     pipeline_start = time.monotonic()
@@ -504,6 +529,8 @@ async def _run_pipeline_core(
             candidate_name=candidate_name,
             company_name=company_name,
             output_dir=output_dir,
+            resume_template=resume_template,
+            resume_templates=resume_templates,
         )
         logger.info("Rendered %d output file(s) into %s", len(output_files), output_dir)
     else:
@@ -635,6 +662,15 @@ def main(argv: list[str] | None = None) -> int:
         metavar="NAME",
         help="Target company name used in rendered output filenames.",
     )
+    parser.add_argument(
+        "--template",
+        default="modern",
+        choices=["modern", "classic", "minimal", "all"],
+        help=(
+            "Resume layout template to render (modern, classic, minimal) or "
+            "'all' to render every layout in one run. Defaults to modern."
+        ),
+    )
     args = parser.parse_args(argv)
 
     # Step 1: no file arguments -> backward-compatible demo run (placeholders).
@@ -665,12 +701,18 @@ def main(argv: list[str] | None = None) -> int:
     jd_text = jd_path.read_text(encoding="utf-8")
 
     runner_instance = create_runner_from_config()
+    template_args: dict[str, Any] = (
+        {"resume_templates": ["modern", "classic", "minimal"]}
+        if args.template == "all"
+        else {"resume_template": args.template}
+    )
     results = run_resume_pipeline(
         runner_instance,
         jd_text,
         resume_text,
         candidate_name=args.candidate_name,
         company_name=args.company_name,
+        **template_args,
     )
 
     print("=== Polished Resume ===")

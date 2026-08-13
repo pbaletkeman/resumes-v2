@@ -108,6 +108,57 @@ class TestRunPipelineSync:
         assert call.kwargs["candidate_name"] == "Jane Doe"
         assert call.kwargs["company_name"] == "Acme Corp"
 
+    def test_resume_template_classic_forwarded(self, client: Any, monkeypatch) -> None:
+        core_mock = AsyncMock(return_value=_canned_result())
+        monkeypatch.setattr(app_module, "_run_pipeline_core", core_mock)
+
+        response = client.post(
+            "/api/pipeline",
+            data={
+                "job_description": JD_TEXT,
+                "resume": RES_TEXT,
+                "resume_template": "classic",
+            },
+        )
+
+        assert response.status_code == 200
+        call = core_mock.call_args
+        assert call is not None
+        assert call.kwargs["resume_template"] == "classic"
+        assert "resume_templates" not in call.kwargs
+
+    def test_resume_template_all_forwarded(self, client: Any, monkeypatch) -> None:
+        core_mock = AsyncMock(return_value=_canned_result())
+        monkeypatch.setattr(app_module, "_run_pipeline_core", core_mock)
+
+        response = client.post(
+            "/api/pipeline",
+            data={
+                "job_description": JD_TEXT,
+                "resume": RES_TEXT,
+                "resume_template": "all",
+            },
+        )
+
+        assert response.status_code == 200
+        call = core_mock.call_args
+        assert call is not None
+        assert call.kwargs["resume_templates"] == ["modern", "classic", "minimal"]
+        assert "resume_template" not in call.kwargs
+
+    def test_invalid_resume_template_returns_400(self, client: Any) -> None:
+        response = client.post(
+            "/api/pipeline",
+            data={
+                "job_description": JD_TEXT,
+                "resume": RES_TEXT,
+                "resume_template": "banana",
+            },
+        )
+
+        assert response.status_code == 400
+        assert "Unknown resume template" in response.json()["detail"]
+
     def test_missing_both_inputs_returns_400(self, client: Any) -> None:
         response = client.post("/api/pipeline", data={})
 
@@ -205,3 +256,25 @@ class TestRunPipelineAsync:
         assert payload["status"] == "failed"
         assert payload["error"] == "boom"
         assert payload["result"] is None
+
+    def test_async_resume_template_all_forwarded(
+        self, client: Any, monkeypatch
+    ) -> None:
+        core_mock = AsyncMock(return_value=_canned_result())
+        monkeypatch.setattr(app_module, "_run_pipeline_core", core_mock)
+
+        launch = client.post(
+            "/api/pipeline/async",
+            data={
+                "job_description": JD_TEXT,
+                "resume": RES_TEXT,
+                "resume_template": "all",
+            },
+        )
+        task_id = launch.json()["task_id"]
+        payload = _wait_for_task(client, task_id)
+
+        assert payload["status"] == "completed"
+        call = core_mock.call_args
+        assert call is not None
+        assert call.kwargs["resume_templates"] == ["modern", "classic", "minimal"]

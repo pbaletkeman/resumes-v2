@@ -17,6 +17,7 @@ export interface RunInputs {
   resumeFile: File | null
   candidateName: string
   companyName: string
+  resumeTemplate: string
 }
 
 /**
@@ -49,7 +50,8 @@ export function validateRunInputs(inputs: RunInputs): string | null {
  * ``_read_text_input``): if pasted text is non-empty it is appended under the
  * text field name and the file is skipped; otherwise the chosen file is
  * appended under its field name. Optional candidate/company names are appended
- * only when non-empty.
+ * only when non-empty. The resume template (modern/classic/minimal/all) is
+ * always appended; the backend rejects unknown values.
  *
  * Args:
  *   inputs: The raw form inputs from the Run page.
@@ -78,6 +80,10 @@ export function buildRunFormData(inputs: RunInputs): FormData {
   const companyName = inputs.companyName.trim()
   if (companyName !== '') {
     formData.append('company_name', companyName)
+  }
+  const resumeTemplate = inputs.resumeTemplate.trim()
+  if (resumeTemplate !== '') {
+    formData.append('resume_template', resumeTemplate)
   }
   return formData
 }

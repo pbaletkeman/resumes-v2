@@ -28,12 +28,12 @@ If you prefer the OpenAI provider instead of local Ollama, set `MODEL_PROVIDER=o
 | `uv run python basic.py` | Single-agent smoke test. Runs one `SimpleAgent` chat call against Ollama (or OpenAI) in JSON mode and pretty-prints the response. |
 | `uv run python pipeline.py` | Runs `sample_run()`: builds the full runner from the environment and runs `run_resume_pipeline` on placeholder text. Shows the polished resume and cover letter on stdout. |
 | `uv run python test_real_files.py` | Live end-to-end integration test: runs the true 7-agent chain against `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt` (requires a running Ollama), then prints a per-check PASS/FAIL summary. |
-| `uv run pytest` | Deterministic unit suite (`tests/`, 493 tests across 24 files) — does **not** require a live LLM. |
+| `uv run pytest` | Deterministic unit suite (`tests/`, 537 tests across 26 files) — does **not** require a live LLM. |
 | `uv run uvicorn app.main:app --reload` | Runs the FastAPI web API (pipeline, tasks, files, outputs endpoints). |
 
 ### Running the full pipeline
 
-The pipeline is exposed as `run_resume_pipeline(runner, job_description, resume, *, candidate_name, company_name)`:
+The pipeline is exposed as `run_resume_pipeline(runner, job_description, resume, *, candidate_name, company_name, resume_template, resume_templates)`:
 
 ```python
 from pipeline import create_runner_from_config, run_resume_pipeline
@@ -46,6 +46,8 @@ results = run_resume_pipeline(
     resume=...,
     candidate_name="Your Name",  # enables file rendering
     company_name="Acme Corp",  # used in output filenames
+    resume_template="classic",  # modern | classic | minimal (default modern)
+    # resume_templates=["modern", "classic", "minimal"],  # render all three
 )
 ```
 
@@ -65,6 +67,11 @@ results = run_resume_pipeline(
   | `cover_letter_markdown` | `.md` (only when letter text is non-empty) |
   | `cover_letter_docx` | `.docx` (only when letter text is non-empty) |
   | `cover_letter_pdf` | `.pdf` (only when letter text is non-empty) |
+
+  When `resume_templates` is provided, the resume keys are namespaced per
+  layout — `resume_{template}_plaintext` / `_markdown` / `_docx` / `_pdf`
+  (e.g. `resume_classic_pdf`) — and the filenames embed the template
+  (`resume-classic.pdf`). The cover letter keys are unchanged.
 
   Files are named with `ResumeRenderer.build_output_path()`:
   `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}` (slugs are filesystem-safe).

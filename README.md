@@ -58,8 +58,10 @@ uv run python pipeline.py \
 
 Passing `--candidate-name "Peter Letkeman"` (optional `--company-name "3Pillar"`)
 also renders `.txt`/`.md`/`.docx`/`.pdf` files into `output/`. `--jd` is
-shorthand for `--job-description`. File mode requires both `--resume` and
-`--job-description`; the no-argument form still runs the sample demo.
+shorthand for `--job-description`. Add `--template classic|minimal|all` to
+pick another resume layout — or `all` to render all three layouts in one run.
+File mode requires both `--resume` and `--job-description`; the no-argument
+form still runs the sample demo.
 
 ### 5. Try the web UI (2-3 min)
 
@@ -246,7 +248,7 @@ tests/
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + load_json_safe + JSON Schema helper tests (23 tests)
   test_formatter.py                # format_* helpers (41 tests)
-  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all (45 tests)
+  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all incl. multi-template (55 tests)
   test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
   test_agent_jd_parsing.py         # Agent 1 contract tests (7 tests)
   test_agent_resume_parsing.py     # Agent 2 contract tests (9 tests)
@@ -255,9 +257,11 @@ tests/
   test_agent_ats_compliance.py     # Agent 5 contract tests (8 tests)
   test_agent_tone_polishing.py     # Agent 6 contract tests (6 tests)
   test_agent_cover_letter.py       # Agent 7 contract tests (10 tests)
-  test_pipeline.py                 # AgentRunner / run_resume_pipeline orchestration (17 tests)
+  test_pipeline.py                 # AgentRunner / run_resume_pipeline orchestration + template passthrough (20 tests)
+  test_model_store.py              # SQLite agent model override store (11 tests)
   test_web_health.py               # Web health + models routes (2 tests)
-  test_web_pipeline.py             # Web sync + async pipeline routes (9 tests)
+  test_web_models_edit.py          # Web model/provider edit + reset routes (14 tests)
+  test_web_pipeline.py             # Web sync + async pipeline routes + template validation (13 tests)
   test_web_tasks.py                # TaskRegistry + tasks routes (9 tests)
   test_web_outputs.py              # Output file serving (3 tests)
   test_web_files.py                # File listing + deletion (11 tests)

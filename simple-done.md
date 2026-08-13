@@ -4424,7 +4424,7 @@ letter rows; `docs/api.md` documents the two new renderer methods + updated
 - `npm run lint` (ui/) — oxlint clean.
 - `npm run build` (ui/) — `tsc -b && vite build` succeeded.
 
-**Commit:** none yet — awaiting user approval to commit.
+**Commit:** `simplify: phase 22 - model editing (SQLite overrides + Models page), phases 23.1/23.2 - cover letter DOCX/PDF + markdown line breaks` (`a1feb81`)
 
 ---
 
@@ -4476,6 +4476,96 @@ in every generated resume.
 - `uv run pyright` — 0 errors, 0 warnings, 0 informations.
 - Backend-only change (renderer templates + tests); no frontend impact, so
   `npm` gates were not re-run.
+
+**Commit:** `simplify: phase 22 - model editing (SQLite overrides + Models page), phases 23.1/23.2 - cover letter DOCX/PDF + markdown line breaks` (`a1feb81`)
+
+---
+
+## Phase 23 - Completed sub-task 23.3: generate all three resume layout formats
+
+Original instruction:
+
+- **23.3** Provide a way to generate all three layout formats of the resume templates.
+
+### Design (user clarification: "Both selector AND all-three option")
+
+The user wants both a **per-run layout selector** (modern/classic/minimal) and
+an **"all" option** that renders every layout in one run. So the selector exists
+everywhere a run is started (CLI, web API, Run page) and the "all" choice maps
+to rendering modern + classic + minimal together. Single-layout runs keep the
+legacy `resume_*` output keys; multi-layout runs namespace them per template.
+
+### Backend
+
+- **`client/templates/renderer.py`** — `ResumeRenderer.render_all()` keeps the
+  existing `resume_template: str = "modern"` single-template path (legacy
+  `resume_plaintext` … keys) and gains `resume_templates: str | list[str] | None = None`.
+  When `resume_templates` is provided (non-`None`) each requested layout is
+  rendered through a new private helper `_render_resume_template()` and its four
+  files are namespaced as `resume_{template}_plaintext` / `_markdown` / `_docx` /
+  `_pdf`, with the template embedded in the filename via the document type
+  `resume-{template}` (e.g. `resume-classic.pdf`) so the layouts never overwrite
+  each other. The cover letter formats are shared and unaffected.
+- **`pipeline.py`** — `run_resume_pipeline()` and `_run_pipeline_core()` gain
+  `resume_template: str = "modern"` and `resume_templates: str | list[str] | None = None`,
+  forwarded to `render_all`. The CLI (`main()`) gains `--template` with choices
+  `modern|classic|minimal|all` (default `modern`); `all` maps to
+  `resume_templates=["modern", "classic", "minimal"]`.
+- **`app/main.py`** — both pipeline routes (`POST /api/pipeline` and
+  `POST /api/pipeline/async`) accept a `resume_template` multipart field
+  (default `"modern"`); `_resolve_resume_template()` maps `modern`/`classic`/
+  `minimal` → `{"resume_template": ...}` and `all` →
+  `{"resume_templates": ["modern", "classic", "minimal"]}`, returning
+  `HTTPException(400)` for unknown values.
+- **`app/schemas.py`** — `PipelineRunRequest.resume_template` field documented
+  (`modern`, `classic`, `minimal`, or `all`).
+
+### Frontend
+
+- **`ui/src/pages/runForm.ts`** — `RunInputs.resumeTemplate` added; `buildRunFormData`
+  appends `resume_template` when non-empty.
+- **`ui/src/pages/RunPage.tsx`** — a PrimeReact `Dropdown` in the run options
+  selects the layout: Modern (default), Classic, Minimal, or "All three". The
+  selection is included in the submitted `FormData`.
+- **`ui/src/pages/results/DownloadsRow.tsx`** — `DOWNLOAD_LABELS` extended with
+  the 12 namespaced keys (`Resume Modern/Classic/Minimal (txt/md/docx/pdf)`) so
+  all-layout runs show one download link per file.
+
+### Tests
+
+- `tests/test_renderer.py` (51 → 55) — multi-template namespaced keys with
+  per-template render usage, distinct `resume-{template}` filenames per layout,
+  single-template-via-`resume_templates` ("classic"), and single-template legacy
+  keys with the requested layout.
+- `tests/test_pipeline.py` (17 → 20) — `_RecordingRenderAll` records
+  `resume_template`/`resume_templates`; new tests for classic single, all-list,
+  and default-modern passthrough.
+- `tests/test_web_pipeline.py` (9 → 13) — sync route forwards `classic`,
+  forwards `all` as the template list, rejects an unknown template with 400; the
+  async route forwards `all` to the background core call.
+- `ui/src/api/client.test.ts` — factory default + `resume_template` appended test.
+- `ui/src/pages/RunPage.test.tsx` — default `modern` submitted; selecting
+  "All three" submits `resume_template=all` (PrimeReact overlay forced visible).
+- `ui/src/pages/results/DownloadsRow.test.tsx` — namespaced links render.
+
+### Verification results
+
+- `uv run pytest` — **537 passed** (526 baseline + 4 renderer + 3 pipeline +
+  4 web-pipeline tests).
+- `uv run ruff check .` — All checks passed.
+- `uv run ruff format --check .` — 100 files already formatted.
+- `uv run pyright` — 0 errors, 0 warnings, 0 informations.
+- `npm test` (ui/) — **61 passed** across 9 files.
+- `npm run lint` (ui/) — oxlint clean.
+- `npm run build` (ui/) — `tsc -b && vite build` succeeded.
+
+**Docs updated:** `docs/api.md` (pipeline + render_all signatures), `docs/usage.md`
+(pipeline kwargs + namespaced output keys), `docs/README.md` (CLI `--template`
+row + example, render_all multi-layout note, web API `resume_template` input,
+pytest count), `docs/architecture.md` (render_all hook-in), `docs/TESTING.md`
+(test census 537), root `README.md` (quickstart `--template` + test map), root
+`AGENTS.md` (quick command + test census + status), `simple.md` (23.3
+completed + verification).
 
 **Commit:** none yet — awaiting user approval to commit.
 
@@ -4551,4 +4641,4 @@ Per-agent model/provider overrides are persisted in SQLite (`app/model_store.py`
 `docs/README.md` (routes table + PATCH/DELETE REST-client examples, pytest count),
 `docs/TESTING.md` (new test files), `simple.md` (Phase 22 -> Completed + verification note).
 
-**Commit:** none yet — awaiting user approval to commit.
+**Commit:** `simplify: phase 22 - model editing (SQLite overrides + Models page), phases 23.1/23.2 - cover letter DOCX/PDF + markdown line breaks` (`a1feb81`)

@@ -13,6 +13,18 @@ const DOWNLOAD_LABELS: Record<string, string> = {
   cover_letter_markdown: 'Cover letter (md)',
   cover_letter_docx: 'Cover letter (docx)',
   cover_letter_pdf: 'Cover letter (pdf)',
+  resume_modern_plaintext: 'Resume Modern (txt)',
+  resume_modern_markdown: 'Resume Modern (md)',
+  resume_modern_docx: 'Resume Modern (docx)',
+  resume_modern_pdf: 'Resume Modern (pdf)',
+  resume_classic_plaintext: 'Resume Classic (txt)',
+  resume_classic_markdown: 'Resume Classic (md)',
+  resume_classic_docx: 'Resume Classic (docx)',
+  resume_classic_pdf: 'Resume Classic (pdf)',
+  resume_minimal_plaintext: 'Resume Minimal (txt)',
+  resume_minimal_markdown: 'Resume Minimal (md)',
+  resume_minimal_docx: 'Resume Minimal (docx)',
+  resume_minimal_pdf: 'Resume Minimal (pdf)',
 }
 
 function DownloadsRow({ outputFiles }: DownloadsRowProps) {

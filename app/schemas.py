@@ -21,6 +21,13 @@ class PipelineRunRequest(BaseModel):
     company_name: str = Field(
         default="", description="Target company for the cover letter."
     )
+    resume_template: str = Field(
+        default="modern",
+        description=(
+            "Resume layout template to render: modern, classic, minimal, or "
+            "all (renders every layout)."
+        ),
+    )
 
 
 class PipelineRunResponse(BaseModel):

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { Button } from 'primereact/button'
+import { Dropdown } from 'primereact/dropdown'
 import { FileUpload } from 'primereact/fileupload'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
@@ -13,6 +14,17 @@ import { buildRunFormData, validateRunInputs } from './runForm'
 import { asStringMap } from './results/coerce'
 import DownloadsRow from './results/DownloadsRow'
 import ResultsTabView from './results/ResultsTabView'
+
+/**
+ * Resume layout options for the Run page. The backend accepts
+ * modern/classic/minimal (single layout) plus "all" (every layout in one run).
+ */
+const RESUME_TEMPLATE_OPTIONS = [
+  { label: 'Modern', value: 'modern' },
+  { label: 'Classic', value: 'classic' },
+  { label: 'Minimal', value: 'minimal' },
+  { label: 'All three', value: 'all' },
+]
 
 interface FileChosenProps {
   file: File | null
@@ -82,6 +94,7 @@ function RunPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [candidateName, setCandidateName] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [resumeTemplate, setResumeTemplate] = useState('modern')
   const [taskId, setTaskId] = useState<string | null>(null)
   const { show } = useToast()
   const invokePipeline = useInvokePipeline()
@@ -112,7 +125,15 @@ function RunPage() {
   function handleSubmit() {
     // Step 1. Gather the raw inputs and validate that the user supplied a job
     // description and a resume (pasted text and/or an uploaded file each).
-    const inputs = { jobDescription, resume, jobFile, resumeFile, candidateName, companyName }
+    const inputs = {
+      jobDescription,
+      resume,
+      jobFile,
+      resumeFile,
+      candidateName,
+      companyName,
+      resumeTemplate,
+    }
     const invalid = validateRunInputs(inputs)
 
     // Step 2. On invalid input, surface the first problem via a toast and do
@@ -184,6 +205,18 @@ function RunPage() {
             onChange={(e) => setCompanyName(e.target.value)}
           />
           <label htmlFor="company-name">Company name (optional)</label>
+        </span>
+        <span className="run-template-picker">
+          <span className="p-float-label">
+            <Dropdown
+              id="resume-template"
+              className="run-template-dropdown"
+              value={resumeTemplate}
+              options={RESUME_TEMPLATE_OPTIONS}
+              onChange={(event) => setResumeTemplate(event.value as string)}
+            />
+            <label htmlFor="resume-template">Resume template</label>
+          </span>
         </span>
       </div>
       <div className="run-actions">

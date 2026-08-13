@@ -45,4 +45,26 @@ describe('DownloadsRow', () => {
     const { container } = render(<DownloadsRow outputFiles={{ other: 'output/a.md' }} />)
     expect(container.querySelector('a')).toBeNull()
   })
+
+  it('renders namespaced links when every resume layout is generated', () => {
+    render(
+      <DownloadsRow
+        outputFiles={{
+          resume_modern_markdown: 'output/20260809_smith_resume-modern.md',
+          resume_classic_markdown: 'output/20260809_smith_resume-classic.md',
+          resume_minimal_markdown: 'output/20260809_smith_resume-minimal.md',
+          resume_modern_pdf: 'output/20260809_smith_resume-modern.pdf',
+          resume_classic_pdf: 'output/20260809_smith_resume-classic.pdf',
+          resume_minimal_pdf: 'output/20260809_smith_resume-minimal.pdf',
+        }}
+      />,
+    )
+    expect(screen.getByText('Resume Modern (md)')).toBeInTheDocument()
+    expect(screen.getByText('Resume Classic (md)')).toBeInTheDocument()
+    expect(screen.getByText('Resume Minimal (md)')).toBeInTheDocument()
+    expect(screen.getByText('Resume Modern (pdf)')).toBeInTheDocument()
+    expect(screen.getByText('Resume Classic (pdf)')).toBeInTheDocument()
+    expect(screen.getByText('Resume Minimal (pdf)')).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(6)
+  })
 })

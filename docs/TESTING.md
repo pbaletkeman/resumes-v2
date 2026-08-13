@@ -226,7 +226,7 @@ uv run pytest --cov --cov-report=xml
 Artifacts: `.coverage` (data file) and `htmlcov/` (HTML report); both are
 git-ignored.
 
-Currently **493 tests across 24 files** (deterministic, no live LLM required):
+Currently **537 tests across 26 files** (deterministic, no live LLM required):
 
 - `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
 - `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
@@ -235,7 +235,7 @@ Currently **493 tests across 24 files** (deterministic, no live LLM required):
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 23 tests (shared parser + `load_json_safe` + JSON Schema helpers)
 - `tests/test_formatter.py` — 41 tests (format_* helpers)
-- `tests/test_renderer.py` — 45 tests (ResumeRenderer plaintext/markdown/docx/pdf/render_all + cover-letter DOCX/PDF + contact-line rendering)
+- `tests/test_renderer.py` — 55 tests (ResumeRenderer plaintext/markdown/docx/pdf/render_all + single/multi-template render_all + cover-letter DOCX/PDF + contact-line rendering)
 - `tests/test_skill_normalizer.py` — 15 tests (SkillNormalizer canonical taxonomy)
 - `tests/test_agent_jd_parsing.py` — 7 tests (Agent 1 contract, mocked ModelClient)
 - `tests/test_agent_resume_parsing.py` — 9 tests (Agent 2 contract, mocked ModelClient)
@@ -244,11 +244,11 @@ Currently **493 tests across 24 files** (deterministic, no live LLM required):
 - `tests/test_agent_ats_compliance.py` — 8 tests (Agent 5 contract, mocked ModelClient)
 - `tests/test_agent_tone_polishing.py` — 6 tests (Agent 6 contract, mocked ModelClient)
 - `tests/test_agent_cover_letter.py` — 10 tests (Agent 7 contract, mocked ModelClient)
-- `tests/test_pipeline.py` — 17 tests (AgentRunner / run_resume_pipeline orchestration, stub agents)
-- `tests/test_model_store.py` — 12 tests (SQLite agent model override store)
+- `tests/test_pipeline.py` — 20 tests (AgentRunner / run_resume_pipeline orchestration, stub agents, resume template passthrough)
+- `tests/test_model_store.py` — 11 tests (SQLite agent model override store)
 - `tests/test_web_health.py` — 2 tests (web health + models routes)
-- `tests/test_web_models_edit.py` — 13 tests (web model/provider edit + reset routes)
-- `tests/test_web_pipeline.py` — 9 tests (web sync + async pipeline routes)
+- `tests/test_web_models_edit.py` — 14 tests (web model/provider edit + reset routes)
+- `tests/test_web_pipeline.py` — 13 tests (web sync + async pipeline routes, resume template validation/forwarding)
 - `tests/test_web_tasks.py` — 9 tests (TaskRegistry + tasks routes)
 - `tests/test_web_outputs.py` — 3 tests (output file serving)
 - `tests/test_web_files.py` — 11 tests (file listing + deletion)

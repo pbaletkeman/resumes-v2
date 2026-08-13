@@ -280,6 +280,35 @@ def _to_response(result: dict[str, Any]) -> PipelineRunResponse:
     )
 
 
+_RESUME_TEMPLATES = ("modern", "classic", "minimal")
+
+
+def _resolve_resume_template(value: str) -> dict[str, Any]:
+    """Map a request ``resume_template`` value to pipeline core kwargs.
+
+    Accepts ``"modern"``/``"classic"``/``"minimal"`` (single layout) or
+    ``"all"`` (every layout in one run).  Unknown values are rejected.
+
+    Args:
+        value: The raw form value (already stripped).
+
+    Returns:
+        Kwargs for ``_run_pipeline_core``: either ``{"resume_template": ...}``
+        or ``{"resume_templates": [...]}`` for ``"all"``.
+
+    Raises:
+        HTTPException(400): when *value* is not a supported template.
+    """
+    if value == "all":
+        return {"resume_templates": list(_RESUME_TEMPLATES)}
+    if value in _RESUME_TEMPLATES:
+        return {"resume_template": value}
+    raise HTTPException(
+        status_code=400,
+        detail="Unknown resume template. Supported: modern, classic, minimal, all",
+    )
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -381,6 +410,7 @@ async def run_pipeline(
     resume_file: Annotated[UploadFile | None, File()] = None,
     candidate_name: Annotated[str, Form()] = "",
     company_name: Annotated[str, Form()] = "",
+    resume_template: Annotated[str, Form()] = "modern",
     runner: Annotated[Any, Depends(_require_runner)] = None,
 ) -> PipelineRunResponse:
     """Run the full pipeline synchronously (multipart form inputs).
@@ -396,6 +426,7 @@ async def run_pipeline(
         rsv,
         candidate_name=candidate_name,
         company_name=company_name,
+        **_resolve_resume_template(resume_template.strip()),
     )
     return _to_response(result)
 
@@ -408,6 +439,7 @@ async def run_pipeline_async(
     resume_file: Annotated[UploadFile | None, File()] = None,
     candidate_name: Annotated[str, Form()] = "",
     company_name: Annotated[str, Form()] = "",
+    resume_template: Annotated[str, Form()] = "modern",
     runner: Annotated[Any, Depends(_require_runner)] = None,
 ) -> TaskCreated:
     """Launch a background pipeline run; returns a task id.
@@ -417,6 +449,7 @@ async def run_pipeline_async(
     """
     jd = _read_text_input(job_description, job_file, "job_description")
     rsv = _read_text_input(resume, resume_file, "resume")
+    template_kwargs = _resolve_resume_template(resume_template.strip())
     task_id = registry.create()
     registry.update(task_id, status="running")
 
@@ -428,6 +461,7 @@ async def run_pipeline_async(
                 rsv,
                 candidate_name=candidate_name,
                 company_name=company_name,
+                **template_kwargs,
             )
             registry.set_result(task_id, _to_response(result).model_dump(mode="json"))
         except Exception as exc:  # noqa: BLE001

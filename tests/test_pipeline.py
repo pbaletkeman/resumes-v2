@@ -369,6 +369,8 @@ class _RecordingRenderAll:
                 "candidate_name": candidate_name,
                 "company_name": company_name,
                 "output_dir": output_dir,
+                "resume_template": kwargs.get("resume_template", "modern"),
+                "resume_templates": kwargs.get("resume_templates"),
             }
         )
         return {
@@ -413,6 +415,57 @@ class TestCompanyCandidatePassthrough:
 
         assert len(recorder.calls) == 0
         assert result["output_files"] == {}
+
+    async def test_resume_template_reaches_renderer(self, monkeypatch) -> None:
+        runner, _ = _stub_runner()
+        recorder = _RecordingRenderAll()
+        monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
+
+        await _run_pipeline_core(
+            runner,
+            JD_TEXT,
+            RESUME_TEXT,
+            candidate_name="Jane Doe",
+            company_name="Acme Corp",
+            resume_template="classic",
+        )
+
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0]["resume_template"] == "classic"
+        assert recorder.calls[0]["resume_templates"] is None
+
+    async def test_resume_templates_list_reaches_renderer(self, monkeypatch) -> None:
+        runner, _ = _stub_runner()
+        recorder = _RecordingRenderAll()
+        monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
+
+        await _run_pipeline_core(
+            runner,
+            JD_TEXT,
+            RESUME_TEXT,
+            candidate_name="Jane Doe",
+            company_name="Acme Corp",
+            resume_templates=["modern", "classic", "minimal"],
+        )
+
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0]["resume_templates"] == ["modern", "classic", "minimal"]
+
+    async def test_default_resume_template_is_modern(self, monkeypatch) -> None:
+        runner, _ = _stub_runner()
+        recorder = _RecordingRenderAll()
+        monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
+
+        await _run_pipeline_core(
+            runner,
+            JD_TEXT,
+            RESUME_TEXT,
+            candidate_name="Jane Doe",
+            company_name="Acme Corp",
+        )
+
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0]["resume_template"] == "modern"
 
 
 class TestAgentRunnerUnit:
