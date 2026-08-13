@@ -4567,6 +4567,73 @@ pytest count), `docs/architecture.md` (render_all hook-in), `docs/TESTING.md`
 `AGENTS.md` (quick command + test census + status), `simple.md` (23.3
 completed + verification).
 
+**Commit:** `simplify: phase 23.3 - generate all three resume layouts (renderer multi-template, CLI --template, API + Run page selector)` (`2f26f05`)
+
+---
+
+## Phase 23 - Completed sub-task 23.4: cover letter closing salutation no longer repeated
+
+Original instruction:
+
+- **23.4** The closing salulation for the cover letters is repeated.
+
+### Root cause
+
+The cover letter body is split into paragraphs and its trailing
+signature is stripped before the template renders its own
+`Sincerely, {candidate_name}` block. Two cases defeated the stripping:
+
+1. `_is_signature()` required `len(paragraph) < 80`, so a signature block
+   carrying contact details (`Sincerely,\nJane Doe\njane@example.com | …`)
+   — produced by the fallback letter, or by the LLM letter plus
+   `_apply_contact_info()`'s appended contact line — exceeded the limit and
+   was kept. The template's own signature then rendered below it, duplicating
+   the salutation.
+2. `_apply_contact_info()` appends the contact line as a separate trailing
+   paragraph, so the *last* paragraph was a contact line (not a signature)
+   and nothing was stripped at all.
+
+### Fix
+
+**`client/templates/renderer.py`** — reworked the body-splitting helpers so the
+renderer owns the signature and never duplicates it, while keeping the letter's
+contact details:
+
+- `_split_letter_body(text)` (renamed from `_split_paragraphs`) returns
+  `(paragraphs, contact_line)`. It strips the leading salutation and a trailing
+  signature block, handling both layouts: a signature paragraph whose final
+  line carries contact info (fallback letter) and a signature paragraph
+  followed by a standalone ` | `-joined contact line (`_apply_contact_info`).
+- `_is_signature()` now applies its length guard to the **first line** (the
+  sign-off phrase) instead of the whole block, so signature + name + contact
+  blocks are recognized regardless of length.
+- New `_is_contact_line()`, `_contact_line_from_signature()`, and
+  `_looks_like_contact()` helpers detect and extract trailing contact lines.
+- `_build_cover_letter_context()` merges any extracted contact line into the
+  header `contact_line` (deduplicated against the explicit phone/email/linkedin/
+  github params), so contact info moves to the letter header instead of being
+  lost — the pipeline calls `render_all` with only `candidate_name`/`company_name`,
+  so this is the only place cover-letter contact info reaches rendered files.
+
+The raw `cover_letter` text (agent output, UI tab) is untouched; only the
+rendered plaintext/markdown/docx/pdf files change.
+
+### Tests
+
+- `tests/test_renderer.py` (55 → 60) — five regression tests: own-signature
+  rendered once; signature block with long inline contact rendered once with
+  contact promoted to the header; `_apply_contact_info`-style trailing contact
+  line rendered once; single (non-` | `) trailing contact value rendered once;
+  Markdown letter signature rendered once.
+
+### Verification results
+
+- `uv run pytest` — **542 passed** (537 baseline + 5 renderer tests).
+- `uv run ruff check .` — All checks passed.
+- `uv run ruff format --check .` — 100 files already formatted.
+- `uv run pyright` — 0 errors, 0 warnings, 0 informations.
+- Backend-only change — no frontend impact.
+
 **Commit:** none yet — awaiting user approval to commit.
 
 ---

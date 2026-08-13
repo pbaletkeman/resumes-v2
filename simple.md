@@ -31,7 +31,7 @@
 | 19 — Repo-wide documentation consolidation | ✅ Completed | `simple-done.md` |
 | 20 — Final verification & regression (20.1-20.5) | ✅ Completed | `simple-done.md` |
 | 22 — Model editing (SQLite overrides + Models page editing) | ✅ Completed | `simple-done.md` |
-| 23 — Formatting (23.1 cover letter DOCX/PDF, 23.2 markdown line breaks, 23.3 all three resume layouts done) | 🔄 In progress | `simple-done.md` |
+| 23 — Formatting (23.1-23.4 done) | ✅ Completed | `simple-done.md` |
 
 Phase 20 verification: backend green (`pytest` 493 passed, `ruff check .`,
 `ruff format --check .`, `pyright` 0 errors/warnings), frontend green
@@ -55,6 +55,10 @@ Phase 23.3 verification: backend green (`pytest` 537 passed, `ruff check .`,
 `ruff format --check .`, `pyright` 0 errors/warnings), frontend green
 (`npm test` 61 passed, `npm run lint`, `npm run build`).
 
+Phase 23.4 verification: backend green (`pytest` 542 passed, `ruff check .`,
+`ruff format --check .`, `pyright` 0 errors/warnings). Backend-only change
+(renderer cover letter signature handling + tests), no frontend impact.
+
 ## Remaining work
 
 ### Phase 23 - Formatting
@@ -62,7 +66,7 @@ Phase 23.3 verification: backend green (`pytest` 537 passed, `ruff check .`,
 - [x] 23.1 The Cover letter is never transformed into a DOCX file or a PDF file. ✅ See `simple-done.md`.
 - [x] 23.2 The line breaks in the generated files are not correct. In Markdown you need two line breaks in a row to have one of then display correctly. ✅ See `simple-done.md`.
 - [x] 23.3 Provide a way to generate all three layout formats of the resume templates. ✅ See `simple-done.md`.
-- [ ] 23.4 The closing salulation for the cover letters is repeated.
+- [x] 23.4 The closing salulation for the cover letters is repeated. ✅ See `simple-done.md`.
 
 ### Phase 21 - Documentation Cleanup
 

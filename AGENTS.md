@@ -103,7 +103,7 @@ tests/
   test_model_clients.py            # response_format + Structured Outputs plumbing tests (11 tests)
   test_json_utils.py               # shared parser + JSON Schema helper tests (23 tests)
   test_formatter.py                # format_* helpers (41 tests)
-  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all incl. multi-template (55 tests)
+  test_renderer.py                 # ResumeRenderer plaintext/markdown/docx/pdf/render_all incl. multi-template + cover-letter signature (60 tests)
   test_skill_normalizer.py         # SkillNormalizer canonical taxonomy tests (15 tests)
   test_agent_jd_parsing.py         # Agent 1 contract tests (7 tests, mocked ModelClient)
   test_agent_resume_parsing.py     # Agent 2 contract tests (9 tests, mocked ModelClient)
@@ -201,7 +201,7 @@ Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compli
 
 ## Testing
 
-pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 537 tests across 26 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer, per-agent contract tests, pipeline orchestration, web API tests including the SPA mount and model override store). Sample files in `sample/jobs/` and `sample/resume/`.
+pytest with `asyncio_mode = "auto"` for async tests. Tests in `tests/` — 542 tests across 26 files (FormatDetector regex, JD parsing, resume rewrite validation, cover letter validation, model clients, JSON utils, formatter, renderer, skill normalizer, per-agent contract tests, pipeline orchestration, web API tests including the SPA mount and model override store). Sample files in `sample/jobs/` and `sample/resume/`.
 
 Manual agent tests in `wip_testing/` chain agents sequentially (e.g., `test_ats_compliance.py` runs agents 1-5). Run with `uv run python wip_testing/test_<agent>.py`.
 

@@ -867,12 +867,25 @@ class ResumeRenderer:
         The letter body is split on blank lines into up to three logical
         paragraphs (opening / middle / closing).  ``contact_line`` holds the
         non-empty contact details joined on `` | `` for the header.
+
+        The body's own closing signature is dropped so the template-supplied
+        one is not duplicated; any contact details that rode along with that
+        signature (appended by ``_apply_contact_info`` or the fallback letter)
+        are merged into ``contact_line`` instead of being lost.
         """
-        paragraphs = _split_paragraphs(cover_letter.cover_letter)
+        paragraphs, trailing_contact = _split_letter_body(cover_letter.cover_letter)
         opening = paragraphs[0] if paragraphs else ""
         closing = paragraphs[-1] if len(paragraphs) > 1 else ""
         body = "\n\n".join(paragraphs[1:-1]) if len(paragraphs) > 2 else ""
-        contact_parts = [p for p in (phone, email, linkedin, github) if p]
+        header_parts = [p for p in (phone, email, linkedin, github) if p]
+        if trailing_contact:
+            header_parts += [
+                p.strip() for p in trailing_contact.split(" | ") if p.strip()
+            ]
+        contact_parts: list[str] = []
+        for part in header_parts:
+            if part not in contact_parts:
+                contact_parts.append(part)
         return {
             "candidate_name": name,
             "company": company,
@@ -1253,30 +1266,79 @@ def _bullet_list(items: list[str], styles: dict[str, PdfParagraphStyle]) -> Flow
     return ListFlowable(cast(Any, flowables), bulletType="bullet")
 
 
-def _split_paragraphs(text: str) -> list[str]:
-    """Split letter text into paragraphs, dropping template-supplied parts.
+def _split_letter_body(text: str) -> tuple[list[str], str]:
+    """Split *text* into paragraphs plus any trailing contact line.
 
     The ``COVER_LETTER`` template renders its own salutation and signature,
     so a leading ``Dear ...`` line and a trailing ``Sincerely, ...`` block
-    are stripped from the letter body to avoid duplication.
+    are dropped from the body to avoid duplication.  A signature block may
+    carry contact details -- either on its final line (fallback letter) or
+    as a separate `` | ``-joined line appended after it (``_apply_contact_info``)
+    -- and that contact line is returned so the renderer can place it in the
+    letter header instead of discarding it.
     """
     parts = [part.strip() for part in text.split("\n\n") if part.strip()]
     if not parts:
-        return parts
+        return parts, ""
     if _is_salutation(parts[0]):
         parts = parts[1:]
-    if parts and _is_signature(parts[-1]):
-        parts = parts[:-1]
-    return parts
+
+    contact_line = ""
+    if len(parts) >= 2 and _is_contact_line(parts[-1]) and _is_signature(parts[-2]):
+        contact_line = parts.pop()
+        parts.pop()
+    elif parts and _is_signature(parts[-1]):
+        block = parts.pop()
+        contact_line = _contact_line_from_signature(block)
+    return parts, contact_line
 
 
 def _is_salutation(paragraph: str) -> bool:
     """Return True when *paragraph* is a standalone greeting line."""
     first_line = paragraph.splitlines()[0].strip().rstrip(",").lower()
-    return len(paragraph) < 80 and first_line.startswith(_SALUTATION_PREFIXES)
+    return len(first_line) < 80 and first_line.startswith(_SALUTATION_PREFIXES)
 
 
 def _is_signature(paragraph: str) -> bool:
-    """Return True when *paragraph* is a standalone closing block."""
+    """Return True when *paragraph* is a closing block.
+
+    The first line must be a short sign-off phrase (``Sincerely,``,
+    ``Best regards,`` ...).  The block may continue with the candidate's
+    name and contact details on later lines, so the length guard applies
+    to the first line rather than the whole paragraph.
+    """
     first_line = paragraph.splitlines()[0].strip().rstrip(",").lower()
-    return len(paragraph) < 80 and first_line.startswith(_SIGNATURE_PREFIXES)
+    return len(first_line) < 80 and first_line.startswith(_SIGNATURE_PREFIXES)
+
+
+def _is_contact_line(paragraph: str) -> bool:
+    """Return True when *paragraph* is a standalone contact line."""
+    if len(paragraph) > 300 or "\n" in paragraph:
+        return False
+    return _looks_like_contact(paragraph) and not paragraph.rstrip().endswith(".")
+
+
+def _contact_line_from_signature(block: str) -> str:
+    """Extract a trailing contact line embedded in a signature *block*."""
+    lines = [line.strip() for line in block.splitlines() if line.strip()]
+    if len(lines) < 3:
+        return ""
+    contact: list[str] = []
+    for line in reversed(lines[1:]):
+        if _looks_like_contact(line):
+            contact.append(line)
+        else:
+            break
+    return " | ".join(reversed(contact))
+
+
+def _looks_like_contact(line: str) -> bool:
+    """Return True when *line* looks like a contact value or joined line."""
+    if " | " in line or "@" in line:
+        return True
+    if line.startswith(("http://", "https://")):
+        return True
+    if len(line) >= 40:
+        return False
+    digits = re.sub(r"\D", "", line)
+    return bool(digits) and len(digits) >= 7

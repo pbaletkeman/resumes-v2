@@ -342,6 +342,80 @@ def test_cover_letter_no_blank_line_between_name_and_date(
 
 
 # ===================================================================
+# Cover letter closing signature (not duplicated)
+# ===================================================================
+
+
+def test_cover_letter_signature_rendered_once() -> None:
+    """A letter that already carries its own signature is not signed twice."""
+    letter = CoverLetterOutput(
+        cover_letter="Dear Hiring Manager,\n\n"
+        "I am writing to apply for the role.\n\n"
+        "Thank you for your time.\n\n"
+        "Sincerely,\nJane Doe"
+    )
+    rendered = ResumeRenderer().render_cover_letter_plaintext(letter, name="Jane Doe")
+    assert rendered.count("Sincerely,") == 1
+    assert rendered.endswith("Sincerely,\nJane Doe")
+
+
+def test_cover_letter_signature_with_inline_contact_not_duplicated() -> None:
+    """A signature block carrying a long contact line is still stripped."""
+    letter = CoverLetterOutput(
+        cover_letter="Dear Hiring Manager,\n\n"
+        "I am writing to apply for the role.\n\n"
+        "Sincerely,\nJane Doe\n"
+        "jane@example.com | 555-123-4567 | "
+        "https://www.linkedin.com/in/jane-doe-with-a-long-name-123456"
+    )
+    rendered = ResumeRenderer().render_cover_letter_plaintext(letter, name="Jane Doe")
+    assert rendered.count("Sincerely,") == 1
+    assert rendered.endswith("Sincerely,\nJane Doe")
+    assert "jane@example.com | 555-123-4567" in rendered.split("Dear")[0]
+    assert "https://www.linkedin.com/in/jane-doe-with-a-long-name-123456" in rendered
+
+
+def test_cover_letter_trailing_contact_line_not_duplicated() -> None:
+    """A contact line appended after the signature moves to the header."""
+    letter = CoverLetterOutput(
+        cover_letter="Dear Hiring Manager,\n\n"
+        "I am writing to apply for the role.\n\n"
+        "Sincerely,\nJane Doe\n\n"
+        "jane@example.com | 555-1234"
+    )
+    rendered = ResumeRenderer().render_cover_letter_plaintext(letter, name="Jane Doe")
+    assert rendered.count("Sincerely,") == 1
+    assert rendered.endswith("Sincerely,\nJane Doe")
+    assert "jane@example.com | 555-1234" in rendered.split("Dear")[0]
+
+
+def test_cover_letter_single_contact_value_after_signature_not_duplicated() -> None:
+    """A lone contact value after the signature is treated like a contact line."""
+    letter = CoverLetterOutput(
+        cover_letter="Dear Hiring Manager,\n\n"
+        "I am writing to apply for the role.\n\n"
+        "Sincerely,\nJane Doe\n\n"
+        "jane@example.com"
+    )
+    rendered = ResumeRenderer().render_cover_letter_plaintext(letter, name="Jane Doe")
+    assert rendered.count("Sincerely,") == 1
+    assert rendered.endswith("Sincerely,\nJane Doe")
+    assert "jane@example.com" in rendered.split("Dear")[0]
+
+
+def test_cover_letter_markdown_signature_rendered_once() -> None:
+    """The Markdown letter also renders the closing signature only once."""
+    letter = CoverLetterOutput(
+        cover_letter="Dear Hiring Manager,\n\n"
+        "I am writing to apply for the role.\n\n"
+        "Sincerely,\nJane Doe"
+    )
+    rendered = ResumeRenderer().render_cover_letter_markdown(letter, name="Jane Doe")
+    assert rendered.count("Sincerely,") == 1
+    assert rendered.endswith("Sincerely,\n\n**Jane Doe**")
+
+
+# ===================================================================
 # build_output_path
 # ===================================================================
 
