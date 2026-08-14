@@ -342,3 +342,7 @@ uv run pytest --cov --cov-report=xml
 Artifacts are written to `.coverage` (data) and `htmlcov/` (HTML). Both are
 git-ignored. The verbose `--cov-report=term-missing` flag shows the line
 numbers of uncovered statements.
+
+## License
+
+This project is released under the [MIT License](LICENSE).

@@ -105,3 +105,8 @@ whose `TAB_KEYS` order mirrors the 7-agent chain, for the exact mapping).
 The PrimeReact dark theme (`lara-dark-blue`) is scoped to `html[data-theme='dark']`
 by `vite.config.ts`; `useTheme.ts` flips that one attribute so the whole app
 switches schemes. The chosen mode is persisted under the `theme` localStorage key.
+
+## License
+
+This frontend is part of the `resumes-v2` project, released under the
+[MIT License](../LICENSE).

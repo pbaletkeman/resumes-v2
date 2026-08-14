@@ -538,3 +538,4 @@ The guides below are linked to each other alphabetically; `docs/README.md`
 - `TESTING.md` — manual testing guide and coverage how-to.
 - `../ui/README.md` — frontend guide (pages, API hooks, theming, testing).
 - `usage.md` — quickstart, model configuration, custom agents.
+- `../LICENSE` — MIT license terms.
