@@ -1007,9 +1007,10 @@ class ResumeRenderer:
         """Build the Platypus flowables for the resume body in *context*.
 
         Mirrors :meth:`_populate_docx_paragraphs`: a name/title header,
-        summary paragraph, skills line, per-experience blocks, and bulleted
-        projects / certifications / education.  Text is XML-escaped for
-        ReportLab's ``Paragraph`` markup parser.
+        summary paragraph, bulleted skills, per-experience blocks with a
+        bold title/company header line, and bulleted projects /
+        certifications / education.  Text is XML-escaped for ReportLab's
+        ``Paragraph`` markup parser (bold via inline ``<b>`` tags).
         """
         flowables: list[Flowable] = []
         name = str(context.get("name", ""))
@@ -1028,7 +1029,7 @@ class ResumeRenderer:
         skills = cast(list[str], context.get("skills", []))
         if skills:
             flowables.append(Paragraph("Skills", styles["heading"]))
-            flowables.append(Paragraph(escape(", ".join(skills)), styles["body"]))
+            flowables.append(_bullet_list(skills, styles))
 
         experience = cast(list[dict[str, object]], context.get("experience", []))
         if experience:
@@ -1038,10 +1039,15 @@ class ResumeRenderer:
                 company = str(job.get("company", ""))
                 dates = str(job.get("dates", ""))
 
-                header_parts = [part for part in (job_title, company, dates) if part]
-                if header_parts:
-                    joined = escape(" - ".join(header_parts))
-                    flowables.append(Paragraph(joined, styles["body"]))
+                pieces: list[str] = []
+                if job_title:
+                    pieces.append(f"<b>{escape(job_title)}</b>")
+                if company:
+                    pieces.append(f"<b>{escape(company)}</b>")
+                if dates:
+                    pieces.append(escape(dates))
+                if pieces:
+                    flowables.append(Paragraph(" - ".join(pieces), styles["body"]))
 
                 for key in ("responsibilities", "achievements", "metrics"):
                     items = cast(list[str], job.get(key, []))
@@ -1069,8 +1075,9 @@ class ResumeRenderer:
 
         *context* is the dict produced by :meth:`_build_context`.  The
         candidate name is rendered at 14pt bold; section headings are bold;
-        experience is rendered as blocks of a bold title plus company/dates
-        and bulleted responsibilities, achievements, and metrics.
+        experience is rendered as blocks of a bold title and company (with
+        plain dates) plus bulleted responsibilities, achievements, and
+        metrics.
         """
         name = str(context.get("name", ""))
         title = str(context.get("title", ""))
@@ -1092,7 +1099,8 @@ class ResumeRenderer:
         skills = cast(list[str], context.get("skills", []))
         if skills:
             ResumeRenderer._docx_heading(doc, "Skills")
-            doc.add_paragraph(", ".join(skills))
+            for item in skills:
+                ResumeRenderer._docx_bullet(doc, item)
 
         experience = cast(list[dict[str, object]], context.get("experience", []))
         if experience:
@@ -1102,15 +1110,16 @@ class ResumeRenderer:
                 company = str(job.get("company", ""))
                 dates = str(job.get("dates", ""))
 
-                header_parts = [part for part in (job_title, company, dates) if part]
-                if header_parts:
+                if job_title or company or dates:
                     header = doc.add_paragraph()
                     if job_title:
                         title_run = header.add_run(job_title)
                         title_run.bold = True
-                    meta = " - ".join(part for part in (company, dates) if part)
-                    if meta:
-                        header.add_run(f" - {meta}")
+                    if company:
+                        company_run = header.add_run(f" - {company}")
+                        company_run.bold = True
+                    if dates:
+                        header.add_run(f" - {dates}")
 
                 for key in ("responsibilities", "achievements", "metrics"):
                     for item in cast(list[str], job.get(key, [])):
@@ -1180,6 +1189,37 @@ class ResumeRenderer:
         return paragraphs
 
     @staticmethod
+    def _cover_letter_blank_before(
+        paragraphs: list[tuple[str, str]], index: int
+    ) -> bool:
+        """Return True when a blank line should precede ``paragraphs[index]``.
+
+        Mirrors the ``COVER_LETTER`` template layout: a blank line separates
+        the header block from the salutation, every body paragraph, and the
+        signature block, while the header (name/contact/date) and the
+        signature (``Sincerely,`` + name) each stay contiguous.
+
+        Args:
+            paragraphs: The ordered ``(text, kind)`` pairs from
+                :meth:`_cover_letter_paragraphs`.
+            index: Position of the paragraph to check.
+
+        Returns:
+            True when a blank line should be inserted before that paragraph.
+        """
+        if index == 0:
+            return False
+        prev_kind = paragraphs[index - 1][1]
+        kind = paragraphs[index][1]
+        if kind == "body":
+            return True
+        if kind == "salutation":
+            return prev_kind in ("name", "meta")
+        if kind == "signature":
+            return prev_kind != "signature"
+        return False
+
+    @staticmethod
     def _populate_cover_letter_docx(
         doc: DocumentType, context: dict[str, object]
     ) -> None:
@@ -1187,9 +1227,14 @@ class ResumeRenderer:
 
         *context* is the dict produced by :meth:`_build_cover_letter_context`.
         The candidate name is rendered at 14pt bold; every other block uses
-        the document's normal style.
+        the document's normal style.  A blank paragraph separates the header
+        from the salutation, each body paragraph, and the signature block so
+        the DOCX letter reads like the plaintext/Markdown versions.
         """
-        for text, kind in ResumeRenderer._cover_letter_paragraphs(context):
+        paragraphs = ResumeRenderer._cover_letter_paragraphs(context)
+        for index, (text, kind) in enumerate(paragraphs):
+            if ResumeRenderer._cover_letter_blank_before(paragraphs, index):
+                doc.add_paragraph()
             para = doc.add_paragraph()
             run = para.add_run(text)
             if kind == "name":
@@ -1203,15 +1248,23 @@ class ResumeRenderer:
         """Build the Platypus flowables for the cover letter in *context*.
 
         Uses :meth:`_cover_letter_paragraphs` and the shared :meth:`_pdf_styles`
-        (name header at 14pt bold, body text otherwise).  Text is XML-escaped
-        for ReportLab's ``Paragraph`` markup parser.
+        (name header at 14pt bold, body text otherwise).  A ``Spacer`` the size
+        of one body line separates the header from the salutation, each body
+        paragraph, and the signature block so the PDF letter reads like the
+        plaintext/Markdown versions.  Text is XML-escaped for ReportLab's
+        ``Paragraph`` markup parser.
         """
         flowables: list[Flowable] = []
-        for text, kind in ResumeRenderer._cover_letter_paragraphs(context):
+        paragraphs = ResumeRenderer._cover_letter_paragraphs(context)
+        for index, (text, kind) in enumerate(paragraphs):
+            if ResumeRenderer._cover_letter_blank_before(paragraphs, index):
+                flowables.append(Spacer(1, _COVER_LETTER_BLANK_PT))
             style = styles["name"] if kind == "name" else styles["body"]
             flowables.append(Paragraph(escape(text), style))
         return flowables
 
+
+_COVER_LETTER_BLANK_PT = 13
 
 _SALUTATION_PREFIXES = ("dear", "to whom it may concern", "hello", "hi")
 _SIGNATURE_PREFIXES = (

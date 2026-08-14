@@ -310,6 +310,23 @@ def _to_rewrite_output(parsed_resume: Any) -> RewriteOutput:
     return RewriteOutput()
 
 
+def _resume_candidate_name(parsed_resume: Any) -> str:
+    """Return the candidate name parsed from the resume, or empty.
+
+    Reads ``ResumeParsingOutput.name`` (or the ``"name"`` key of a raw dict
+    from a generic agent) so runs that omit the explicit ``candidate_name``
+    field -- e.g. the web UI, where it is optional -- can still render named
+    output files.
+    """
+    if isinstance(parsed_resume, ResumeParsingOutput):
+        return parsed_resume.name.strip()
+    if isinstance(parsed_resume, dict):
+        name = cast(dict[str, Any], parsed_resume).get("name")
+        if isinstance(name, str):
+            return name.strip()
+    return ""
+
+
 def run_resume_pipeline(
     runner: AgentRunner,
     job_description: str,
@@ -327,7 +344,8 @@ def run_resume_pipeline(
         job_description: Raw job description text.
         resume: Raw resume text.
         candidate_name: Candidate name for rendered output headers and
-            filenames.  When empty, file rendering is skipped.
+            filenames.  When empty, the name parsed from the resume is used;
+            when neither is available, file rendering is skipped.
         company_name: Target company name for rendered output filenames.
         resume_template: Template key (``"modern"``/``"classic"``/
             ``"minimal"``) for the rendered resume, used when
@@ -341,7 +359,7 @@ def run_resume_pipeline(
         ``tailoring_strategy``, ``rewritten_resume``, ``ats_optimized_resume``,
         ``polished_resume``, ``cover_letter``, and ``output_files`` (a
         ``dict[str, Path]`` mapping format name to written file, empty when
-        ``candidate_name`` was not provided).
+        no candidate name was available for rendering).
     """
     configure_logging()
 
@@ -428,7 +446,8 @@ async def _run_pipeline_core(
         job_description: Raw job description text.
         resume: Raw resume text.
         candidate_name: Candidate name for rendered output headers and
-            filenames.  When empty, file rendering is skipped.
+            filenames.  When empty, the name parsed from the resume is used;
+            when neither is available, file rendering is skipped.
         company_name: Target company name for rendered output filenames.
         resume_template: Template key for the rendered resume, used when
             *resume_templates* is ``None``.
@@ -513,10 +532,12 @@ async def _run_pipeline_core(
         tailoring_strategy=tailoring_strategy,
     )
 
-    # Optional file output via ResumeRenderer.  Skipped when no candidate
-    # name was provided (candidate_name is the gate for rendering).
+    # Optional file output via ResumeRenderer.  The explicit candidate name
+    # wins when provided; otherwise the name parsed from the resume is used,
+    # so runs that omit the field (e.g. the web UI) still produce files.
     output_files: dict[str, Path] = {}
-    if candidate_name:
+    render_name = candidate_name or _resume_candidate_name(parsed_resume)
+    if render_name:
         resume_data = _to_rewrite_output(parsed_resume)
         letter_data = (
             CoverLetterOutput(cover_letter=cover_letter) if cover_letter else None
@@ -526,7 +547,7 @@ async def _run_pipeline_core(
         output_files = renderer.render_all(
             resume_data,
             letter_data,
-            candidate_name=candidate_name,
+            candidate_name=render_name,
             company_name=company_name,
             output_dir=output_dir,
             resume_template=resume_template,
@@ -534,7 +555,7 @@ async def _run_pipeline_core(
         )
         logger.info("Rendered %d output file(s) into %s", len(output_files), output_dir)
     else:
-        logger.info("Skipping file rendering (candidate_name is empty)")
+        logger.info("Skipping file rendering (no candidate name available)")
 
     total_time = time.monotonic() - pipeline_start
     logger.info(

@@ -911,6 +911,88 @@ def test_render_pdf_produces_nonempty_file(
     assert out.read_bytes().startswith(b"%PDF")
 
 
+def test_render_docx_skills_are_bulleted(
+    rewrite_output: RewriteOutput, tmp_path
+) -> None:
+    """render_docx renders each skill as its own List Bullet paragraph."""
+    pytest.importorskip("docx")
+    out = tmp_path / "resume.docx"
+    ResumeRenderer().render_docx(rewrite_output, name="Jane Doe", output_path=out)
+
+    from docx import Document
+
+    doc = Document(str(out))
+    paragraphs = [p.text for p in doc.paragraphs]
+    skill_bullets = [p.text for p in doc.paragraphs if p.style.name == "List Bullet"]
+
+    assert "Skills" in paragraphs
+    assert "Python, Rust, Kubernetes" not in paragraphs
+    assert all(skill in skill_bullets for skill in ("Python", "Rust", "Kubernetes"))
+
+
+def test_render_pdf_skills_are_not_comma_joined(
+    rewrite_output: RewriteOutput, tmp_path
+) -> None:
+    """render_pdf emits each skill separately, not one comma-joined line."""
+    pytest.importorskip("reportlab")
+    pytest.importorskip("pypdf")
+    from pypdf import PdfReader
+
+    out = tmp_path / "resume.pdf"
+    ResumeRenderer().render_pdf(rewrite_output, name="Jane Doe", output_path=out)
+
+    text = "\n".join(page.extract_text() or "" for page in PdfReader(str(out)).pages)
+    for skill in ("Python", "Rust", "Kubernetes"):
+        assert skill in text
+    assert "Python, Rust" not in text
+
+
+def test_render_docx_experience_header_has_bold_title_and_company(
+    rewrite_output: RewriteOutput, tmp_path
+) -> None:
+    """render_docx bolds the job title and company, keeping dates regular."""
+    pytest.importorskip("docx")
+    out = tmp_path / "resume.docx"
+    ResumeRenderer().render_docx(rewrite_output, name="Jane Doe", output_path=out)
+
+    from docx import Document
+
+    doc = Document(str(out))
+    for para in doc.paragraphs:
+        if para.text == "Staff Engineer - Acme Corp - 2020-2024":
+            runs = [(run.text, run.bold) for run in para.runs]
+            assert runs == [
+                ("Staff Engineer", True),
+                (" - Acme Corp", True),
+                (" - 2020-2024", None),
+            ]
+            break
+    else:
+        raise AssertionError("experience header paragraph not found")
+
+
+def test_render_pdf_experience_header_has_bold_title_and_company(
+    rewrite_output: RewriteOutput,
+) -> None:
+    """render_pdf bolds the job title and company, keeping dates regular."""
+    pytest.importorskip("reportlab")
+    renderer = ResumeRenderer()
+    context = renderer._build_context(rewrite_output, name="Jane Doe")
+    flowables = renderer._populate_pdf_flowables(context, renderer._pdf_styles())
+
+    headers = [
+        f
+        for f in flowables
+        if hasattr(f, "getPlainText")
+        and f.getPlainText() == "Staff Engineer - Acme Corp - 2020-2024"
+    ]
+    assert len(headers) == 1
+    raw = headers[0].text
+    assert "<b>Staff Engineer</b>" in raw
+    assert "<b>Acme Corp</b>" in raw
+    assert "- 2020-2024" in raw
+
+
 def test_render_cover_letter_docx_produces_nonempty_file(
     cover_letter_output: CoverLetterOutput, tmp_path
 ) -> None:
@@ -939,3 +1021,61 @@ def test_render_cover_letter_pdf_produces_nonempty_file(
     assert out.exists()
     assert out.stat().st_size > 0
     assert out.read_bytes().startswith(b"%PDF")
+
+
+def test_render_cover_letter_docx_has_blank_lines_between_paragraphs(
+    cover_letter_output: CoverLetterOutput, tmp_path
+) -> None:
+    """render_cover_letter_docx inserts a blank paragraph between letter blocks."""
+    pytest.importorskip("docx")
+    out = tmp_path / "cover_letter.docx"
+    ResumeRenderer().render_cover_letter_docx(
+        cover_letter_output, name="Jane Doe", company="Acme Corp", output_path=out
+    )
+
+    from docx import Document
+
+    paragraphs = [p.text for p in Document(str(out)).paragraphs]
+
+    assert paragraphs[0] == "Jane Doe"
+    assert paragraphs[1] != ""  # date
+    assert paragraphs[2] == ""
+    assert paragraphs[3] == "Dear Hiring Manager,"
+    assert paragraphs[4] == ""
+    assert paragraphs[5] == "I am excited to apply for the role."
+    assert paragraphs[6] == ""
+    assert paragraphs[7] == "Sincerely,"
+    assert paragraphs[8] == "Jane Doe"
+
+
+def test_render_cover_letter_pdf_has_blank_lines_between_paragraphs(
+    cover_letter_output: CoverLetterOutput,
+) -> None:
+    """render_cover_letter_pdf inserts a spacer between letter blocks."""
+    pytest.importorskip("reportlab")
+    from reportlab.platypus import Spacer
+
+    renderer = ResumeRenderer()
+    context = renderer._build_cover_letter_context(
+        cover_letter_output, name="Jane Doe", company="Acme Corp"
+    )
+    flowables = renderer._populate_cover_letter_pdf_flowables(
+        context, renderer._pdf_styles()
+    )
+
+    entries: list[str] = []
+    for flowable in flowables:
+        if isinstance(flowable, Spacer):
+            entries.append("")
+        else:
+            entries.append(flowable.getPlainText())
+
+    assert entries[0] == "Jane Doe"
+    assert entries[1] != ""  # date
+    assert entries[2] == ""
+    assert entries[3] == "Dear Hiring Manager,"
+    assert entries[4] == ""
+    assert entries[5] == "I am excited to apply for the role."
+    assert entries[6] == ""
+    assert entries[7] == "Sincerely,"
+    assert entries[8] == "Jane Doe"

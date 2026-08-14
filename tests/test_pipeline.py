@@ -404,13 +404,49 @@ class TestCompanyCandidatePassthrough:
         assert recorder.calls[0]["company_name"] == "Acme Corp"
         assert "output_files" in result
 
-    async def test_empty_candidate_name_skips_rendering(self, monkeypatch) -> None:
+    async def test_empty_candidate_name_falls_back_to_parsed_name(
+        self, monkeypatch
+    ) -> None:
         runner, _ = _stub_runner()
         recorder = _RecordingRenderAll()
         monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
 
         result = await _run_pipeline_core(
             runner, JD_TEXT, RESUME_TEXT, candidate_name=""
+        )
+
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0]["candidate_name"] == "Jane Doe"
+        assert result["output_files"] != {}
+
+    async def test_explicit_candidate_name_wins_over_parsed_name(
+        self, monkeypatch
+    ) -> None:
+        runner, _ = _stub_runner()
+        recorder = _RecordingRenderAll()
+        monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
+
+        await _run_pipeline_core(
+            runner,
+            JD_TEXT,
+            RESUME_TEXT,
+            candidate_name="Jane Q. Public",
+        )
+
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0]["candidate_name"] == "Jane Q. Public"
+
+    async def test_no_name_anywhere_skips_rendering(self, monkeypatch) -> None:
+        runner, agents = _stub_runner()
+        agents["resume_parsing_agent"] = StubAgent(
+            ResumeParsingOutput(summary="Senior engineer.")
+        )
+        nameless_runner = AgentRunner(agents)
+        recorder = _RecordingRenderAll()
+        monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
+
+        result = await _run_pipeline_core(
+            nameless_runner, JD_TEXT, RESUME_TEXT, candidate_name=""
         )
 
         assert len(recorder.calls) == 0
