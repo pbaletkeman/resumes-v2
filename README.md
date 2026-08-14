@@ -284,12 +284,14 @@ app/                       # FastAPI web API layer
   upload.py                # .txt/.docx/.pdf text extraction
   tasks.py                 # In-memory background task registry
   files.py                 # File listing/filter/paging + delete helpers
+  model_store.py           # SQLite agent model override store (agent_model_overrides)
 ```
 
 ## Configuration
 
 - **Default model:** `qwen2.5:7b-instruct` on Ollama
 - **Per-agent overrides** via env vars: `COVER_LETTER_AGENT_MODEL=gpt-4o`, `COVER_LETTER_AGENT_PROVIDER=openai`
+- **Web-persisted overrides:** the web API (Models page) stores per-agent provider/model edits in SQLite (`app/model_store.py`). `create_runner_from_config()` loads these by default, so CLI, `sample_run()`, and the web API resolve the identical model configuration (pass `overrides={}` to force env-only).
 - **Global override:** `MODEL_PROVIDER` and `MODEL_NAME`
 - **Logging:** `LOG_LEVEL` env var (default `INFO`). Set to `DEBUG` for verbose LLM traffic.
 
@@ -312,6 +314,8 @@ app/                       # FastAPI web API layer
 - `scratch/resume-todo.md` - Completed-work log (all done; pointer to `resume-done.md`)
 - `scratch/resume-web-todo.md` - Web API (FastAPI) work log
 - `scratch/web-files-todo.md` - File-management endpoint work log
+- `scratch/simple.md` / `scratch/simple-done.md` - Simplification plan progress log + completed-phase archive
+- `scratch/frontend-tasks.md` / `scratch/frontend-tasks-done.md` / `scratch/frontend-plan.md` - Frontend work log + archive + plan
 
 ## Test coverage
 

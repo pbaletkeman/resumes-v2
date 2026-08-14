@@ -14,7 +14,7 @@
       // simple-done.md is a completion archive that embeds the archived
       // original plan as a standalone historical document, which has its own
       // top-level title. Allow those embedded top-level headings.
-      "filter": ["simple-done.md"],
+      "filter": ["**/simple-done.md"],
       "config": {
         "MD025": false
       },
