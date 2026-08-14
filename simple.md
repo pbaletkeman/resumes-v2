@@ -73,6 +73,13 @@ models → skill-taxonomy → TESTING → usage) plus a link to `docs/README.md`
 `docs/README.md` documentation index was re-sorted alphabetically. Markdown-only
 change.
 
+Phase 21.5 verification: all markdown docs audited against the code —
+`_split_paragraphs` → `_split_letter_body` in `docs/api.md`, `pipeline.py`
+line refs refreshed (432/330), ModelsPage no longer "read-only" in
+`ui/README.md`, rendering-gate claims updated for the parsed-resume-name
+fallback (commit `eab20e2`), and the test census refreshed to **550 passed**
+(`test_renderer.py` 66, `test_pipeline.py` 22). Markdown-only change.
+
 ## Remaining work
 
 ### Phase 23 - Formatting
@@ -91,5 +98,5 @@ change.
   - [x] 21.2.3 Common issues and fixes ✅ See `simple-done.md`.
 - [x] 21.3 Replace all ASCII diagrams with Mermaid Markdown diagrams ✅ See `simple-done.md`.
 - [x] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file ✅ See `simple-done.md`.
-- [ ] 21.5 Ensure all markdown files are up to date.
+- [x] 21.5 Ensure all markdown files are up to date ✅ See `simple-done.md`.
 - [ ] 21.6 No markdown linting errors in any of the markdown files

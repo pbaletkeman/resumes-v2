@@ -136,7 +136,7 @@ def run_resume_pipeline(
 ) -> dict[str, Any]:
 ```
 
-Runs the full 7-agent chain on one event loop via `_run_pipeline_core()`. Returns 7 result keys (`parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_optimized_resume`, `polished_resume`, `cover_letter`) plus `output_files` when `candidate_name` is non-empty. `resume_template` picks the rendered resume layout (`"modern"`/`"classic"`/`"minimal"`); pass `resume_templates` (a key or list of keys) to render several layouts in one run — their files are namespaced `resume_{template}_*` with the template embedded in the filename. See `docs/usage.md`, section 1.
+Runs the full 7-agent chain on one event loop via `_run_pipeline_core()`. Returns 7 result keys (`parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_optimized_resume`, `polished_resume`, `cover_letter`) plus `output_files` when a candidate name is available (`candidate_name`, or the name parsed from the resume). `resume_template` picks the rendered resume layout (`"modern"`/`"classic"`/`"minimal"`); pass `resume_templates` (a key or list of keys) to render several layouts in one run — their files are namespaced `resume_{template}_*` with the template embedded in the filename. See `docs/usage.md`, section 1.
 
 ```python
 def create_runner_from_config(
@@ -239,7 +239,7 @@ def render_cover_letter_pdf(
 ) -> Path:
 ```
 
-Render the letter in plaintext, Markdown, DOCX, or PDF. Contact fields (`phone`, `email`, `linkedin`, `github`) are joined with ` | ` into a header `contact_line`. The letter text is split on blank lines into opening / body / closing paragraphs (the template renders its own salutation and signature, so leading `Dear ...` and trailing `Sincerely, ...` blocks are stripped by `_split_paragraphs`). The DOCX and PDF variants mirror that layout with the same styling as the resume binary formats (letter size, 1-inch margins, name at 14pt bold) and return the written `Path` (a temp file when `output_path` is `None`).
+Render the letter in plaintext, Markdown, DOCX, or PDF. Contact fields (`phone`, `email`, `linkedin`, `github`) are joined with ` | ` into a header `contact_line`. The letter text is split on blank lines into opening / body / closing paragraphs (the template renders its own salutation and signature, so leading `Dear ...` and trailing `Sincerely, ...` blocks are stripped by `_split_letter_body`, which also promotes any trailing contact line into the header). The DOCX and PDF variants mirror that layout with the same styling as the resume binary formats (letter size, 1-inch margins, name at 14pt bold) and return the written `Path` (a temp file when `output_path` is `None`).
 
 ### Binary formats
 
@@ -350,7 +350,7 @@ Accepts a `CoverLetterOutput` or a raw string, strips surrounding whitespace, fi
 - `client/errors.py` — `LLMConnectionError` / `LLMResponseError` / `LLMTimeoutError`.
 - `client/json_utils.py` — `parse_json_response`, `load_json_safe`, `model_to_json_schema`.
 - `pipeline.py` — `Agent`, `PipelineAgent`, `AgentRunner`, `run_resume_pipeline`, `_run_pipeline_core`, `create_runner_from_config`, `DEFAULT_AGENT_CLASSES`.
-- `client/templates/renderer.py` — `ResumeRenderer` and module-level helpers (`_default_extension`, `_split_paragraphs`, ...).
+- `client/templates/renderer.py` — `ResumeRenderer` and module-level helpers (`_default_extension`, `_split_letter_body`, ...).
 - `client/formatter.py` — `format_resume_markdown`, `format_resume_plain`, `format_cover_letter`.
 - `client/models.py` — `RewriteOutput`, `CoverLetterOutput`, and the other output models.
 - `docs/architecture.md`, `docs/agents.md`, `docs/usage.md` — companion guides.

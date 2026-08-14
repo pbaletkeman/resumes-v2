@@ -28,7 +28,7 @@ If you prefer the OpenAI provider instead of local Ollama, set `MODEL_PROVIDER=o
 | `uv run python basic.py` | Single-agent smoke test. Runs one `SimpleAgent` chat call against Ollama (or OpenAI) in JSON mode and pretty-prints the response. |
 | `uv run python pipeline.py` | Runs `sample_run()`: builds the full runner from the environment and runs `run_resume_pipeline` on placeholder text. Shows the polished resume and cover letter on stdout. |
 | `uv run python test_real_files.py` | Live end-to-end integration test: runs the true 7-agent chain against `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt` (requires a running Ollama), then prints a per-check PASS/FAIL summary. |
-| `uv run pytest` | Deterministic unit suite (`tests/`, 542 tests across 26 files) — does **not** require a live LLM. |
+| `uv run pytest` | Deterministic unit suite (`tests/`, 550 tests across 26 files) — does **not** require a live LLM. |
 | `uv run uvicorn app.main:app --reload` | Runs the FastAPI web API (pipeline, tasks, files, outputs endpoints). |
 
 ### Running the full pipeline
@@ -55,7 +55,7 @@ results = run_resume_pipeline(
 
 - The returned dict always has 7 keys:
   `parsed_job_description`, `parsed_resume`, `tailoring_strategy`, `rewritten_resume`, `ats_optimized_resume`, `polished_resume`, `cover_letter`.
-- When `candidate_name` is non-empty, an eighth key `output_files` maps format names to the written `Path`s. `ResumeRenderer.render_all()` writes into `output/`:
+- When a candidate name is available (explicit `candidate_name`, or the name parsed from the resume when it is omitted), an eighth key `output_files` maps format names to the written `Path`s. `ResumeRenderer.render_all()` writes into `output/`:
 
   | Key | Extension |
   |-----|-----------|
@@ -76,7 +76,8 @@ results = run_resume_pipeline(
   Files are named with `ResumeRenderer.build_output_path()`:
   `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}` (slugs are filesystem-safe).
 
-- When `candidate_name` is empty, rendering is skipped and `output_files` is `{}`.
+- When no candidate name is available — explicit `candidate_name` or the name
+  parsed from the resume — rendering is skipped and `output_files` is `{}`.
 
 ## 2. Model Configuration
 

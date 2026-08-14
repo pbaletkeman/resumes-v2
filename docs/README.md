@@ -56,8 +56,9 @@ flowchart TD
 | 7 | `cover_letter_agent` | `cover_letter` | final result |
 
 The returned dict from `run_resume_pipeline()` always has those 7 keys; when a
-candidate name is provided, an eighth key `output_files` maps format names to
-written `Path`s (see [Output rendering](#6-output-rendering)).
+candidate name is available (explicit or parsed from the resume), an eighth key
+`output_files` maps format names to written `Path`s (see
+[Output rendering](#6-output-rendering)).
 
 Every agent runs on either **Ollama** (local, default) or **OpenAI**. Each
 LLM call uses provider-native JSON mode (`response_format="json"`) plus an
@@ -134,8 +135,8 @@ uv run python pipeline.py \
   --company-name "3Pillar"
 ```
 
-`--candidate-name` enables rendering the output files into `output/`
-(see section 6). Full flag reference in section 3.1.
+`--candidate-name` (or the name parsed from the resume) enables rendering the
+output files into `output/` (see section 6). Full flag reference in section 3.1.
 
 ### 2.5 Run the web API and the React UI
 
@@ -160,7 +161,7 @@ build it once with `npm run build` inside `ui/`.
 ### 2.6 Run the tests
 
 ```bash
-uv run pytest                # deterministic unit suite: 542 tests, no LLM needed
+uv run pytest                # deterministic unit suite: 550 tests, no LLM needed
 uv run pytest -v             # verbose
 uv run pytest --cov          # coverage summary
 uv run pytest tests/test_renderer.py   # a single file
@@ -197,7 +198,7 @@ See `TESTING.md` for the full manual testing guide and coverage how-to.
 |---|---|---|---|
 | `--resume PATH` | — | (none) | Path to the plain-text resume file. |
 | `--job-description PATH` | `--jd` | (none) | Path to the plain-text job description file. |
-| `--candidate-name NAME` | — | `""` | Candidate name used in rendered outputs/headers. **Enables file rendering.** |
+| `--candidate-name NAME` | — | `""` | Candidate name used in rendered outputs/headers. **Enables file rendering** (falls back to the name parsed from the resume when omitted). |
 | `--company-name NAME` | — | `""` | Target company name used in rendered output filenames. |
 | `--template TEMPLATE` | — | `modern` | Resume layout: `modern`, `classic`, `minimal`, or `all` (renders all three layouts in one run; files are namespaced `resume-{template}.*`). |
 | `-h` / `--help` | — | — | Print usage and exit. |
@@ -251,7 +252,7 @@ uv run python pipeline.py --resume resume.txt --jd jd.txt --template all
 | `uv run python wip_testing/test_tone_polishing.py` | Tone Polishing Agent demo (chains 1-6). |
 | `uv run python wip_testing/test_cover_letter.py` | Cover Letter Agent demo (chains 1-7). |
 | `uv run python wip_testing/test_parsing.py` | Regex + LLM `FormatDetector` parsing demo. |
-| `uv run pytest` | Unit suite (`tests/`, 542 tests, no LLM). |
+| `uv run pytest` | Unit suite (`tests/`, 550 tests, no LLM). |
 | `uv run pytest -v` / `--cov` / `--cov-report=html` | Verbose / coverage / HTML coverage report. |
 | `uv run pytest tests/test_<name>.py` | Run one test file. |
 | `uv run ruff check .` | Lint. |
@@ -411,7 +412,9 @@ GET {{base}}/api/tasks/{id}
 Rendering is done by `ResumeRenderer` (`client/templates/renderer.py`) using
 Jinja2 templates (`client/templates/`: `modern`, `classic`, `minimal`,
 `cover_letter`) — or the simpler `client/formatter.py` string helpers.
-`render_all()` writes these files when `candidate_name` is non-empty:
+`render_all()` writes these files when a candidate name is available — the
+explicit `candidate_name` argument, or the name parsed from the resume when it
+is omitted:
 
 | `output_files` key | Extension |
 |---|---|
@@ -435,8 +438,9 @@ letter keys are shared and unchanged.
 Filenames follow `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}`
 with every segment slugified (e.g. `cover_letter` → `cover-letter`), so the
 actual file looks like
-`20260812_1040_peter-letkeman_3pillar_cover-letter.txt`. With an empty
-`candidate_name`, rendering is skipped and `output_files` is `{}`.
+`20260812_1040_peter-letkeman_3pillar_cover-letter.txt`. With no candidate
+name available (explicit or parsed from the resume), rendering is skipped and
+`output_files` is `{}`.
 
 ---
 
@@ -467,7 +471,7 @@ actual file looks like
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `output_files` is empty / no files rendered | `--candidate-name` (or API `candidate_name`) not provided | Pass `--candidate-name "Name"` — it is the rendering gate. |
+| `output_files` is empty / no files rendered | No candidate name available — neither `--candidate-name` (or API `candidate_name`) nor a name parsed from the resume | Pass `--candidate-name "Name"`, or ensure the resume's top line contains the candidate name (used as the rendering fallback). |
 | Output filenames use `cover-letter` (hyphen) not `cover_letter` | `ResumeRenderer.build_output_path` slugifies every segment | Expected naming; adjust any test/globs to match `cover[-_]letter`. |
 | API returns 400 "one of text-or-file" | Both absent or text+file provided both absent | Supply pasted text **or** one file per input; text wins when both present. |
 | `RecursionError` / event-loop "already running" when calling `run_resume_pipeline` from an endpoint | The sync wrapper uses `asyncio.run` | Endpoints must call `_run_pipeline_core(runner, ...)` directly (see `app/main.py`); never `run_resume_pipeline()` inside a route. |

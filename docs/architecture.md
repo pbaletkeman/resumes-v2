@@ -110,7 +110,7 @@ Entry points that drive this flow:
 
 ## Agent Chain & Transition Contracts
 
-Each stage reads exactly the inputs named below and returns a single validated Pydantic model. The orchestrator (`_run_pipeline_core` in `pipeline.py:404`) runs the chain via `_run_stage` calls and is responsible for serializing models to JSON string before handing them to the next agent.
+Each stage reads exactly the inputs named below and returns a single validated Pydantic model. The orchestrator (`_run_pipeline_core` in `pipeline.py:432`) runs the chain via `_run_stage` calls and is responsible for serializing models to JSON string before handing them to the next agent.
 
 **1 → 2 — Splitting the raw sources.**
 
@@ -139,7 +139,8 @@ After stage 7, `_run_pipeline_core` optionally renders files. When `candidate_na
 2. `CoverLetterOutput(cover_letter=...)` carries the stage-7 letter text.
 3. `ResumeRenderer.render_all(...)` writes up to 8 formats into `output/`: `resume_plaintext`, `resume_markdown`, `resume_docx`, `resume_pdf`, and (when letter text is non-empty) `cover_letter_plaintext`, `cover_letter_markdown`, `cover_letter_docx`, `cover_letter_pdf`. A single layout is rendered by default (`resume_template`); passing `resume_templates` renders each requested layout under namespaced keys (`resume_{template}_*`) with the template embedded in the filename so the layouts don't overwrite each other. The cover letter formats are shared and unaffected.
 
-When `candidate_name` is empty, rendering is skipped and `output_files` is `{}`.
+When no candidate name is available (explicit `candidate_name` or the name
+parsed from the resume), rendering is skipped and `output_files` is `{}`.
 
 ## References
 

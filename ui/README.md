@@ -54,7 +54,7 @@ repo-level commands (backend tests, ruff, pyright) are documented in
 | --- | --- | --- |
 | `/` | RunPage | Input form (JD + resume text/files) and the pipeline task lifecycle (submit -> poll -> results + downloads) |
 | `/files` | FilesPage | Browse / filter / delete generated (`output/`) and uploaded (`uploads/`) files |
-| `/models` | ModelsPage | Read-only table of the configured per-agent models |
+| `/models` | ModelsPage | Per-agent model/provider table with inline editing and reset-to-defaults (SQLite-persisted overrides) |
 
 Routing is set up in `src/App.tsx` (a `Menubar` shell wrapping the routed pages
 with a theme toggle). The Run page's task-status helpers live in `src/pages/`:

@@ -3650,6 +3650,56 @@ Original instruction:
 
 ---
 
+## Phase 21 - Completed sub-task 21.5: markdown docs audited and refreshed
+
+Original instruction:
+
+- **21.5** Ensure all markdown files are up to date.
+
+### Completion record
+
+**Changes made (markdown only, no source touched):**
+
+Audited every doc guide (`README.md`, `AGENTS.md`, `docs/*.md`,
+`ui/README.md`) against the current codebase and fixed the stale references:
+
+- **`docs/api.md`** — `_split_paragraphs` → **`_split_letter_body`** (renamed in
+  Phase 23.4) in the cover-letter renderer docs and the References list; also
+  noted that `_split_letter_body` promotes a trailing contact line into the
+  header. `run_resume_pipeline` doc updated for the new rendering fallback.
+- **`docs/api.md`, `docs/README.md`, `docs/architecture.md`, `docs/usage.md`,
+  `README.md`** — rendering-gate claims updated for the parsed-resume-name
+  fallback landed in commit `eab20e2`: `render_all()` / `output_files` now
+  appear when a candidate name is available (explicit `candidate_name` **or**
+  the name parsed from the resume), not only when `candidate_name` is set.
+  Updated §1/§2/§3.1/§6/§7 of `docs/README.md`, `docs/architecture.md`,
+  `docs/usage.md`, and the root `README.md` quickstart.
+- **`AGENTS.md`, `docs/architecture.md`** — `pipeline.py` line references
+  refreshed: `_run_pipeline_core` 404 → **432**, `run_resume_pipeline`
+  313 → **330**.
+- **`ui/README.md`** — ModelsPage description no longer "read-only": inline
+  model/provider editing + reset-to-defaults (Phase 22).
+- **Test census refreshed to the live suite (550 passed):**
+  `AGENTS.md` / `README.md` test maps (`test_renderer.py` 60 → **66**,
+  `test_pipeline.py` 20 → **22**, `test_web_models_edit.py` 13 → **14**),
+  totals 542 → **550** in `AGENTS.md`, `docs/README.md`, `docs/TESTING.md`,
+  `docs/usage.md`; `docs/TESTING.md` renderer/pipeline descriptors extended to
+  name the new coverage (bulleted skills / bold header bullets, DOCX letter
+  spacing, candidate-name rendering fallback). The +8 tests came from the
+  user's `eab20e2` renderer/pipeline enhancement.
+
+**Behavior verification:**
+
+- Documentation-only change — no Python/TS source touched.
+- `uv run pytest -q` — **550 passed** (authoritative census; matches the docs).
+- Grep sweep: no `542`/`537`/`_split_paragraphs`/old per-file counts remain in
+  `README.md`, `AGENTS.md`, `docs/*.md`, or `ui/README.md`; the only `(13 tests)`
+  match is `test_web_pipeline.py`, which is correct.
+
+**Commit:** none yet — awaiting user approval to commit.
+
+---
+
 # Archive: Full Simplification Plan (from simple.md)
 
 The original full plan (title, guiding rules, file inventory, phase specs, and
