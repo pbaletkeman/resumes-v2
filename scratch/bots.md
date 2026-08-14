@@ -6,6 +6,22 @@
 > the authoritative, maintained reference is `docs/agents.md` (and the pipeline
 > flow in `AGENTS.md`). Kept in the repo for provenance only.
 
+- [🧩 Full Agent Pipeline (7 agents)](#-full-agent-pipeline-7-agents)
+  - [1. JD Parsing Agent](#1-jd-parsing-agent)
+  - [2. Resume Parsing Agent](#2-resume-parsing-agent)
+  - [3. Gap Analysis Agent](#3-gap-analysis-agent)
+  - [4. Rewrite Agent](#4-rewrite-agent)
+  - [5. ATS Compliance Agent](#5-ats-compliance-agent)
+  - [6. Tone Polishing Agent](#6-tone-polishing-agent)
+  - [7. Cover Letter Agent](#7-cover-letter-agent)
+    - [🧠 Agent 1 — JD Parsing Agent](#-agent-1--jd-parsing-agent)
+    - [🧠 Agent 2 — Resume Parsing Agent](#-agent-2--resume-parsing-agent)
+    - [🧠 Agent 3 — Gap Analysis Agent](#-agent-3--gap-analysis-agent)
+    - [🧠 Agent 4 — Resume Rewrite Agent](#-agent-4--resume-rewrite-agent)
+    - [🧠 Agent 5 — ATS Compliance Agent](#-agent-5--ats-compliance-agent)
+    - [🧠 Agent 6 — Tone Polishing Agent](#-agent-6--tone-polishing-agent)
+    - [🧠 Agent 7 — Cover Letter Tailoring Agent](#-agent-7--cover-letter-tailoring-agent)
+
 ## 1. JD Parsing Agent
 
 **Extracts**:

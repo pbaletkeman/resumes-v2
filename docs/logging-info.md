@@ -1,5 +1,35 @@
 # Logging Implementation Plan
 
+- [Logging Implementation Plan](#logging-implementation-plan)
+  - [Problem](#problem)
+  - [Goal](#goal)
+  - [Approach](#approach)
+    - [Why `dictConfig` over `basicConfig` or YAML](#why-dictconfig-over-basicconfig-or-yaml)
+  - [Tasks](#tasks)
+    - [1. Create logging configuration module](#1-create-logging-configuration-module)
+    - [2. Call `configure_logging()` at pipeline entry points](#2-call-configure_logging-at-pipeline-entry-points)
+    - [3. Add logging to OllamaClient](#3-add-logging-to-ollamaclient)
+    - [4. Add logging to OpenAIClient](#4-add-logging-to-openaiclient)
+    - [5. Add debug logging to FormatDetector](#5-add-debug-logging-to-formatdetector)
+    - [6. Add debug logging to JD Parsing Agent](#6-add-debug-logging-to-jd-parsing-agent)
+    - [7. Add debug logging to Resume Parsing Agent](#7-add-debug-logging-to-resume-parsing-agent)
+    - [8. Add logging to config loader](#8-add-logging-to-config-loader)
+    - [9. Add logging to ModelClientRegistry](#9-add-logging-to-modelclientregistry)
+    - [10. Add logging to model clients (base class awareness)](#10-add-logging-to-model-clients-base-class-awareness)
+    - [11. Suppress noisy third-party loggers](#11-suppress-noisy-third-party-loggers)
+    - [12. Enforce lazy formatting in log calls](#12-enforce-lazy-formatting-in-log-calls)
+    - [13. Use `exc_info=True` for exception paths](#13-use-exc_infotrue-for-exception-paths)
+    - [14. Add test logging configuration](#14-add-test-logging-configuration)
+    - [15. Security: log redaction guidelines](#15-security-log-redaction-guidelines)
+    - [16. Log startup environment configuration](#16-log-startup-environment-configuration)
+    - [17. Log pipeline completion summary](#17-log-pipeline-completion-summary)
+    - [18. Verify lint and typecheck pass](#18-verify-lint-and-typecheck-pass)
+  - [Summary of changes by file](#summary-of-changes-by-file)
+  - [Log level conventions](#log-level-conventions)
+  - [Env var control](#env-var-control)
+  - [Not in scope (future work)](#not-in-scope-future-work)
+  - [Related](#related)
+
 ## Problem
 
 Logging is dead code. Four files create loggers and emit 12 log calls, but with no `logging.basicConfig()` or handler configuration, all messages are silently discarded by Python. All user-facing output uses raw `print()` (47 calls across 5 files). The LLM clients (`ollama_client.py`, `open_ai_client.py`) have zero logging — API calls, retries, timeouts, and errors are invisible. There are no `debug`-level calls anywhere, so there's no trace-level visibility into the pipeline.

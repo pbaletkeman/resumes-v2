@@ -1,5 +1,32 @@
 # README — Detailed Documentation
 
+- [README — Detailed Documentation](#readme--detailed-documentation)
+  - [Table of contents](#table-of-contents)
+  - [1. Overview](#1-overview)
+  - [2. Getting started, in detail](#2-getting-started-in-detail)
+    - [2.1 Prerequisites](#21-prerequisites)
+    - [2.2 Install dependencies](#22-install-dependencies)
+    - [2.3 Verify the install (no pipeline needed)](#23-verify-the-install-no-pipeline-needed)
+    - [2.4 Run the pipeline](#24-run-the-pipeline)
+    - [2.5 Run the web API and the React UI](#25-run-the-web-api-and-the-react-ui)
+    - [2.6 Run the tests](#26-run-the-tests)
+  - [3. Command-line reference](#3-command-line-reference)
+    - [3.1 `pipeline.py` — all switches](#31-pipelinepy--all-switches)
+    - [3.2 Other CLI commands](#32-other-cli-commands)
+  - [4. Model configuration](#4-model-configuration)
+  - [5. Web API + frontend](#5-web-api--frontend)
+    - [5.1 Running it](#51-running-it)
+    - [5.2 Routes](#52-routes)
+    - [5.3 Inputs](#53-inputs)
+    - [5.4 Example (VS Code REST Client)](#54-example-vs-code-rest-client)
+  - [6. Output rendering](#6-output-rendering)
+  - [7. Common issues and fixes](#7-common-issues-and-fixes)
+    - [LLM / model](#llm--model)
+    - [Toolchain](#toolchain)
+    - [Rendering / web](#rendering--web)
+    - [Tests](#tests)
+  - [Documentation index (alpha)](#documentation-index-alpha)
+
 This is the in-depth documentation for the **resumes-v2** repo: a multi-agent
 resume optimization pipeline. Seven sequential agents transform a job
 description + resume into an ATS-optimized resume and a tailored cover letter,

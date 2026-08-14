@@ -1,5 +1,18 @@
 # Testing Guide
 
+- [Testing Guide](#testing-guide)
+  - [Prerequisites](#prerequisites)
+  - [1. Basic Agent (SimpleAgent)](#1-basic-agent-simpleagent)
+  - [2. FormatDetector (Regex Parsing)](#2-formatdetector-regex-parsing)
+  - [3. Full Pipeline (7 Agents)](#3-full-pipeline-7-agents)
+  - [4. Individual Agent Testing](#4-individual-agent-testing)
+  - [5. Model Client Registry](#5-model-client-registry)
+  - [6. OpenAI Provider](#6-openai-provider)
+  - [7. Unit Tests (pytest) + Coverage](#7-unit-tests-pytest--coverage)
+    - [Coverage reporting](#coverage-reporting)
+  - [Quick Reference](#quick-reference)
+  - [Related](#related)
+
 ## Prerequisites
 
 1. **Ollama running** on `localhost:11434`

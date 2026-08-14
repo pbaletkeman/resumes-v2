@@ -6,6 +6,18 @@
 > (quickstart + source layout), `AGENTS.md` UI section, and task-by-task
 > completion in `frontend-tasks-done.md`. Kept for the decisions + wireframes.
 
+- [Frontend Plan: React + PrimeReact UI for the Resume API](#frontend-plan-react--primereact-ui-for-the-resume-api)
+  - [1. Backend prep - `app/main.py` (small, typecheck-clean)](#1-backend-prep---appmainpy-small-typecheck-clean)
+  - [2. Scaffold `ui/` (Vite + React + TS)](#2-scaffold-ui-vite--react--ts)
+  - [3. `vite.config.ts`](#3-viteconfigts)
+  - [4. `src/api/` - typed client + hooks](#4-srcapi---typed-client--hooks)
+  - [5. Views (PrimeReact)](#5-views-primereact)
+  - [5b. ASCII preview](#5b-ascii-preview)
+  - [6. Verification](#6-verification)
+  - [7. Docs (optional)](#7-docs-optional)
+  - [Known limitations](#known-limitations)
+  - [Dev workflow](#dev-workflow)
+
 Decisions locked in:
 
 - TypeScript (Vite `react-ts` template)

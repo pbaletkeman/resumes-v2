@@ -4,6 +4,24 @@ This guide covers three things: getting the pipeline running end-to-end, configu
 
 The system is a 7-agent resume optimization pipeline (see `docs/architecture.md`). You feed it a job description and a resume; it produces an ATS-optimized resume and a tailored cover letter, then optionally renders them to files.
 
+- [Usage](#usage)
+  - [1. Quickstart](#1-quickstart)
+    - [Prerequisites](#prerequisites)
+    - [First runs](#first-runs)
+    - [Running the full pipeline](#running-the-full-pipeline)
+  - [2. Model Configuration](#2-model-configuration)
+    - [Global overrides](#global-overrides)
+    - [Per-agent overrides](#per-agent-overrides)
+    - [Web-persisted overrides](#web-persisted-overrides)
+    - [How `config/agents.py` picks them](#how-configagentspy-picks-them)
+  - [3. Adding a Custom Agent](#3-adding-a-custom-agent)
+    - [The contract a new class must satisfy](#the-contract-a-new-class-must-satisfy)
+    - [Steps](#steps)
+    - [Registry harness](#registry-harness)
+    - [Adding a true 8th *replacement* stage](#adding-a-true-8th-replacement-stage)
+  - [References](#references)
+  - [Related](#related)
+
 ## 1. Quickstart
 
 ### Prerequisites

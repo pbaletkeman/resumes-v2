@@ -6,6 +6,12 @@
 > under "Archive: Full Simplification Plan". This file keeps only the progress
 > table and the remaining work.
 
+- [Simplification Plan — Progress Log](#simplification-plan--progress-log)
+  - [Progress log](#progress-log)
+  - [Remaining work](#remaining-work)
+    - [Phase 23 - Formatting](#phase-23---formatting)
+    - [Phase 21 - Documentation Cleanup](#phase-21---documentation-cleanup)
+
 ## Progress log
 
 | Phase | Status | Record |

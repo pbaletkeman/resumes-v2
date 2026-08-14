@@ -1,5 +1,11 @@
 # Quick Reference of Models for Agent Output
 
+- [Quick Reference of Models for Agent Output](#quick-reference-of-models-for-agent-output)
+  - [Regex/FormatDetector Models](#regexformatdetector-models)
+  - [Agent Output Models](#agent-output-models)
+  - [Coercion Helpers](#coercion-helpers)
+  - [Related](#related)
+
 ## Regex/FormatDetector Models
 
 | Model | Purpose |

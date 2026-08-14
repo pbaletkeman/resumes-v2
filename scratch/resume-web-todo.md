@@ -7,6 +7,24 @@
 > for the architectural-constraint rationale (`_run_pipeline_core` vs
 > `run_resume_pipeline`).
 
+- [Resume Web API — Plan (FastAPI)](#resume-web-api--plan-fastapi)
+  - [Key architectural constraint](#key-architectural-constraint)
+  - [Design](#design)
+  - [Files to create](#files-to-create)
+  - [Routes](#routes)
+  - [Config changes (`pyproject.toml`)](#config-changes-pyprojecttoml)
+  - [Task breakdown](#task-breakdown)
+    - [1. Dependencies \& config (`pyproject.toml`)](#1-dependencies--config-pyprojecttoml)
+    - [2. Package scaffold](#2-package-scaffold)
+    - [3. `app/schemas.py` — Pydantic models](#3-appschemaspy--pydantic-models)
+    - [4. `app/upload.py` — text extraction + 400 handling](#4-appuploadpy--text-extraction--400-handling)
+    - [5. `app/tasks.py` — in-memory task registry](#5-apptaskspy--in-memory-task-registry)
+    - [6. `app/main.py` — FastAPI app + routes](#6-appmainpy--fastapi-app--routes)
+    - [7. Manual smoke + live verification](#7-manual-smoke--live-verification)
+  - [Notes / follow-ups implemented after this plan](#notes--follow-ups-implemented-after-this-plan)
+  - [Known limitations (documented, not solved)](#known-limitations-documented-not-solved)
+  - [Out of scope (this pass)](#out-of-scope-this-pass)
+
 Turn the existing 7-agent CLI pipeline into a FastAPI application. **API layer only** in this pass — no API tests, no `test_pipeline.py`, no Phase 7 docs, no `AGENTS.md`/`docs/` edits.
 
 ## Key architectural constraint

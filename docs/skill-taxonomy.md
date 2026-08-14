@@ -1,5 +1,15 @@
 # Skill Taxonomy (`client/skills/taxonomy.json`)
 
+- [Skill Taxonomy (`client/skills/taxonomy.json`)](#skill-taxonomy-clientskillstaxonomyjson)
+  - [What it is](#what-it-is)
+  - [File structure](#file-structure)
+  - [How it is loaded and used](#how-it-is-loaded-and-used)
+    - [Key API](#key-api)
+  - [What it is used for](#what-it-is-used-for)
+  - [How to add or change a skill](#how-to-add-or-change-a-skill)
+  - [Tips](#tips)
+  - [Related](#related)
+
 ## What it is
 
 `client/skills/taxonomy.json` is the **canonical skill taxonomy** for the pipeline: a

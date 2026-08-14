@@ -6,6 +6,23 @@
 > `tests/test_web_files.py` + `tests/test_web_upload.py`; docs in `docs/api.md`.
 > Kept for the listing/delete design rationale (safe-path guard, paging).
 
+- [File Management Endpoints — Plan (FastAPI)](#file-management-endpoints--plan-fastapi)
+  - [Current state](#current-state)
+  - [Design](#design)
+    - [Shared file-metadata model \& listing helpers](#shared-file-metadata-model--listing-helpers)
+    - [Persisting uploads](#persisting-uploads)
+    - [Endpoints (all in `app/main.py`)](#endpoints-all-in-appmainpy)
+  - [Schemas (`app/schemas.py`)](#schemas-appschemaspy)
+  - [Files to create / modify](#files-to-create--modify)
+  - [Task breakdown](#task-breakdown)
+    - [1. Schemas (`app/schemas.py`)](#1-schemas-appschemaspy)
+    - [2. `app/files.py` helpers](#2-appfilespy-helpers)
+    - [3. `app/main.py` — persist uploads](#3-appmainpy--persist-uploads)
+    - [4. `app/main.py` — routes](#4-appmainpy--routes)
+    - [5. Manual smoke + verification](#5-manual-smoke--verification)
+  - [Known limitations / notes](#known-limitations--notes)
+  - [Out of scope (this pass)](#out-of-scope-this-pass)
+
 Add file-management capabilities to the existing FastAPI app in `app/`:
 
 1. **List generated files** (from the `output/` dir) with metadata + filtering + paging.

@@ -1,5 +1,12 @@
 # resumes-v2 Frontend (`ui/`)
 
+- [resumes-v2 Frontend (`ui/`)](#resumes-v2-frontend-ui)
+  - [Quickstart](#quickstart)
+  - [Commands](#commands)
+  - [Routes](#routes)
+  - [Source layout](#source-layout)
+  - [Theme note](#theme-note)
+
 React 19 + TypeScript + Vite single-page app for the multi-agent resume
 optimization pipeline. It talks to the FastAPI backend (`app/`, served on
 `localhost:8000`): you paste a job description + resume (or upload files),

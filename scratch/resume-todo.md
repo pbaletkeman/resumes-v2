@@ -1,5 +1,9 @@
 # Resume Pipeline — Remaining Work
 
+- [Resume Pipeline — Remaining Work](#resume-pipeline--remaining-work)
+  - [Final verification state](#final-verification-state)
+  - [Web API workstreams](#web-api-workstreams)
+
 **Status:** ✅ ALL DONE (2026-08-08) — nothing left to implement.
 
 Everything that was once on this list has been completed and archived in [resume-done.md](resume-done.md):

@@ -1,5 +1,16 @@
 # Architecture
 
+- [Architecture](#architecture)
+  - [Overview](#overview)
+    - [The 7-agent chain](#the-7-agent-chain)
+    - [Two provider backends](#two-provider-backends)
+    - [Renderer / formatter layers](#renderer--formatter-layers)
+  - [Data Flow](#data-flow)
+  - [Agent Chain \& Transition Contracts](#agent-chain--transition-contracts)
+    - [Where `ResumeRenderer` hooks in](#where-resumerenderer-hooks-in)
+  - [References](#references)
+  - [Related](#related)
+
 ## Overview
 
 This project is a multi-agent resume optimization pipeline. It takes two plain-text inputs — a job description and a resume — and produces an ATS-optimized resume plus a tailored cover letter, then renders them to multiple file formats.

@@ -7,6 +7,27 @@
 > `_extract_field` model handling). Superseded by `resume-done.md`, the `docs/`
 > guides, and the test suite. Kept for the verification history.
 
+- [Resume Pipeline - Verification Plan (resume-verify.md)](#resume-pipeline---verification-plan-resume-verifymd)
+  - [Section 0. Baseline measured during planning (2026-08-06)](#section-0-baseline-measured-during-planning-2026-08-06)
+  - [Section 0a. Fix the known stale doc counts (unconditional)](#section-0a-fix-the-known-stale-doc-counts-unconditional)
+  - [Section 1. Phase 1 - Core Infrastructure (1.1-1.3)](#section-1-phase-1---core-infrastructure-11-13)
+  - [Section 2. Phase 2 - Document Parsing (2.1-2.4)](#section-2-phase-2---document-parsing-21-24)
+  - [Section 3. Phases 3 and 4 - Analysis, Rewriting, Polish (3.1-3.3, 4.1-4.2)](#section-3-phases-3-and-4---analysis-rewriting-polish-31-33-41-42)
+  - [Section 4. Phase 4.3 - LLM fallback falsehoods (A-F)](#section-4-phase-43---llm-fallback-falsehoods-a-f)
+  - [Section 5. Phase 5 - Orchestration (5.1-5.2)](#section-5-phase-5---orchestration-51-52)
+  - [Section 6. Phase 6 - Output and Validation (6.1-6.3, 6.10)](#section-6-phase-6---output-and-validation-61-63-610)
+  - [Section 7. Phase 8 (Contact Info)](#section-7-phase-8-contact-info)
+  - [Section 8. Phase 8.5 - Skill Normalization (8.5.1-8.5.6)](#section-8-phase-85---skill-normalization-851-856)
+  - [Section 9. Live / integration claims (need runtimes)](#section-9-live--integration-claims-need-runtimes)
+  - [Section 9. Cross-doc consistency sweep](#section-9-cross-doc-consistency-sweep)
+  - [Command matrix (run order)](#command-matrix-run-order)
+  - [Results tracker](#results-tracker)
+  - [Definition of done](#definition-of-done)
+  - [Verification Results (2026-08-06)](#verification-results-2026-08-06)
+    - [Two live bugs fixed in `pipeline.py` (found during Section 9 / 5.2)](#two-live-bugs-fixed-in-pipelinepy-found-during-section-9--52)
+    - [Live end-to-end (Ollama on :11434, model qwen2.5:7b-instruct)](#live-end-to-end-ollama-on-11434-model-qwen257b-instruct)
+    - [Files changed (source/docs only)](#files-changed-sourcedocs-only)
+
 Purpose: systematically confirm that **every claim in resume-done.md** is actually
 true in the codebase, and fix or re-archive anything that is not. Each item below
 has a **Verify** step (how to check) and a **Fix** step (what to do if it fails).

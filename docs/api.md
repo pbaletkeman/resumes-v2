@@ -2,6 +2,29 @@
 
 This page documents the public programming surface of the pipeline: the LLM client abstraction, the agent and runner classes, and the renderer plus formatter helpers. Signature details are taken directly from the code; see `docs/architecture.md` for the system view and `docs/agents.md` for how the seven built-in agents use these APIs.
 
+- [API Reference](#api-reference)
+  - [1. `ModelClient` — the LLM abstraction](#1-modelclient--the-llm-abstraction)
+    - [`ModelClient` (ABC)](#modelclient-abc)
+      - [The `chat()` contract](#the-chat-contract)
+    - [Implementations](#implementations)
+      - [`OllamaClient` — `client/ollama_client.py`](#ollamaclient--clientollama_clientpy)
+      - [`OpenAIClient` — `client/open_ai_client.py`](#openaiclient--clientopen_ai_clientpy)
+    - [Choosing a client per agent](#choosing-a-client-per-agent)
+  - [2. Agents and the runner — `pipeline.py`](#2-agents-and-the-runner--pipelinepy)
+    - [`Agent` (protocol)](#agent-protocol)
+    - [`PipelineAgent`](#pipelineagent)
+    - [`AgentRunner`](#agentrunner)
+    - [Pipeline function](#pipeline-function)
+  - [3. `ResumeRenderer` — `client/templates/renderer.py`](#3-resumerenderer--clienttemplatesrendererpy)
+    - [Text formats](#text-formats)
+    - [Cover letter formats](#cover-letter-formats)
+    - [Binary formats](#binary-formats)
+    - [Everything at once](#everything-at-once)
+    - [Path helper](#path-helper)
+  - [4. `formatter` helpers — `client/formatter.py`](#4-formatter-helpers--clientformatterpy)
+  - [References](#references)
+  - [Related](#related)
+
 ## 1. `ModelClient` — the LLM abstraction
 
 `client/model_client.py` defines the abstract base class every provider implements. Agents never talk to a provider directly; they call `ModelClient.chat(...)`.
