@@ -6,17 +6,18 @@ This project is a multi-agent resume optimization pipeline. It takes two plain-t
 
 The runtime follows a strict 7-agent chain. Each agent is a dedicated class in `client/agents/` with its own LLM prompt, Pydantic output model, and deterministic fallback. All seven agents run sequentially on a single event loop, with each agent's validated output fed as the next agent's input.
 
-```
-JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
-                            ↓
-                    [3. Gap Analysis]
-                            ↓
-                    [4. Resume Rewrite]
-                            ↓
-                    [5. ATS Compliance]
-                            ↓
-                    [6. Tone Polishing] → polished_resume
-                    [7. Cover Letter] → cover_letter
+```mermaid
+flowchart TD
+    JD([Job description]) --> A1[1. JD Parsing]
+    RS([Resume]) --> A2[2. Resume Parsing]
+    A1 --> A2
+    A2 --> A3[3. Gap Analysis]
+    A3 --> A4[4. Resume Rewrite]
+    A4 --> A5[5. ATS Compliance]
+    A5 --> A6[6. Tone Polishing]
+    A6 --> POL([polished_resume])
+    A6 --> A7[7. Cover Letter]
+    A7 --> CL([cover_letter])
 ```
 
 ### The 7-agent chain
@@ -152,3 +153,11 @@ When `candidate_name` is empty, rendering is skipped and `output_files` is `{}`.
 - `pipeline.py` — `AgentRunner`, `run_resume_pipeline`, `_run_pipeline_core`, `create_runner_from_config`, `DEFAULT_AGENT_CLASSES`, sample run.
 - `docs/logging-info.md` logging setup; `scratch/resume-done.md` completed work; `scratch/bots.md` pipeline description.
 - `app/main.py` — FastAPI web layer exposing the same core pipeline.
+
+---
+
+## Related
+
+- [Previous: `api.md`](api.md)
+- [Next: `logging-info.md`](logging-info.md)
+- [Index: `docs/README.md`](README.md)

@@ -93,3 +93,11 @@ Normalization is wired into **5 agents** (`client/agents/`):
   sides, so `"React.js"`, `"reactjs"`, and `"REACT.JS"` all resolve to `"React"`.
 - `get_variants()` returns only non-canonical variants; the canonical name itself is
   excluded.
+
+---
+
+## Related
+
+- [Previous: `models.md`](models.md)
+- [Next: `TESTING.md`](TESTING.md)
+- [Index: `docs/README.md`](README.md)

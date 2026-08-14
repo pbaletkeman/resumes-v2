@@ -364,3 +364,11 @@ Example: `LOG_LEVEL=DEBUG uv run python pipeline.py`
 - Replacing `print()` in `wip_testing/` scripts — these are ad-hoc test scripts, print is fine
 - Per-agent `LoggerAdapter` with `extra={}` context (run ID, agent name) — useful for concurrent runs, not needed for single-threaded pipeline
 - Token count / cost tracking in logs — depends on LLM provider exposing usage data
+
+---
+
+## Related
+
+- [Previous: `architecture.md`](architecture.md)
+- [Next: `models.md`](models.md)
+- [Index: `docs/README.md`](README.md)

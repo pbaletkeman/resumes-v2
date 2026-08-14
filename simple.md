@@ -63,6 +63,16 @@ Phase 21.2 verification: `docs/README.md` audited against the current code and
 refreshed (pytest count 542, Vitest count 61 — confirmed by `npm test -- --run`
 9 files/61 tests). Markdown-only change, no source touched.
 
+Phase 21.3 verification: pipeline-flow ASCII diagram replaced with Mermaid in
+`AGENTS.md`, `docs/agents.md`, `docs/architecture.md`, and `docs/README.md`;
+no `↓`/`←`/box-drawing ASCII diagrams remain in the docs. Markdown-only change.
+
+Phase 21.4 verification: all 8 docs guides now carry a `## Related` footer with
+alphabetical Previous/Next links (agents → api → architecture → logging-info →
+models → skill-taxonomy → TESTING → usage) plus a link to `docs/README.md`; the
+`docs/README.md` documentation index was re-sorted alphabetically. Markdown-only
+change.
+
 ## Remaining work
 
 ### Phase 23 - Formatting
@@ -79,7 +89,7 @@ refreshed (pytest count 542, Vitest count 61 — confirmed by `npm test -- --run
   - [x] 21.2.1 Detailed instructions on how to get started ✅ See `simple-done.md`.
   - [x] 21.2.2 Detailed examples on all command line switches/options ✅ See `simple-done.md`.
   - [x] 21.2.3 Common issues and fixes ✅ See `simple-done.md`.
-- [ ] 21.3 Replace all ASCII diagrams with Mermaid Markdown diagrams
-- [ ] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
+- [x] 21.3 Replace all ASCII diagrams with Mermaid Markdown diagrams ✅ See `simple-done.md`.
+- [x] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file ✅ See `simple-done.md`.
 - [ ] 21.5 Ensure all markdown files are up to date.
 - [ ] 21.6 No markdown linting errors in any of the markdown files

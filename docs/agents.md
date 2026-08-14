@@ -9,17 +9,18 @@ This guide documents the seven dedicated pipeline agents. For each agent it cove
 
 Every agent follows the same contract: `run(inputs)` → `_try_llm()` (one retry with `strict=True`) → Pydantic validation → deterministic fallback. The LLM call always uses `response_format="json"` and passes `json_schema=model_to_json_schema(<OutputModel>)` for provider Structured Outputs.
 
-```plaintext
-JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
-                            ↓
-                    [3. Gap Analysis]
-                            ↓
-                    [4. Resume Rewrite]
-                            ↓
-                    [5. ATS Compliance]
-                            ↓
-                    [6. Tone Polishing] → polished_resume
-                    [7. Cover Letter] → cover_letter
+```mermaid
+flowchart TD
+    JD([Job description]) --> A1[1. JD Parsing]
+    RS([Resume]) --> A2[2. Resume Parsing]
+    A1 --> A2
+    A2 --> A3[3. Gap Analysis]
+    A3 --> A4[4. Resume Rewrite]
+    A4 --> A5[5. ATS Compliance]
+    A5 --> A6[6. Tone Polishing]
+    A6 --> POL([polished_resume])
+    A6 --> A7[7. Cover Letter]
+    A7 --> CL([cover_letter])
 ```
 
 ## Common fallback mechanics
@@ -375,3 +376,10 @@ Triggers when: empty input, both LLM attempts failed, or the letter was rejected
 - `client/templates/` (Jinja2 templates) and `client/templates/renderer.py` (`ResumeRenderer`) — turn the agent outputs into files.
 - `pipeline.py` — `_run_pipeline_core` orchestrates the chain (see `docs/architecture.md`).
 - `docs/architecture.md` — system overview + data flow. `scratch/resume-done.md` — completed work.
+
+---
+
+## Related
+
+- [Index: `docs/README.md`](README.md)
+- [Next: `api.md`](api.md)

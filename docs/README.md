@@ -31,17 +31,18 @@ subsystem.
 
 ## 1. Overview
 
-```
-JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
-                            ↓
-                    [3. Gap Analysis]
-                            ↓
-                    [4. Resume Rewrite]
-                            ↓
-                    [5. ATS Compliance]
-                            ↓
-                    [6. Tone Polishing] → polished_resume
-                    [7. Cover Letter] → cover_letter
+```mermaid
+flowchart TD
+    JD([Job description]) --> A1[1. JD Parsing]
+    RS([Resume]) --> A2[2. Resume Parsing]
+    A1 --> A2
+    A2 --> A3[3. Gap Analysis]
+    A3 --> A4[4. Resume Rewrite]
+    A4 --> A5[5. ATS Compliance]
+    A5 --> A6[6. Tone Polishing]
+    A6 --> POL([polished_resume])
+    A6 --> A7[7. Cover Letter]
+    A7 --> CL([cover_letter])
 ```
 
 | Stage | Agent | Output key (dict key) | Consumed by |
@@ -500,9 +501,9 @@ The guides below are linked to each other alphabetically; `docs/README.md`
 - `agents.md` — the seven agents: prompts, input/output schemas, fallbacks.
 - `api.md` — `ModelClient`, agents, `ResumeRenderer`, `formatter` API reference.
 - `architecture.md` — system overview, data flow, transition contracts.
-- `TESTING.md` — manual testing guide and coverage how-to.
 - `logging-info.md` — logging implementation notes.
 - `models.md` — Pydantic model reference and coercion helpers.
 - `skill-taxonomy.md` — canonical skill taxonomy (`taxonomy.json`).
-- `usage.md` — quickstart, model configuration, custom agents.
+- `TESTING.md` — manual testing guide and coverage how-to.
 - `../ui/README.md` — frontend guide (pages, API hooks, theming, testing).
+- `usage.md` — quickstart, model configuration, custom agents.

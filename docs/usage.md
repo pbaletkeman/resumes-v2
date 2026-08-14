@@ -195,3 +195,10 @@ The 7 staged agents are hard-wired in `_run_pipeline_core` by name. To *insert* 
 - `docs/architecture.md` — system overview and data flow.
 - `docs/agents.md` — the seven built-in agents and their prompts/fallbacks.
 - `docs/TESTING.md` — manual verification section-by-section, including the regex-only FormatDetector runs.
+
+---
+
+## Related
+
+- [Previous: `TESTING.md`](TESTING.md)
+- [Index: `docs/README.md`](README.md)

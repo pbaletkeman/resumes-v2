@@ -268,3 +268,11 @@ Currently **542 tests across 26 files** (deterministic, no live LLM required):
 | Model config | See section 5 |
 | OpenAI provider | See section 6 |
 | Unit tests | `uv run pytest` |
+
+---
+
+## Related
+
+- [Previous: `skill-taxonomy.md`](skill-taxonomy.md)
+- [Next: `usage.md`](usage.md)
+- [Index: `docs/README.md`](README.md)

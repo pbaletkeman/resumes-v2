@@ -355,3 +355,11 @@ Accepts a `CoverLetterOutput` or a raw string, strips surrounding whitespace, fi
 - `client/models.py` — `RewriteOutput`, `CoverLetterOutput`, and the other output models.
 - `docs/architecture.md`, `docs/agents.md`, `docs/usage.md` — companion guides.
 - `tests/test_renderer.py`, `tests/test_formatter.py` — behavior examples for these APIs.
+
+---
+
+## Related
+
+- [Previous: `agents.md`](agents.md)
+- [Next: `architecture.md`](architecture.md)
+- [Index: `docs/README.md`](README.md)

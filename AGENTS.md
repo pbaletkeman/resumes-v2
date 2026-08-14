@@ -176,17 +176,18 @@ app/                       # FastAPI web API layer
 
 ## Pipeline flow
 
-```plaintext
-JD → [1. JD Parsing] → [2. Resume Parsing] ← Resume
-                            ↓
-                    [3. Gap Analysis]
-                            ↓
-                    [4. Resume Rewrite]
-                            ↓
-                    [5. ATS Compliance]
-                            ↓
-                    [6. Tone Polishing] → polished_resume
-                    [7. Cover Letter] → cover_letter
+```mermaid
+flowchart TD
+    JD([Job description]) --> A1[1. JD Parsing]
+    RS([Resume]) --> A2[2. Resume Parsing]
+    A1 --> A2
+    A2 --> A3[3. Gap Analysis]
+    A3 --> A4[4. Resume Rewrite]
+    A4 --> A5[5. ATS Compliance]
+    A5 --> A6[6. Tone Polishing]
+    A6 --> POL([polished_resume])
+    A6 --> A7[7. Cover Letter]
+    A7 --> CL([cover_letter])
 ```
 
 Agents 1-7 (JD Parsing, Resume Parsing, Gap Analysis, Resume Rewrite, ATS Compliance, Tone Polishing, Cover Letter) have dedicated classes with LLM + validation + fallback logic.

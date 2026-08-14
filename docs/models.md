@@ -26,3 +26,11 @@
 | --- | --- |
 | `_coerce_str_list` | Converts dicts, ints, None to `list[str]` — handles LLMs returning non-string items in list fields |
 | `_coerce_experience_list` | Converts `list[str]` or `list[dict]` to `list[ExperienceEntry]` |
+
+---
+
+## Related
+
+- [Previous: `logging-info.md`](logging-info.md)
+- [Next: `skill-taxonomy.md`](skill-taxonomy.md)
+- [Index: `docs/README.md`](README.md)

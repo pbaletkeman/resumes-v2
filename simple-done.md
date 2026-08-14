@@ -3566,6 +3566,90 @@ Original instruction:
 
 ---
 
+## Phase 21 - Completed sub-task 21.3: ASCII diagrams → Mermaid
+
+Original instruction:
+
+- **21.3** Replace all ASCII diagrams with Mermaid Markdown diagrams.
+
+### Completion record
+
+**Changes made (markdown only, no source touched):**
+
+- The repo's only ASCII diagrams were the 7-agent pipeline-flow blocks (the
+  `JD → [1. JD Parsing] → …` box-and-arrow charts). Each was replaced with an
+  equivalent **Mermaid `flowchart TD`** diagram (same nodes/edges, process
+  boxes `[...]`, rounded input/output `([...])`):
+  - `AGENTS.md` ("Pipeline flow")
+  - `docs/agents.md` (intro)
+  - `docs/architecture.md` (intro — this file already had a second, larger
+    Mermaid data-flow diagram)
+  - `docs/README.md` (§1 Overview)
+- The root `README.md` and `docs/architecture.md` "Data Flow" already used
+  Mermaid; they were untouched.
+- File-tree listings (root `README.md`, `AGENTS.md`, `docs/README.md`) were
+  kept as `plaintext` trees — they are structural listings, not flow diagrams,
+  and read better as trees than Mermaid.
+- Verified no `↓`, `←`, or box-drawing characters remain in any doc markdown
+  (remaining `|---|---|` matches are markdown table separators).
+
+**Behavior verification:**
+
+- Documentation-only change — no Python/TS source touched.
+- Grep across `README.md`, `AGENTS.md`, `docs/*.md`, `ui/README.md` for
+  `↓` / `←` / box-drawing chars returns nothing.
+
+**Commit:** none yet — awaiting user approval to commit.
+
+---
+
+## Phase 21 - Completed sub-task 21.4: alphabetical prev/next links + docs/README.md index
+
+Original instruction:
+
+- **21.4** All markdown files should link to previous and next file, sorted
+  alphabetically with a link docs/README.md file.
+
+### Completion record
+
+**Changes made (markdown only, no source touched):**
+
+- Every docs guide now ends with a `## Related` footer containing the
+  alphabetical **Previous**/**Next** links and a link back to
+  `docs/README.md` (the hub). Case-insensitive alphabetical order of the guide
+  set:
+
+  ```text
+  agents.md → api.md → architecture.md → logging-info.md → models.md →
+  skill-taxonomy.md → TESTING.md → usage.md
+  ```
+
+  - `docs/agents.md` (head of chain: Index + Next)
+  - `docs/api.md`, `docs/architecture.md`, `docs/logging-info.md`,
+    `docs/models.md`, `docs/skill-taxonomy.md`, `docs/TESTING.md` (Previous +
+    Next + Index)
+  - `docs/usage.md` (tail of chain: Previous + Index)
+- The `docs/README.md` "Documentation index (alpha)" was re-sorted to a true
+  alphabetical order (previously `TESTING.md` and `usage.md`/`ui/README.md`
+  were out of order). It remains the hub that links every guide (including
+  `../AGENTS.md` and `../ui/README.md`).
+- Scope note: the prev/next chain covers the eight `docs/` guides. Root
+  `README.md`, `AGENTS.md`, and `ui/README.md` are not part of the alphabetical
+  guide chain (root `README.md` is the quickstart and already links to
+  `docs/README.md`); `simple.md`/`simple-done.md` are the internal progress
+  logs, not documentation guides.
+
+**Behavior verification:**
+
+- Documentation-only change — no Python/TS source touched.
+- Grepped all 8 guides for `## Related`; each Previous/Next points to the
+  adjacent file in the alphabetical chain and every `README.md` link resolves
+  to `docs/README.md`.
+
+**Commit:** none yet — awaiting user approval to commit.
+
+---
+
 # Archive: Full Simplification Plan (from simple.md)
 
 The original full plan (title, guiding rules, file inventory, phase specs, and
