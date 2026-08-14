@@ -3517,6 +3517,55 @@ Original instruction:
 
 ---
 
+## Phase 21 - Completed sub-task 21.2: detailed `docs/README.md`
+
+Original instruction:
+
+- **21.2** Create a more expansive/detailed README.md in the docs directory which contains:
+  - **21.2.1** Detailed instructions on how to get started
+  - **21.2.2** Detailed examples on all command line switches/options
+  - **21.2.3** Common issues and fixes
+
+### Completion record
+
+**Changes made (markdown only, no source touched):**
+
+- `docs/README.md` already existed (created during the Phase 19 docs
+  consolidation) and covers all three sub-items; this phase **audited it
+  against the current codebase** and refreshed the stale test counts:
+  - Section 2 "Getting started, in detail" (**21.2.1**): prerequisites (Python
+    3.14+, uv, Ollama on `localhost:11434` + `ollama pull qwen2.5:7b-instruct`,
+    `curl` verify), `uv sync` install, install verification (`basic.py` +
+    per-agent model summary one-liner), running the pipeline (sample mode + own
+    files), the web API + React UI (dev proxy + production `ui/dist` mount),
+    and the full test suite (backend / frontend / live E2E).
+  - Section 3 "Command-line reference" (**21.2.2**): every `pipeline.py` switch
+    in a table with defaults, aliases, and meanings; sample-vs-file modes;
+    exit codes; six worked examples (`--jd` shorthand, `--template classic`,
+    `--template all`); a table of the other CLI commands (wip_testing chain
+    scripts, pytest/ruff/pyright variants, uvicorn); and the environment
+    variables.
+  - Section 7 "Common issues and fixes" (**21.2.3**): symptom → cause → fix
+    tables across LLM/model, toolchain, rendering/web, and tests, plus the
+    "agent behavior on LLM failure" explainer.
+- Accuracy fixes in `docs/README.md`: pytest count 493 → **542**, frontend
+  Vitest count 48 → **61** (verified live: `npm test -- --run` → 9 files,
+  61 tests).
+- Verified the CLI reference against the live argparse in `pipeline.py`
+  (`--resume`, `--job-description`/`--jd`, `--candidate-name`, `--company-name`,
+  `--template {modern,classic,minimal,all}`) and confirmed every doc in the
+  index exists (all 9 `docs/*.md` guides + `../ui/README.md`).
+
+**Behavior verification:**
+
+- Documentation-only change — no Python/TS source touched.
+- Backend suite still 542 tests; frontend `npm test -- --run` 61 passed
+  (re-run during the audit).
+
+**Commit:** none yet — awaiting user approval to commit.
+
+---
+
 # Archive: Full Simplification Plan (from simple.md)
 
 The original full plan (title, guiding rules, file inventory, phase specs, and

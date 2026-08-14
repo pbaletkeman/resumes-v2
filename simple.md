@@ -59,6 +59,10 @@ Phase 23.4 verification: backend green (`pytest` 542 passed, `ruff check .`,
 `ruff format --check .`, `pyright` 0 errors/warnings). Backend-only change
 (renderer cover letter signature handling + tests), no frontend impact.
 
+Phase 21.2 verification: `docs/README.md` audited against the current code and
+refreshed (pytest count 542, Vitest count 61 — confirmed by `npm test -- --run`
+9 files/61 tests). Markdown-only change, no source touched.
+
 ## Remaining work
 
 ### Phase 23 - Formatting
@@ -71,10 +75,10 @@ Phase 23.4 verification: backend green (`pytest` 542 passed, `ruff check .`,
 ### Phase 21 - Documentation Cleanup
 
 - [x] 21.1 Root README.md needs to be less than 500 lines with a quickstart section that explains to to get started in 10 minutes or less and links to detailed README.md file ✅ See `simple-done.md`.
-- [ ] 21.2 Create a more expansive/detailed README.md in the docs directory which contains:
-  - [ ] 21.2.1 Detailed instructions on how to get started
-  - [ ] 21.2.2 Detailed examples on all command line switches/options
-  - [ ] 21.2.3 Common issues and fixes
+- [x] 21.2 Create a more expansive/detailed README.md in the docs directory which contains:
+  - [x] 21.2.1 Detailed instructions on how to get started ✅ See `simple-done.md`.
+  - [x] 21.2.2 Detailed examples on all command line switches/options ✅ See `simple-done.md`.
+  - [x] 21.2.3 Common issues and fixes ✅ See `simple-done.md`.
 - [ ] 21.3 Replace all ASCII diagrams with Mermaid Markdown diagrams
 - [ ] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file
 - [ ] 21.5 Ensure all markdown files are up to date.

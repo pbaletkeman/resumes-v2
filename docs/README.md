@@ -159,7 +159,7 @@ build it once with `npm run build` inside `ui/`.
 ### 2.6 Run the tests
 
 ```bash
-uv run pytest                # deterministic unit suite: 493 tests, no LLM needed
+uv run pytest                # deterministic unit suite: 542 tests, no LLM needed
 uv run pytest -v             # verbose
 uv run pytest --cov          # coverage summary
 uv run pytest tests/test_renderer.py   # a single file
@@ -168,7 +168,7 @@ uv run pytest tests/test_renderer.py   # a single file
 Frontend (from `ui/`):
 
 ```bash
-npm test -- --run            # 48 tests, Vitest
+npm test -- --run            # 61 tests, Vitest
 npm run lint                 # oxlint
 npx tsc -b                   # type-check + build
 ```
