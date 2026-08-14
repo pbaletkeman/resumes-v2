@@ -226,7 +226,7 @@ uv run pytest --cov --cov-report=xml
 Artifacts: `.coverage` (data file) and `htmlcov/` (HTML report); both are
 git-ignored.
 
-Currently **537 tests across 26 files** (deterministic, no live LLM required):
+Currently **542 tests across 26 files** (deterministic, no live LLM required):
 
 - `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
 - `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
@@ -235,7 +235,7 @@ Currently **537 tests across 26 files** (deterministic, no live LLM required):
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 23 tests (shared parser + `load_json_safe` + JSON Schema helpers)
 - `tests/test_formatter.py` — 41 tests (format_* helpers)
-- `tests/test_renderer.py` — 55 tests (ResumeRenderer plaintext/markdown/docx/pdf/render_all + single/multi-template render_all + cover-letter DOCX/PDF + contact-line rendering)
+- `tests/test_renderer.py` — 60 tests (ResumeRenderer plaintext/markdown/docx/pdf/render_all + single/multi-template render_all + cover-letter DOCX/PDF + contact-line rendering + no-duplicate cover-letter signature)
 - `tests/test_skill_normalizer.py` — 15 tests (SkillNormalizer canonical taxonomy)
 - `tests/test_agent_jd_parsing.py` — 7 tests (Agent 1 contract, mocked ModelClient)
 - `tests/test_agent_resume_parsing.py` — 9 tests (Agent 2 contract, mocked ModelClient)

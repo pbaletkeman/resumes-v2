@@ -250,7 +250,7 @@ uv run python pipeline.py --resume resume.txt --jd jd.txt --template all
 | `uv run python wip_testing/test_tone_polishing.py` | Tone Polishing Agent demo (chains 1-6). |
 | `uv run python wip_testing/test_cover_letter.py` | Cover Letter Agent demo (chains 1-7). |
 | `uv run python wip_testing/test_parsing.py` | Regex + LLM `FormatDetector` parsing demo. |
-| `uv run pytest` | Unit suite (`tests/`, 537 tests, no LLM). |
+| `uv run pytest` | Unit suite (`tests/`, 542 tests, no LLM). |
 | `uv run pytest -v` / `--cov` / `--cov-report=html` | Verbose / coverage / HTML coverage report. |
 | `uv run pytest tests/test_<name>.py` | Run one test file. |
 | `uv run ruff check .` | Lint. |
