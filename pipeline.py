@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -577,6 +578,39 @@ async def _run_pipeline_core(
     }
 
 
+def _load_persisted_overrides() -> dict[str, dict[str, str | None]]:
+    """Load the per-agent model overrides persisted by the web layer.
+
+    The web API persists model/provider edits in SQLite (see
+    ``app.model_store.ModelStore``).  This helper reads the same store so CLI
+    runs (``main``/``sample_run``) and the API resolve the identical effective
+    model configuration for identical inputs — the only thing that can make
+    the two entry points produce different output is a different model set.
+    When the store does not exist yet (no overrides to honor) or cannot be
+    read, an empty dict is returned so the environment-variable configuration
+    stays in effect.
+
+    Returns:
+        Mapping of ``{agent: {"provider": ..., "model": ...}}``, empty when
+        there are no persisted overrides.
+    """
+    db_path = os.getenv("MODEL_DB_PATH") or "db.sqlite3"
+    if not Path(db_path).is_file():
+        return {}
+    try:
+        from app.model_store import ModelStore
+
+        return ModelStore(db_path=db_path).all_overrides()
+    except Exception:
+        logger.warning(
+            "Could not read persisted model overrides at %s; using environment "
+            "configuration",
+            db_path,
+            exc_info=True,
+        )
+        return {}
+
+
 def create_runner_from_config(
     agent_classes: dict[str, Any] | None = None,
     overrides: Mapping[str, Mapping[str, str | None]] | None = None,
@@ -593,7 +627,11 @@ def create_runner_from_config(
         overrides: Optional persisted (database) provider/model overrides
             keyed by agent name; passed through to ``config.agents`` so they
             win over the environment-var configuration.  Used by the web API
-            (``app/main.py``) so model edits survive restarts.
+            (``app/main.py``) so model edits survive restarts.  When ``None``
+            (the default), the overrides persisted by the web layer are
+            loaded from the same SQLite store (see
+            :func:`_load_persisted_overrides`), so CLI and API entry points
+            resolve the identical effective model configuration.
 
     Returns:
         A configured ``AgentRunner`` with the registry attached.
@@ -605,6 +643,8 @@ def create_runner_from_config(
         runner = create_runner_from_config()
         results = run_resume_pipeline(runner, jd_text, resume_text)
     """
+    if overrides is None:
+        overrides = _load_persisted_overrides()
     registry = build_registry(overrides=overrides)
     return AgentRunner(agent_classes or DEFAULT_AGENT_CLASSES, registry=registry)
 
@@ -612,10 +652,11 @@ def create_runner_from_config(
 def sample_run() -> None:
     """Demonstrate the full 7-agent pipeline end-to-end.
 
-    Builds a ``ModelClientRegistry`` from the environment (see
-    ``config.agents``) and wires all 7 dedicated agent classes into an
-    ``AgentRunner`` via ``create_runner_from_config``.  The agents are
-    executed sequentially via ``run_resume_pipeline``.
+    Builds a ``ModelClientRegistry`` from the environment plus any overrides
+    persisted by the web layer (see ``config.agents`` and
+    ``create_runner_from_config``) and wires all 7 dedicated agent classes
+    into an ``AgentRunner`` via ``create_runner_from_config``.  The agents
+    are executed sequentially via ``run_resume_pipeline``.
 
     Replace the placeholder JD and resume text with real content to see
     meaningful output.

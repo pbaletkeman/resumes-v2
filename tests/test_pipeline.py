@@ -11,11 +11,14 @@ Covers Phase 7.2.2.1 (async end-to-end), 7.2.2.2 (dependency threading),
 7.2.2.5 (``AgentRunner`` unit).
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+import pipeline
+from app.model_store import ModelStore
 from client.errors import LLMConnectionError
 from client.models import (
     ATSComplianceOutput,
@@ -28,7 +31,12 @@ from client.models import (
     TonePolishingOutput,
 )
 from client.templates.renderer import ResumeRenderer
-from pipeline import AgentRunner, PipelineAgent, _run_pipeline_core, run_resume_pipeline
+from pipeline import (
+    AgentRunner,
+    PipelineAgent,
+    _run_pipeline_core,
+    run_resume_pipeline,
+)
 
 JD_TEXT = "Senior Backend Engineer at Acme Corp"
 RESUME_TEXT = "Jane Doe, senior engineer with 10 years of experience."
@@ -548,3 +556,111 @@ class TestAgentRunnerUnit:
 
         with pytest.raises(LLMConnectionError):
             await runner.run_agent_async("gap_analysis_agent", {})
+
+
+class TestPersistedOverrideAlignment:
+    """CLI/sample-run resolve the same effective model config as the web API.
+
+    The web API builds its runner with the overrides persisted in SQLite
+    (``app.model_store.ModelStore``); ``create_runner_from_config`` now does
+    the same by default, so the CLI and sample run cannot diverge from the
+    API's model choices.
+    """
+
+    def test_load_persisted_overrides_reads_store(self, monkeypatch, tmp_path) -> None:
+        db = tmp_path / "model.db"
+        ModelStore(db_path=db).set_override("cover_letter_agent", None, "gpt-4o")
+        monkeypatch.setenv("MODEL_DB_PATH", str(db))
+
+        overrides = pipeline._load_persisted_overrides()
+
+        assert overrides == {
+            "cover_letter_agent": {"provider": None, "model": "gpt-4o"}
+        }
+
+    def test_load_persisted_overrides_empty_without_store(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        monkeypatch.setenv("MODEL_DB_PATH", str(tmp_path / "missing.db"))
+
+        assert pipeline._load_persisted_overrides() == {}
+
+    def test_create_runner_defaults_to_persisted_overrides(self, monkeypatch) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_build_registry(
+            overrides: Mapping[str, Mapping[str, str | None]] | None = None,
+        ) -> object:
+            captured["overrides"] = overrides
+            return object()
+
+        monkeypatch.setattr(pipeline, "build_registry", fake_build_registry)
+        monkeypatch.setattr(
+            pipeline,
+            "_load_persisted_overrides",
+            lambda: {"cover_letter_agent": {"provider": None, "model": "gpt-4o"}},
+        )
+
+        pipeline.create_runner_from_config(agent_classes={})
+
+        assert captured["overrides"] == {
+            "cover_letter_agent": {"provider": None, "model": "gpt-4o"}
+        }
+
+    def test_create_runner_explicit_overrides_win(self, monkeypatch) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_build_registry(
+            overrides: Mapping[str, Mapping[str, str | None]] | None = None,
+        ) -> object:
+            captured["overrides"] = overrides
+            return object()
+
+        def unexpected() -> dict[str, Any]:
+            raise AssertionError("persisted overrides must not be loaded")
+
+        monkeypatch.setattr(pipeline, "build_registry", fake_build_registry)
+        monkeypatch.setattr(pipeline, "_load_persisted_overrides", unexpected)
+
+        explicit = {
+            "cover_letter_agent": {
+                "provider": "ollama",
+                "model": "qwen2.5:7b-instruct",
+            }
+        }
+        pipeline.create_runner_from_config(agent_classes={}, overrides=explicit)
+
+        assert captured["overrides"] == explicit
+
+    def test_sample_run_forwards_demo_params(self, monkeypatch) -> None:
+        recorded: list[dict[str, Any]] = []
+
+        async def recording_core(
+            runner: Any, job_description: str, resume: str, **kwargs: Any
+        ) -> dict[str, Any]:
+            recorded.append(
+                {"job_description": job_description, "resume": resume, **kwargs}
+            )
+            return {
+                "parsed_job_description": {},
+                "parsed_resume": {},
+                "tailoring_strategy": {},
+                "rewritten_resume": "",
+                "ats_optimized_resume": "",
+                "polished_resume": "Polished resume.",
+                "cover_letter": "Cover letter.",
+                "output_files": {},
+            }
+
+        monkeypatch.setattr(pipeline, "_run_pipeline_core", recording_core)
+        monkeypatch.setattr(
+            pipeline, "create_runner_from_config", lambda *a, **k: object()
+        )
+
+        pipeline.sample_run()
+
+        assert len(recorded) == 1
+        call = recorded[0]
+        assert call["candidate_name"] == "Your Name"
+        assert call["company_name"] == "Company"
+        assert call["resume_template"] == "modern"

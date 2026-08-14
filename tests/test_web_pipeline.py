@@ -278,3 +278,134 @@ class TestRunPipelineAsync:
         call = core_mock.call_args
         assert call is not None
         assert call.kwargs["resume_templates"] == ["modern", "classic", "minimal"]
+
+
+def _record_parity_calls(
+    client: Any,
+    monkeypatch: Any,
+    tmp_path: Any,
+    *,
+    candidate_name: str,
+    company_name: str,
+    template: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Capture the pipeline-core kwargs from the CLI and the sync web route.
+
+    Both entry points must forward the exact same parameters (runner aside)
+    for identical user inputs; otherwise identical inputs can produce
+    different output.
+    """
+    import pipeline
+
+    recorded: list[dict[str, Any]] = []
+
+    async def recording_core(
+        runner: Any, job_description: str, resume: str, **kwargs: Any
+    ) -> dict[str, Any]:
+        recorded.append(
+            {"job_description": job_description, "resume": resume, **kwargs}
+        )
+        return _canned_result()
+
+    monkeypatch.setattr(pipeline, "_run_pipeline_core", recording_core)
+    monkeypatch.setattr(app_module, "_run_pipeline_core", recording_core)
+    monkeypatch.setattr(pipeline, "create_runner_from_config", lambda *a, **k: object())
+
+    resume_file = tmp_path / "resume.txt"
+    resume_file.write_text(RES_TEXT, encoding="utf-8")
+    jd_file = tmp_path / "jd.txt"
+    jd_file.write_text(JD_TEXT, encoding="utf-8")
+
+    cli_args = ["--resume", str(resume_file), "--job-description", str(jd_file)]
+    if candidate_name:
+        cli_args += ["--candidate-name", candidate_name]
+    if company_name:
+        cli_args += ["--company-name", company_name]
+    if template:
+        cli_args += ["--template", template]
+
+    exit_code = pipeline.main(cli_args)
+    assert exit_code == 0
+
+    web_data: dict[str, str] = {"job_description": JD_TEXT, "resume": RES_TEXT}
+    if candidate_name:
+        web_data["candidate_name"] = candidate_name
+    if company_name:
+        web_data["company_name"] = company_name
+    if template:
+        web_data["resume_template"] = template
+
+    response = client.post("/api/pipeline", data=web_data)
+    assert response.status_code == 200
+    assert len(recorded) == 2
+    return recorded[0], recorded[1]
+
+
+def _effective(call: dict[str, Any]) -> dict[str, Any]:
+    """Reduce a core call to its effective template semantics.
+
+    ``run_resume_pipeline`` always forwards ``resume_templates`` (``None``
+    when not requested) while the web route omits the key entirely; both mean
+    "render the single ``resume_template``".  When ``resume_templates`` is
+    set it takes precedence over ``resume_template`` in
+    ``ResumeRenderer.render_all``, so the trailing default
+    ``resume_template="modern"`` the CLI still forwards is dropped too.
+    """
+    effective = {k: v for k, v in call.items() if v is not None}
+    if effective.get("resume_templates") is not None:
+        effective.pop("resume_template", None)
+    return effective
+
+
+class TestEntryPointParity:
+    """CLI and web API forward identical parameters to the pipeline core.
+
+    The CLI (``pipeline.main`` -> ``run_resume_pipeline``) and the web route
+    (``POST /api/pipeline``) both funnel through ``_run_pipeline_core``; with
+    the same inputs and the same effective model configuration they produce
+    the same output.  These tests lock the parameter-forwarding contract.
+    """
+
+    def test_cli_and_web_forward_identical_core_kwargs(
+        self, client: Any, monkeypatch, tmp_path
+    ) -> None:
+        cli_call, web_call = _record_parity_calls(
+            client,
+            monkeypatch,
+            tmp_path,
+            candidate_name="Jane Doe",
+            company_name="Acme Corp",
+            template="classic",
+        )
+        assert _effective(cli_call) == _effective(web_call)
+        assert cli_call["resume_template"] == "classic"
+
+    def test_cli_and_web_template_all_match(
+        self, client: Any, monkeypatch, tmp_path
+    ) -> None:
+        cli_call, web_call = _record_parity_calls(
+            client,
+            monkeypatch,
+            tmp_path,
+            candidate_name="Jane Doe",
+            company_name="Acme Corp",
+            template="all",
+        )
+        assert _effective(cli_call) == _effective(web_call)
+        assert cli_call["resume_templates"] == ["modern", "classic", "minimal"]
+
+    def test_cli_and_web_defaults_match(
+        self, client: Any, monkeypatch, tmp_path
+    ) -> None:
+        cli_call, web_call = _record_parity_calls(
+            client,
+            monkeypatch,
+            tmp_path,
+            candidate_name="",
+            company_name="",
+            template="",
+        )
+        assert _effective(cli_call) == _effective(web_call)
+        assert cli_call["candidate_name"] == ""
+        assert cli_call["company_name"] == ""
+        assert cli_call["resume_template"] == "modern"

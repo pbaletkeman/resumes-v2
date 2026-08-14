@@ -30,9 +30,9 @@ If you prefer the OpenAI provider instead of local Ollama, set `MODEL_PROVIDER=o
 | Command | What it does |
 |---------|--------------|
 | `uv run python basic.py` | Single-agent smoke test. Runs one `SimpleAgent` chat call against Ollama (or OpenAI) in JSON mode and pretty-prints the response. |
-| `uv run python pipeline.py` | Runs `sample_run()`: builds the full runner from the environment and runs `run_resume_pipeline` on placeholder text. Shows the polished resume and cover letter on stdout. |
+| `uv run python pipeline.py` | Runs `sample_run()`: builds the full runner from the environment (plus any model overrides persisted by the web API) and runs `run_resume_pipeline` on placeholder text. Shows the polished resume and cover letter on stdout. |
 | `uv run python test_real_files.py` | Live end-to-end integration test: runs the true 7-agent chain against `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt` (requires a running Ollama), then prints a per-check PASS/FAIL summary. |
-| `uv run pytest` | Deterministic unit suite (`tests/`, 550 tests across 26 files) — does **not** require a live LLM. |
+| `uv run pytest` | Deterministic unit suite (`tests/`, 558 tests across 26 files) — does **not** require a live LLM. |
 | `uv run uvicorn app.main:app --reload` | Runs the FastAPI web API (pipeline, tasks, files, outputs endpoints). |
 
 ### Running the full pipeline
@@ -42,7 +42,9 @@ The pipeline is exposed as `run_resume_pipeline(runner, job_description, resume,
 ```python
 from pipeline import create_runner_from_config, run_resume_pipeline
 
-runner = create_runner_from_config()  # wires all 7 agents from the environment
+runner = (
+    create_runner_from_config()
+)  # env vars + web-persisted model overrides, matching the web API
 
 results = run_resume_pipeline(
     runner,
@@ -105,6 +107,10 @@ Every agent has a `<AGENT>` name (`jd_parsing_agent`, `resume_parsing_agent`, `g
 | `<AGENT>_MODEL` | `COVER_LETTER_AGENT_MODEL=gpt-4o` |
 
 The prefix is the **uppercased agent name**. Setting either variable for an agent creates a distinct client entry (`<agent_name>_client`) in the registry. Setting one without the other inherits the default for the missing part.
+
+### Web-persisted overrides
+
+The web API (Models page) persists per-agent provider/model edits in SQLite (`app/model_store.py`). `create_runner_from_config()` loads those persisted overrides by default (when no explicit `overrides=` mapping is passed), so the CLI (`pipeline.py`), `sample_run()`, and the web API all resolve the same effective model configuration — identical inputs produce the same output across entry points. A persisted override wins over the matching env-var override; the env value remains the fallback for the dimension the persisted row leaves unset. To keep a CLI run strictly environment-driven, pass `overrides={}`.
 
 ### How `config/agents.py` picks them
 

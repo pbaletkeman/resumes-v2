@@ -141,10 +141,11 @@ Runs the full 7-agent chain on one event loop via `_run_pipeline_core()`. Return
 ```python
 def create_runner_from_config(
     agent_classes: dict[str, Any] | None = None,
+    overrides: Mapping[str, Mapping[str, str | None]] | None = None,
 ) -> AgentRunner:
 ```
 
-Builds a `ModelClientRegistry` from the environment (`build_registry()`) and returns `AgentRunner(agent_classes or DEFAULT_AGENT_CLASSES, registry=registry)`. `DEFAULT_AGENT_CLASSES` wires the seven dedicated classes.
+Builds a `ModelClientRegistry` from the environment (`build_registry()`) and returns `AgentRunner(agent_classes or DEFAULT_AGENT_CLASSES, registry=registry)`. `DEFAULT_AGENT_CLASSES` wires the seven dedicated classes. When `overrides` is `None` (the default), the overrides persisted by the web API (`app.model_store.ModelStore`) are loaded automatically, so CLI and API entry points resolve the identical effective model configuration.
 
 ## 3. `ResumeRenderer` — `client/templates/renderer.py`
 
