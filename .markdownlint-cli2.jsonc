@@ -1,0 +1,24 @@
+{
+  // markdownlint-cli2 configuration.
+  // Project style: compact tables, long prose lines, no line-length limit.
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD036": false,
+    "MD060": false
+  },
+  "overrides": [
+    {
+      // simple-done.md is a completion archive that embeds the archived
+      // original plan as a standalone historical document, which has its own
+      // top-level title. Allow those embedded top-level headings.
+      "filter": ["simple-done.md"],
+      "config": {
+        "MD025": false
+      },
+      "combine": "merge"
+    }
+  ]
+}

@@ -10,13 +10,17 @@ The system is a 7-agent resume optimization pipeline (see `docs/architecture.md`
 
 1. **Ollama running** on `localhost:11434`.
 2. **Model pulled** — at minimum `qwen2.5:7b-instruct`:
+
    ```bash
    ollama pull qwen2.5:7b-instruct
    ```
+
 3. **uv installed** — create the environment and install dependencies:
+
    ```bash
    uv sync
    ```
+
    This installs the project dependencies including `ollama`, `openai`, `pydantic`, `fastapi`, `python-docx`, `reportlab`, and `jinja2`.
 
 If you prefer the OpenAI provider instead of local Ollama, set `MODEL_PROVIDER=openai` and `OPENAI_API_KEY` (see section 2). No infrastructure is needed for Ollama besides the local server.
@@ -150,6 +154,7 @@ The runner accepts either **pre-instantiated agents** or **agent classes** plus 
 
 1. **Create the class** in `client/agents/` (or anywhere) implementing the contract above. Give it a clear `purpose`/system prompt and Pydantic output model following `client/models.py` style.
 2. **Wire it into the registry** — either per-agent env override (section 2) or by registering explicitly:
+
    ```python
    from client.model_registry import ModelClientRegistry
 
@@ -157,7 +162,9 @@ The runner accepts either **pre-instantiated agents** or **agent classes** plus 
    registry.register("default", OllamaClient("qwen2.5:7b-instruct"))
    registry.set_default_client("default")
    ```
+
 3. **Add it to `DEFAULT_AGENT_CLASSES`** in `pipeline.py` (or pass a substitute mapping to `create_runner_from_config`), keyed by the snake_case agent name, e.g.:
+
    ```python
    DEFAULT_AGENT_CLASSES = {
        "jd_parsing_agent": JDParsingAgent,
@@ -165,6 +172,7 @@ The runner accepts either **pre-instantiated agents** or **agent classes** plus 
        "my_new_agent": MyNewAgent,
    }
    ```
+
    The key is also the env-var prefix (`MY_NEW_AGENT_MODEL`, `MY_NEW_AGENT_PROVIDER`).
 
 4. **Add an `AgentRunner` wiring** in `_run_pipeline_core` (or a custom orchestrator) so the new stage receives the right `inputs` and its output feeds the next stage.

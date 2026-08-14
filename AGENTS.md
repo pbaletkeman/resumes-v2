@@ -22,6 +22,8 @@ Python multi-agent resume optimization pipeline. 7 sequential agents transform a
 | Run web API | `uv run uvicorn app.main:app --reload` |
 | Regex parsing test (no LLM) | See `docs/TESTING.md` section 2 |
 | Check which model each agent uses | `uv run python -c "from config.agents import get_model_summary; [print(f'{a[\"agent\"]}: {a[\"provider\"]}/{a[\"model\"]}') for a in get_model_summary()]"` |
+| Markdown lint | `npx --yes markdownlint-cli2 "*.md" "docs/*.md" "ui/README.md" "frontend-tasks.md" "scratch/*.md"` (config: `.markdownlint-cli2.jsonc`) |
+| Markdown lint (auto-fix) | `npx --yes markdownlint-cli2 --fix "*.md" "docs/*.md" "ui/README.md" "frontend-tasks.md" "scratch/*.md"` |
 | Lint | `uv run ruff check .` |
 | Lint (auto-fix) | `uv run ruff check --fix .` |
 | Format check | `uv run ruff format --check .` |

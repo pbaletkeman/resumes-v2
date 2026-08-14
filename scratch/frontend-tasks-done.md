@@ -243,7 +243,7 @@ New file `ui/src/api/hooks.ts` (server-rendered for TanStack Query v5 — `^5.10
 Restructured the entrypoint into a routed shell.
 
 - `ui/src/App.tsx` (rewritten) — `QueryClient`/`QueryClientProvider` (covers the 4.x hooks) → `BrowserRouter` → `ToastProvider` → `Routes` with a layout route (`<Shell />` holding the `Menubar` + `<Outlet/>`) and three children: `index` → RunPage, `/files` → FilesPage, `/models` → ModelsPage.
-  - `Menubar` `start` slot = brand (`pi pi-briefcase` + "Resume Optimizer"); `model` items built from `NAV_ITEMS` (Run `/`, Files `/files`, Models `/models`) each using an item **template** that renders a `NavLink` (`end` on `/`) with base class `p-menuitem-link` plus ` p-menuitem-link-active` when `isActive` — Menubar highlighting comes from React Router, no command/state needed.
+  - `Menubar` `start` slot = brand (`pi pi-briefcase` + "Resume Optimizer"); `model` items built from `NAV_ITEMS` (Run `/`, Files `/files`, Models `/models`) each using an item **template** that renders a `NavLink` (`end` on `/`) with base class `p-menuitem-link` plus `p-menuitem-link-active` when `isActive` — Menubar highlighting comes from React Router, no command/state needed.
   - `Menubar` `end` slot = the existing three-way `ThemeToggle` (System | Light | Dark from 2.5) — satisfies the theme switch; flips via `useTheme` by setting `data-theme` on `<html>` with no reload.
 - `ui/src/pages/RunPage.tsx`, `FilesPage.tsx`, `ModelsPage.tsx` (new) — minimal placeholder pages (headers only); filled in by 5.2–5.7.
 - `ui/src/toast/ToastContext.ts` + `ui/src/toast/ToastProvider.tsx` (new) — `ToastContext.Provider` owns one `Toast` ref; `useToast()` returns `{ show(message), clear() }` (throws outside the provider). Pages call `useToast().show({ severity, summary, detail })`.
@@ -345,7 +345,7 @@ Built the Parsed Resume result tab.
 Built the Gap Analysis result tab.
 
 - `ui/src/pages/results/GapAnalysisTab.tsx` (new) — takes `value: unknown` (non-object → `NoData`) and renders the tailoring strategy: Missing skills / Weak skills / Strong matches / Recommended emphasis / Keyword strategy / Bullet plan via `TagSection` (`emptyText="No data"`), plus `tone_guidance` as a `results-text` paragraph when present.
-- `ui/src/pages/results/coerce.ts` — added `pickText()`: reads a text field from a `Record<string, unknown> | null` that may arrive as a plain string, an array (joined `, `), or an object (`k: v` pairs joined `, `, empty values skipped) — mirrors the backend `_coerce_tone_guidance` in `client/models.py:206`.
+- `ui/src/pages/results/coerce.ts` — added `pickText()`: reads a text field from a `Record<string, unknown> | null` that may arrive as a plain string, an array (elements joined with comma-space), or an object (`k: v` pairs joined with comma-space, empty values skipped) — mirrors the backend `_coerce_tone_guidance` in `client/models.py:206`.
 - `ui/src/pages/results/ResultsTabView.tsx` — `tailoring_strategy` case now renders `<GapAnalysisTab />`.
 - `ui/src/index.css` — `.results-text` (pre-wrap paragraph for guidance text).
 

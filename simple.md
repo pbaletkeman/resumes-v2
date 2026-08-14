@@ -99,4 +99,16 @@ fallback (commit `eab20e2`), and the test census refreshed to **550 passed**
 - [x] 21.3 Replace all ASCII diagrams with Mermaid Markdown diagrams ✅ See `simple-done.md`.
 - [x] 21.4 All markdown files should link to previous and next file, sorted alphabetically with a link docs/README.md file ✅ See `simple-done.md`.
 - [x] 21.5 Ensure all markdown files are up to date ✅ See `simple-done.md`.
-- [ ] 21.6 No markdown linting errors in any of the markdown files
+- [x] 21.6 No markdown linting errors in any of the markdown files ✅ See `simple-done.md`.
+
+Phase 21.6 verification: all git-tracked markdown files (root `*.md`,
+`docs/*.md`, `scratch/*.md`, `ui/README.md`) pass `npx markdownlint-cli2`
+with a new repo `.markdownlint-cli2.jsonc` config — 0 issues. The config
+tracks the project style (long prose lines, compact tables) and scopes
+`MD025` off for `simple-done.md` only, which embeds the archived original
+plan as a standalone historical document with its own top-level heading.
+Auto-fixable spacing/trailing-newline issues were fixed via
+`markdownlint-cli2 --fix`; bare fences gained `text`/`bash`/`powershell`
+languages; a `docs/README.md` table cell containing `(resume|cover[-_]letter)`
+was reworded (the `|` inside the code span split the row). Markdown-only
+change.

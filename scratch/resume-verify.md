@@ -65,12 +65,14 @@ the File Structure block. Run `git diff` to confirm nothing else changed.
 ## Section 1. Phase 1 - Core Infrastructure (1.1-1.3)
 
 Claims:
+
 - 1.1 `client/model_client.py` is a clean ABC with `@abstractmethod async def chat(...)`.
 - 1.2 `client/errors.py` defines `LLMError/LLMConnectionError/LLMResponseError/LLMTimeoutError`;
      Ollama and OpenAI clients wrap the documented error types.
 - 1.3 core deps `ollama`, `openai`, `pydantic` are present in `pyproject.toml` `dependencies` (project uses uv, not `requirements.txt`).
 
 **Verify:**
+
 - `uv run python -c "from client.model_client import ModelClient; import inspect; print(inspect.isabstract(ModelClient), list(ModelClient.__abstractmethods__))"` -> abstractmethods includes `chat`.
 - `uv run python -c "from client import errors; print([e.__name__ for e in (errors.LLMError, errors.LLMConnectionError, errors.LLMResponseError, errors.LLMTimeoutError)])"`.
 - Grep `client/ollama_client.py` for `RequestError|ResponseError|TimeoutError`; `client/open_ai_client.py` for `AuthenticationError|RateLimitError|APIConnectionError|APIError|TimeoutError`.
@@ -91,6 +93,7 @@ parse_job_description`; LLM fallback connected; `ParsedResume` has `projects`/
 validation -> fallback contract.
 
 **Verify:**
+
 - Symbol presence: Section 0 table already confirmed the FormatDetector methods.
 - Contract scan across `client/agents/*.py`: each agent defines `run()`, `_try_llm()`,
   a `_parse_json`-style helper, and passes `response_format="json"` +
@@ -108,6 +111,7 @@ implement per the AGENTS.md agent-class pattern and add a unit test; re-run the 
 Claims: agents 3-7 exist with documented in/out schemas and fallbacks.
 
 **Verify:**
+
 - Output schema fields against `client/models.py`:
   `uv run python -c "from client.models import GapAnalysisOutput, RewriteOutput, ATSComplianceOutput, TonePolishingOutput, CoverLetterOutput as M; [print(n, list(M.model_fields)) for n,M in []..."` and manually check each keyed field named in resume-done.md is present.
 - Fallback existence: `GapAnalysisAgent` must have NO regex fallback (LLM only) -
@@ -123,6 +127,7 @@ post-validation / default result; add a unit test.
 ## Section 4. Phase 4.3 - LLM fallback falsehoods (A-F)
 
 Claims (behavior; hardest to assert by grep):
+
 - A. `_sanitize_skills` (drop fabricated skills; reject if >50% dropped),
   `_validate_companies` (reject fabricated company), `_validate_chronological`.
 - B/C. `_validate_role`, `_check_company` (warn), `_check_skills` (warn),
@@ -133,6 +138,7 @@ Claims (behavior; hardest to assert by grep):
 - F. `JDParsingOutput.company_name` + `_sync_company_name` + `_extract_company_name`.
 
 **Verify:**
+
 - Presence: import the helpers
   `from client.agents.cover_letter import _build_fallback_cover_letter, _validate_length, _check_company, _check_skills, _apply_company_name, _apply_candidate_name, _contact_from_resume, _apply_contact_info`
   and `from client.agents.resume_rewrite import _tailor_skills, _sanitize_skills, _parsed_to_rewrite, _ensure_chronological`.
@@ -154,6 +160,7 @@ Claims: `AgentRunner` in `pipeline.py`; `DEFAULT_AGENT_CLASSES` = 7 classes;
 handles dict and model.
 
 **Verify:**
+
 - `uv run python -c "from pipeline import AgentRunner, PipelineAgent, run_resume_pipeline, DEFAULT_AGENT_CLASSES, create_runner_from_config; print(list(DEFAULT_AGENT_CLASSES))"` -> the 7 agent keys in order.
 - `get_model_summary()` returns 7 rows: `uv run python -c "from config.agents import get_model_summary; print(len(get_model_summary()))"`.
 
@@ -169,6 +176,7 @@ Claims: models; formatter helpers; `ResumeRenderer` all 8 methods; DOCX/PDF deps
 `render_all` writes 6 output keys; `build_output_path` naming.
 
 **Verify:**
+
 - `uv run pytest tests/test_formatter.py tests/test_renderer.py -q` -> 41 + 43.
 - DOCX/PDF smoke must NOT be skipped because deps are missing:
   `uv run python -c "import docx; print('python-docx OK')"` and
@@ -188,6 +196,7 @@ renderer `contact_line`; agent `_contact_from_resume`/`_apply_contact_info`/
 `_contact_signature_line`; tests.
 
 **Verify:**
+
 - `uv run python -c "from client.models import ResumeParsingOutput; print([f for f in ('phone','email','linkedin','github') if f in ResumeParsingOutput.model_fields])"` -> 4/4.
 - Presence of the cover-letter contact functions + renderer kwargs (grep `contact_line`,
   `phone`, `email`, `linkedin`, `github` in `renderer.py` and `cover_letter.py`).
@@ -200,6 +209,7 @@ renderer `contact_line`; agent `_contact_from_resume`/`_apply_contact_info`/
 ## Section 8. Phase 8.5 - Skill Normalization (8.5.1-8.5.6)
 
 **Verify:**
+
 - `client/skills/{__init__,normalizer}.py` + `client/skills/taxonomy.json` +
   `tests/test_skill_normalizer.py` present.
 - `uv run pytest tests/test_skill_normalizer.py -q` -> 15.
@@ -230,12 +240,14 @@ cannot be proven by `pytest`:
   producing real `output/` files.
 
 **Verify (live; requires Ollama on :11434):**
-```
+
+```bash
 uv run python wip_testing/test_cover_letter.py        # full chain
 uv run python wip_testing/test_resume_rewrite.py      # agents 1-4
 uv run python wip_testing/test_job_description.py     # agent 1
 uv run python pipeline.py                             # full pipeline -> output/* files
 ```
+
 Confirm no fallbacks at `LOG_LEVEL=DEBUG`; confirm `output/` files exist and are non-empty.
 
 **Fix if not implemented:** each of these is a *claim*, not a hard requirement. Mark in
@@ -250,12 +262,14 @@ file a new bug/Phase entry.
 **Verify:** word/test counts match across `AGENTS.md`, `README.md`, `resume-todo.md`,
 `resume-done.md`, and the actual `uv run pytest` total.
 
-```
+```bash
 rg -n "tests across|passed|/n tests" AGENTS.md README.md resume-todo.md resume-done.md
 ```
+
 Every hard-coded total must equal the pytest-collected count (currently **362**).
 Recompute live:
-```
+
+```powershell
 uv run pytest --collect-only -q 2>$null | Measure-Object -Line
 ```
 
@@ -373,6 +387,7 @@ below). No seed/text test counts changed — still 362.
 OpenAI gpt-4o remains unverifiable (no `OPENAI_API_KEY`), noted in resume-todo.md.
 
 ### Files changed (source/docs only)
+
 - `resume-done.md` — stale doc counts (Section 0a).
 - `resume-verify.md` — tracker + this results section.
 - `pipeline.py` — event-loop fix + `_extract_field` model handling.

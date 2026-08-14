@@ -4,9 +4,11 @@
 
 1. **Ollama running** on `localhost:11434`
 2. **Model pulled** — at minimum `qwen2.5:7b-instruct`:
+
    ```bash
    ollama pull qwen2.5:7b-instruct
    ```
+
 3. **uv installed** — run `uv sync` to set up the venv
 
 ---

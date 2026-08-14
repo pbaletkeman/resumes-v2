@@ -3041,7 +3041,7 @@ are the remaining drift that Phases 1-18 introduced or left stale.
 
 - Re-read each doc section against the matching module; no remaining drift:
   - `config/agents.py` reads only `MODEL_PROVIDER`/`MODEL_NAME`/`OPENAI_API_KEY`
-    + per-agent overrides (confirmed by grep); `get_agent_config()`/`build_registry()`
+    - per-agent overrides (confirmed by grep); `get_agent_config()`/`build_registry()`
     shape matches `usage.md` section 2.
   - `pipeline.py:404` = `async def _run_pipeline_core`, `pipeline.py:291` =
     `_to_rewrite_output`, `pipeline.py:354` = `_run_stage` (confirmed by grep).
@@ -3700,6 +3700,58 @@ Audited every doc guide (`README.md`, `AGENTS.md`, `docs/*.md`,
 
 ---
 
+## Phase 21 - Completed sub-task 21.6: no markdown lint errors in any markdown file
+
+Original instruction:
+
+- **21.6** No markdown linting errors in any of the markdown files.
+
+### Completion record
+
+**Changes made (markdown/tooling only, no source touched):**
+
+- Added `.markdownlint-cli2.jsonc` (new) — a `markdownlint-cli2` config that
+  matches the project's actual style: `MD013` (line length) off, `MD060`
+  (table column style) off, `MD024` (duplicate headings) as `siblings_only`,
+  `MD033` (inline HTML) and `MD036` (emphasis-as-heading) off. A scoped
+  `overrides` entry turns `MD025` off for `simple-done.md` **only**, because
+  that file archives the original full plan as a standalone historical
+  document carrying its own top-level heading.
+- Ran `npx --yes markdownlint-cli2 --fix ...` over all git-tracked markdown
+  files (root `*.md`, `docs/*.md`, `scratch/*.md`, `ui/README.md`), which
+  auto-fixed the fixable spacing rules:
+  - `MD032`/`MD031`/`MD022` — blank lines around lists, fenced code blocks,
+    and headings (`docs/logging-info.md`, `docs/usage.md`, `docs/TESTING.md`,
+    `scratch/resume-web-todo.md`, `scratch/resume-verify.md`, `simple-done.md`).
+  - `MD047` — files now end with a single trailing newline
+    (`docs/agents.md`, `docs/api.md`, `docs/architecture.md`,
+    `docs/README.md`, `docs/skill-taxonomy.md`, `docs/usage.md`,
+    `scratch/resume-todo.md`, `scratch/resume-verify.md`).
+  - `MD038` — leading/trailing space inside code spans
+    (`scratch/frontend-tasks-done.md`).
+  - `MD004`/`MD012` — list-marker style and a doubled blank line
+    (`simple-done.md`).
+- Hand-fixed the non-fixable rules:
+  - `MD040` — bare fences tagged `text` (Gap Analysis + Tone Polishing
+    prompts in `docs/agents.md`), `bash`, and `powershell`
+    (`scratch/resume-verify.md`).
+  - `MD056` — a `docs/README.md` table cell containing
+    `(resume|cover[-_]letter)` reworded to "accepts both `resume` and
+    `cover[-_]letter`" (the `|` inside the inline code span split the row).
+- Restored one `MD038` auto-fix that had changed meaning in
+  `scratch/frontend-tasks-done.md` (an array/object join was documented as
+  comma-space, not plain comma) using lint-safe phrasing.
+
+**Behavior verification:**
+
+- `npx --yes markdownlint-cli2 "*.md" "docs/*.md" "ui/README.md"
+  "frontend-tasks.md" "scratch/*.md"` — **0 issues in 0 files**.
+- Documentation/tooling-only change — no Python/TS source touched.
+
+**Commit:** none yet — awaiting user approval to commit.
+
+---
+
 # Archive: Full Simplification Plan (from simple.md)
 
 The original full plan (title, guiding rules, file inventory, phase specs, and
@@ -3707,7 +3759,6 @@ the work-breakdown checklists) exactly as it stood when it was archived by
 sub-task 20.5. Completed phases are recorded above this section; this is the
 historical working document. Phase 21 remained actionable and was carried into
 the `simple.md` progress log.
-
 
 # Simplification Plan: Inspect & Simplify Every File, Method, Module
 
@@ -4560,6 +4611,7 @@ plaintext and Markdown — the letter never became a `.docx` or `.pdf`.
 ### Changes
 
 **`client/templates/renderer.py`**
+
 - Added `render_cover_letter_docx()` and `render_cover_letter_pdf()` — letter-size
   pages, 1-inch margins, Calibri 11pt (DOCX) / Helvetica base-14 (PDF), name at 14pt
   bold, mirroring the resume binary formats. Both accept `output_path` (temp file when
@@ -4577,6 +4629,7 @@ plaintext and Markdown — the letter never became a `.docx` or `.pdf`.
 - Module + `render_all` docstrings updated (four letter formats).
 
 **`tests/test_renderer.py`**
+
 - `test_render_all_returns_six_keys` → `test_render_all_returns_eight_keys` (8 keys,
   new render methods monkeypatched).
 - `test_render_all_renders_with_empty_segments` → expects 8 keys.
@@ -4629,6 +4682,7 @@ in every generated resume.
 ### Changes
 
 **`client/templates/modern.py`, `client/templates/classic.py`, `client/templates/minimal.py`**
+
 - Wrapped every header title in a `{% if title %}` guard so an empty title
   emits nothing instead of a bare `**`/`****` Markdown artifact:
   - modern: markdown `**{{ title }}**` → `{% if title %}**{{ title }}**{% endif %}`
@@ -4643,6 +4697,7 @@ in every generated resume.
   modern/classic/minimal with multi-job experience.
 
 **`tests/test_renderer.py`** (45 → 51 tests)
+
 - `test_markdown_empty_title_no_horizontal_rule` (parametrized modern/classic/
   minimal) — asserts no `****` in rendered Markdown.
 - `test_markdown_title_bold_when_present` (parametrized modern/classic) —

@@ -485,7 +485,7 @@ name available (explicit or parsed from the resume), rendering is skipped and
 | Symptom | Cause | Fix |
 |---|---|---|
 | Live E2E reports nondeterministic "cover letter word count" / "certifications preserved" failures | Local 7B model output varies run-to-run; some checks are soft/quality gates | Re-run; the pipeline logs accept these cases. Deterministic checks (structure, output files) must stay green. |
-| "output filename pattern" E2E check fails | Regex expected `cover_letter` | The renderer emits `cover-letter`; the check regex is `(resume|cover[-_]letter)`. |
+| "output filename pattern" E2E check fails | Regex expected `cover_letter` | The renderer emits `cover-letter`; the check regex accepts both `resume` and `cover[-_]letter`. |
 
 > **Agent behavior on LLM failure** (why "fallback" is not an error): parsing
 > agents (1-2) fall back to regex via `FormatDetector`; LLM-only reasoning

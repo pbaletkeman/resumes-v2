@@ -7,6 +7,7 @@ Logging is dead code. Four files create loggers and emit 12 log calls, but with 
 ## Goal
 
 Add working, configurable logging to every layer of the pipeline so that:
+
 - Logs appear on stdout with meaningful format (timestamp, level, module)
 - LLM requests/responses are visible at `DEBUG` level
 - Parsing fallback decisions are traceable
@@ -73,6 +74,7 @@ def configure_logging() -> None:
 ```
 
 Key design decisions:
+
 - Root level reads from `LOG_LEVEL` env var (default `INFO`)
 - `disable_existing_loggers: False` so loggers created before `configure_logging()` still work
 - LLM client loggers hard-coded to `DEBUG` so API traffic is always visible when root is at `DEBUG`
@@ -85,6 +87,7 @@ Includes third-party suppressions (task 11): `ollama`, `openai`, `httpx`, `httpc
 **Files:** `pipeline.py`, `basic.py` ✅ DONE
 
 Call `configure_logging()` at the top of each entry point, before any agents run:
+
 - `pipeline.py` ~line 184 (`run_resume_pipeline`): add `configure_logging()` before agent execution
 - `basic.py` ~line 50: add `configure_logging()` for the standalone demo entry point
 
@@ -99,11 +102,13 @@ This ensures all existing `logger.info()` / `logger.warning()` / `logger.error()
 Add `logger = logging.getLogger(__name__)` after imports.
 
 Log at these points:
+
 - `chat()` method entry (DEBUG): model name, prompt length, message count
 - `chat()` method success (DEBUG): response content length, latency
 - `chat()` exception paths (WARNING/ERROR): connection errors, timeouts, unexpected failures
 
 **Lines to modify:**
+
 - Line ~15 (after imports): add logger
 - Line ~40 (`chat()`): add debug log on entry, debug log on success, warning/error on exceptions
 
@@ -114,11 +119,13 @@ Log at these points:
 Add `logger = logging.getLogger(__name__)` after imports.
 
 Log at these points:
+
 - `chat()` method entry (DEBUG): model name, prompt length, message count
 - `chat()` method success (DEBUG): response content length, latency
 - `chat()` exception paths (WARNING/ERROR): `RateLimitError`, `APIConnectionError`, `AuthenticationError`, generic `APIError`, timeouts
 
 **Lines to modify:**
+
 - Line ~24 (after imports): add logger
 - Line ~48 (`chat()`): add debug log on entry, debug log on success, warning/error on exceptions
 
@@ -174,6 +181,7 @@ Add `logger = logging.getLogger(__name__)` after imports.
 - `build_registry()` (line ~107): log registry construction at INFO (number of agents configured)
 
 **Lines to modify:**
+
 - Line ~5 (after imports): add logger
 - Line ~28, ~107: add debug/info log calls
 
@@ -186,6 +194,7 @@ Add `logger = logging.getLogger(__name__)` after imports.
 - Log agent-to-model assignment at DEBUG when registry is populated
 
 **Lines to modify:**
+
 - After imports: add logger
 - In registry population logic: add `logger.debug(...)` calls
 
@@ -236,6 +245,7 @@ except LLMConnectionError as e:
 ```
 
 This gives full stack traces in the log output without requiring `logger.exception()`. Apply to:
+
 - `OllamaClient.chat()` exception handlers (task 3) ✅
 - `OpenAIClient.chat()` exception handlers (task 4) ✅
 - `AgentRunner.run_agent()` error path (existing line 167) ✅
@@ -268,6 +278,7 @@ uv run pytest tests/test_format_detector.py -v --log-cli-level=DEBUG
 ### 15. Security: log redaction guidelines
 
 Do NOT log:
+
 - API keys or tokens (even partially masked)
 - Full resume or JD text at INFO level (DEBUG is acceptable since it's opt-in)
 - File paths that reveal directory structure on the user's machine
@@ -315,6 +326,7 @@ This gives users a clear pass/fail signal without reading through all intermedia
 ### 18. Verify lint and typecheck pass
 
 Run after all changes:
+
 ```bash
 uv run ruff check .
 uv run ruff format --check .
