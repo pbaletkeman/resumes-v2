@@ -54,7 +54,12 @@ from client.agents import (
 )
 from client.model_client import ModelClient
 from client.model_registry import ModelClientRegistry
-from client.models import CoverLetterOutput, ResumeParsingOutput, RewriteOutput
+from client.models import (
+    CoverLetterOutput,
+    JDParsingOutput,
+    ResumeParsingOutput,
+    RewriteOutput,
+)
 from client.templates.renderer import ResumeRenderer
 from config.agents import build_registry
 from logging_config import configure_logging
@@ -328,6 +333,23 @@ def _resume_candidate_name(parsed_resume: Any) -> str:
     return ""
 
 
+def _jd_company_name(parsed_job_description: Any) -> str:
+    """Return the target company parsed from the job description, or empty.
+
+    Reads ``JDParsingOutput.company_name`` (or the ``"company_name"`` key of
+    a raw dict from a generic agent) so runs that omit the explicit
+    ``company_name`` field -- e.g. CLI runs that only pass files -- can still
+    include the target company in the rendered output filenames.
+    """
+    if isinstance(parsed_job_description, JDParsingOutput):
+        return parsed_job_description.company_name.strip()
+    if isinstance(parsed_job_description, dict):
+        name = cast(dict[str, Any], parsed_job_description).get("company_name")
+        if isinstance(name, str):
+            return name.strip()
+    return ""
+
+
 def run_resume_pipeline(
     runner: AgentRunner,
     job_description: str,
@@ -348,6 +370,7 @@ def run_resume_pipeline(
             filenames.  When empty, the name parsed from the resume is used;
             when neither is available, file rendering is skipped.
         company_name: Target company name for rendered output filenames.
+            When empty, the company parsed from the job description is used.
         resume_template: Template key (``"modern"``/``"classic"``/
             ``"minimal"``) for the rendered resume, used when
             *resume_templates* is ``None``.
@@ -450,6 +473,7 @@ async def _run_pipeline_core(
             filenames.  When empty, the name parsed from the resume is used;
             when neither is available, file rendering is skipped.
         company_name: Target company name for rendered output filenames.
+            When empty, the company parsed from the job description is used.
         resume_template: Template key for the rendered resume, used when
             *resume_templates* is ``None``.
         resume_templates: Optional template key or list of keys to render
@@ -536,8 +560,10 @@ async def _run_pipeline_core(
     # Optional file output via ResumeRenderer.  The explicit candidate name
     # wins when provided; otherwise the name parsed from the resume is used,
     # so runs that omit the field (e.g. the web UI) still produce files.
+    # The same fallback fills the company segment from the job description.
     output_files: dict[str, Path] = {}
     render_name = candidate_name or _resume_candidate_name(parsed_resume)
+    render_company = company_name or _jd_company_name(parsed_job_description)
     if render_name:
         resume_data = _to_rewrite_output(parsed_resume)
         letter_data = (
@@ -549,7 +575,7 @@ async def _run_pipeline_core(
             resume_data,
             letter_data,
             candidate_name=render_name,
-            company_name=company_name,
+            company_name=render_company,
             output_dir=output_dir,
             resume_template=resume_template,
             resume_templates=resume_templates,

@@ -241,7 +241,7 @@ uv run pytest --cov --cov-report=xml
 Artifacts: `.coverage` (data file) and `htmlcov/` (HTML report); both are
 git-ignored.
 
-Currently **573 tests across 26 files** (deterministic, no live LLM required):
+Currently **575 tests across 26 files** (deterministic, no live LLM required):
 
 - `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
 - `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
@@ -259,7 +259,7 @@ Currently **573 tests across 26 files** (deterministic, no live LLM required):
 - `tests/test_agent_ats_compliance.py` — 8 tests (Agent 5 contract, mocked ModelClient)
 - `tests/test_agent_tone_polishing.py` — 6 tests (Agent 6 contract, mocked ModelClient)
 - `tests/test_agent_cover_letter.py` — 10 tests (Agent 7 contract, mocked ModelClient)
-- `tests/test_pipeline.py` — 27 tests (AgentRunner / run_resume_pipeline orchestration, stub agents, resume template passthrough, candidate-name rendering fallback, CLI/web persisted-override alignment)
+- `tests/test_pipeline.py` — 29 tests (AgentRunner / run_resume_pipeline orchestration, stub agents, resume template passthrough, candidate-name rendering fallback, CLI/web persisted-override alignment)
 - `tests/test_model_store.py` — 11 tests (SQLite agent model override store)
 - `tests/test_web_health.py` — 2 tests (web health + models routes)
 - `tests/test_web_models_edit.py` — 14 tests (web model/provider edit + reset routes)

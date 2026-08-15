@@ -258,7 +258,7 @@ tests/
   test_agent_ats_compliance.py     # Agent 5 contract tests (8 tests)
   test_agent_tone_polishing.py     # Agent 6 contract tests (6 tests)
   test_agent_cover_letter.py       # Agent 7 contract tests (10 tests)
-  test_pipeline.py                 # AgentRunner / run_resume_pipeline orchestration + template passthrough + CLI/web persisted-override alignment (27 tests)
+  test_pipeline.py                 # AgentRunner / run_resume_pipeline orchestration + template passthrough + CLI/web persisted-override alignment (29 tests)
   test_model_store.py              # SQLite agent model override store (11 tests)
   test_web_health.py               # Web health + models routes (2 tests)
   test_web_models_edit.py          # Web model/provider edit + reset routes (14 tests)

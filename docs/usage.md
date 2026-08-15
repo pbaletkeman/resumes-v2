@@ -50,7 +50,7 @@ If you prefer the OpenAI provider instead of local Ollama, set `MODEL_PROVIDER=o
 | `uv run python basic.py` | Single-agent smoke test. Runs one `SimpleAgent` chat call against Ollama (or OpenAI) in JSON mode and pretty-prints the response. |
 | `uv run python pipeline.py` | Runs `sample_run()`: builds the full runner from the environment (plus any model overrides persisted by the web API) and runs `run_resume_pipeline` on placeholder text. Shows the polished resume and cover letter on stdout. |
 | `uv run python test_real_files.py` | Live end-to-end integration test: runs the true 7-agent chain against `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt` (requires a running Ollama), then prints a per-check PASS/FAIL summary. |
-| `uv run pytest` | Deterministic unit suite (`tests/`, 573 tests across 26 files) — does **not** require a live LLM. |
+| `uv run pytest` | Deterministic unit suite (`tests/`, 575 tests across 26 files) — does **not** require a live LLM. |
 | `uv run uvicorn app.main:app --reload` | Runs the FastAPI web API (pipeline, tasks, files, outputs endpoints). |
 
 ### Running the full pipeline
@@ -98,7 +98,10 @@ results = run_resume_pipeline(
   (`resume-classic.pdf`). The cover letter keys are unchanged.
 
   Files are named with `ResumeRenderer.build_output_path()`:
-  `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}` (slugs are filesystem-safe).
+  `{YYYYMMDD}_{candidate}_{company6}_{document_type}.{ext}` — the date has no
+  time component and the company segment is the first six characters of the
+  company name (explicit `company_name` or parsed from the JD); slugs are
+  filesystem-safe.
 
 - When no candidate name is available — explicit `candidate_name` or the name
   parsed from the resume — rendering is skipped and `output_files` is `{}`.

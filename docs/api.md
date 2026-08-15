@@ -331,7 +331,7 @@ def build_output_path(
 ) -> Path:
 ```
 
-Builds `{output_dir}/{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}`. Name segments are slugified (`_slugify`: lowercase, non-alphanumerics → single `-`, trimmed) so the result is filesystem-safe. `ext` defaults per `_DEFAULT_EXTENSIONS` when `None`. Pure path logic — no file I/O.
+Builds `{output_dir}/{YYYYMMDD}_{candidate}_{company6}_{document_type}.{ext}` where `company6` is the first six characters of the company name. The date has no time component, so rerunning a job the same day overwrites the previous files instead of accumulating minute-by-minute copies. Name segments are slugified (`_slugify`: lowercase, non-alphanumerics → single `-`, trimmed) so the result is filesystem-safe. `ext` defaults per `_DEFAULT_EXTENSIONS` when `None`. Pure path logic — no file I/O.
 
 ## 4. `formatter` helpers — `client/formatter.py`
 

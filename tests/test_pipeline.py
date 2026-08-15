@@ -427,6 +427,39 @@ class TestCompanyCandidatePassthrough:
         assert recorder.calls[0]["candidate_name"] == "Jane Doe"
         assert result["output_files"] != {}
 
+    async def test_empty_company_name_falls_back_to_parsed_company(
+        self, monkeypatch
+    ) -> None:
+        runner, _ = _stub_runner()
+        recorder = _RecordingRenderAll()
+        monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
+
+        result = await _run_pipeline_core(
+            runner, JD_TEXT, RESUME_TEXT, candidate_name="Jane Doe"
+        )
+
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0]["company_name"] == "Acme Corp"
+        assert result["output_files"] != {}
+
+    async def test_explicit_company_name_wins_over_parsed_company(
+        self, monkeypatch
+    ) -> None:
+        runner, _ = _stub_runner()
+        recorder = _RecordingRenderAll()
+        monkeypatch.setattr(ResumeRenderer, "render_all", recorder)
+
+        await _run_pipeline_core(
+            runner,
+            JD_TEXT,
+            RESUME_TEXT,
+            candidate_name="Jane Doe",
+            company_name="Globex",
+        )
+
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0]["company_name"] == "Globex"
+
     async def test_explicit_candidate_name_wins_over_parsed_name(
         self, monkeypatch
     ) -> None:

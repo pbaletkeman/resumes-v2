@@ -188,7 +188,7 @@ build it once with `npm run build` inside `ui/`.
 ### 2.6 Run the tests
 
 ```bash
-uv run pytest                # deterministic unit suite: 573 tests, no LLM needed
+uv run pytest                # deterministic unit suite: 575 tests, no LLM needed
 uv run pytest -v             # verbose
 uv run pytest --cov          # coverage summary
 uv run pytest tests/test_renderer.py   # a single file
@@ -279,7 +279,7 @@ uv run python pipeline.py --resume resume.txt --jd jd.txt --template all
 | `uv run python wip_testing/test_tone_polishing.py` | Tone Polishing Agent demo (chains 1-6). |
 | `uv run python wip_testing/test_cover_letter.py` | Cover Letter Agent demo (chains 1-7). |
 | `uv run python wip_testing/test_parsing.py` | Regex + LLM `FormatDetector` parsing demo. |
-| `uv run pytest` | Unit suite (`tests/`, 573 tests, no LLM). |
+| `uv run pytest` | Unit suite (`tests/`, 575 tests, no LLM). |
 | `uv run pytest -v` / `--cov` / `--cov-report=html` | Verbose / coverage / HTML coverage report. |
 | `uv run pytest tests/test_<name>.py` | Run one test file. |
 | `uv run ruff check .` | Lint. |
@@ -462,11 +462,14 @@ own namespaced keys `resume_{template}_plaintext` … `resume_{template}_pdf`
 (`resume-classic.pdf`) so the layouts never overwrite each other. The cover
 letter keys are shared and unchanged.
 
-Filenames follow `{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}`
+Filenames follow `{YYYYMMDD}_{candidate}_{company6}_{document_type}.{ext}`
 with every segment slugified (e.g. `cover_letter` → `cover-letter`), so the
 actual file looks like
-`20260812_1040_peter-letkeman_3pillar_cover-letter.txt`. With no candidate
-name available (explicit or parsed from the resume), rendering is skipped and
+`20260812_peter-letkeman_3pilla_cover-letter.txt`. The date carries no time
+(a same-day rerun overwrites the previous files) and the company segment is
+the first six characters of the company name, taken from the explicit
+`company_name` or the parsed job description. With no candidate name
+available (explicit or parsed from the resume), rendering is skipped and
 `output_files` is `{}`.
 
 ---

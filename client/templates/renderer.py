@@ -736,8 +736,11 @@ class ResumeRenderer:
 
         The returned path has the form::
 
-            {output_dir}/{YYYYMMDD_HHMM}_{candidate}_{company}_{document_type}.{ext}
+            {output_dir}/{YYYYMMDD}_{candidate}_{company6}_{document_type}.{ext}
 
+        where ``company6`` is the first six characters of the company name.
+        The date carries no time so a day's runs collide (files are
+        overwritten) rather than accumulating minute-by-minute variants.
         Names are slugified (see :meth:`_slugify`) so the result is safe
         to write on any filesystem.  Pure path logic -- no file I/O.
 
@@ -757,9 +760,9 @@ class ResumeRenderer:
         if not resolved_ext.startswith("."):
             resolved_ext = f".{resolved_ext}"
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        timestamp = datetime.now().strftime("%Y%m%d")
         slug_candidate = ResumeRenderer._slugify(candidate_name)
-        slug_company = ResumeRenderer._slugify(company_name)
+        slug_company = ResumeRenderer._slugify(company_name[:6])
         slug_type = ResumeRenderer._slugify(document_type) or "output"
 
         filename = (

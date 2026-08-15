@@ -421,7 +421,7 @@ def test_cover_letter_markdown_signature_rendered_once() -> None:
 
 
 def test_build_output_path_naming_pattern(tmp_path) -> None:
-    """Path follows {dir}/{YYYYMMDD_HHMM}_{candidate}_{company}_{type}.{ext}."""
+    """Path follows {dir}/{YYYYMMDD}_{candidate}_{company6}_{type}.{ext}."""
     path = ResumeRenderer.build_output_path(
         "resume",
         candidate_name="Jane Doe",
@@ -432,12 +432,12 @@ def test_build_output_path_naming_pattern(tmp_path) -> None:
     assert path.parent == tmp_path
     assert path.suffix == ".docx"
     assert "jane-doe" in path.name
-    assert "acme-corp" in path.name
+    assert "acme-c" in path.name
     assert "resume" in path.name
 
 
 def test_build_output_path_date_format(tmp_path) -> None:
-    """The filename carries a YYYYMMDD_HHMM timestamp prefix."""
+    """The filename carries a YYYYMMDD date prefix with no time."""
     from datetime import datetime
 
     path = ResumeRenderer.build_output_path(
@@ -448,8 +448,7 @@ def test_build_output_path_date_format(tmp_path) -> None:
     )
     parts = path.name.split("_")
     assert len(parts) >= 2
-    timestamp = f"{parts[0]}_{parts[1]}"
-    datetime.strptime(timestamp, "%Y%m%d_%H%M")  # raises if malformed
+    datetime.strptime(parts[0], "%Y%m%d")  # raises if malformed
 
 
 def test_build_output_path_slugifies(tmp_path) -> None:
@@ -460,10 +459,10 @@ def test_build_output_path_slugifies(tmp_path) -> None:
         company_name="Acme_Corp",
         output_dir=tmp_path,
     )
-    # timestamp prefix ends at the first two underscore-separated parts
-    body = "_".join(path.name.split("_")[2:])
+    # date prefix ends at the first underscore-separated part
+    body = "_".join(path.name.split("_")[1:])
     assert "jane-doe" in body
-    assert "acme-corp" in body
+    assert "acme-c" in body
     assert "!" not in body and "!!!" not in body
 
 
@@ -475,7 +474,7 @@ def test_build_output_path_ascii_slugify(tmp_path) -> None:
         company_name="Acme",
         output_dir=tmp_path,
     )
-    body = "_".join(path.name.split("_")[2:])
+    body = "_".join(path.name.split("_")[1:])
     assert "caf" in body
     assert not any(ord(c) > 127 for c in body)
     assert "é" not in body
@@ -664,7 +663,7 @@ def test_render_all_writes_timestamped_files(
     assert resume_txt.parent == tmp_path
     assert resume_txt.suffix == ".txt"
     assert "jane-doe" in resume_txt.name
-    assert "acme-corp" in resume_txt.name
+    assert "acme-c" in resume_txt.name
     assert resume_txt.read_text() == "hello world"
 
     md_file = paths["resume_markdown"]
