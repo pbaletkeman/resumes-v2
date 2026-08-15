@@ -51,6 +51,16 @@ def _match_keys(value: str) -> tuple[str, str, str]:
     return low, squashed, tokenized
 
 
+def _whole_word_in(text: str, target: str) -> bool:
+    """Return True when ``text`` appears in ``target`` as a whole word.
+
+    Uses non-alphanumeric lookarounds (rather than ``\\b``) so multi-token
+    and punctuation-bearing forms (e.g. ``"ci/cd"``, ``"c#"``) match on
+    their boundaries without tripping on adjacent characters.
+    """
+    return re.search(rf"(?<![a-z0-9]){re.escape(text)}(?![a-z0-9])", target) is not None
+
+
 _CANONICAL_BY_KEY: dict[str, str] = {}
 _VARIANTS: dict[str, list[str]] = {}
 _CATEGORIES: list[str] = []
@@ -152,6 +162,39 @@ class SkillNormalizer:
             if name.strip().lower() == target:
                 return list(variants)
         return []
+
+    def known_skills_in_text(
+        self, text: str, *, include_soft: bool = False
+    ) -> list[str]:
+        """Return canonical taxonomy skills that appear in ``text`` as whole words.
+
+        Every canonical name and known variant in the taxonomy is scanned for
+        in ``text`` (case-insensitive, whole-word), and the canonical names of
+        the hits are returned in taxonomy order.  Soft skills (e.g.
+        Communication, Leadership) are excluded unless ``include_soft`` is
+        True, so ordinary prose words in a cover letter (such as
+        "communication skills") are not misread as technology skill claims.
+
+        Args:
+            text: Free text (e.g. a joined list of JD skill phrases).
+            include_soft: When False (default), soft-skill categories are
+                skipped so only technical skill nouns are reported.
+
+        Returns:
+            The canonical names of taxonomy skills found in ``text``.
+        """
+        text_lower = text.lower()
+        found: list[str] = []
+        for canonical, variants in _VARIANTS.items():
+            if (
+                not include_soft
+                and _CATEGORY_BY_CANONICAL.get(canonical) == "soft_skills"
+            ):
+                continue
+            forms = [canonical, *variants]
+            if any(_whole_word_in(form, text_lower) for form in forms):
+                found.append(canonical)
+        return found
 
     def match_skills(
         self, jd_skills: list[str], resume_skills: list[str]

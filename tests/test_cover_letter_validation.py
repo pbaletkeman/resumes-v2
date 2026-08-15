@@ -18,6 +18,7 @@ from client.agents.cover_letter import (
     _check_company,
     _check_skills,
     _company_from,
+    _foreign_skill_claims,
     _get_company_name,
     _join_skills,
     _load_str_list,
@@ -26,6 +27,7 @@ from client.agents.cover_letter import (
     _skill_in_list,
     _skill_mentioned,
     _validate_length,
+    _validate_no_fabricated_skills,
     _validate_role,
 )
 from client.agents.resume_parsing import ResumeParsingAgent
@@ -353,6 +355,61 @@ class TestCheckSkills:
     def test_no_skills_no_warning(self, caplog) -> None:
         _check_skills(_letter("anything"), _resume_json(), _jd_json())
         assert "mentions skills not in resume" not in caplog.text
+
+
+class TestForeignSkillClaims:
+    def test_django_absent_from_resume_flagged(self) -> None:
+        jd = _jd_json(
+            required_skills=[
+                "experience with modern full stack technologies including "
+                "python django typescript react"
+            ]
+        )
+        resume = _resume_json(skills=["Python"])
+        letter = "I build products using Python and Django."
+        assert _foreign_skill_claims(_letter(letter), resume, jd) == ["Django"]
+
+    def test_resume_skill_not_flagged(self) -> None:
+        jd = _jd_json(required_skills=["Python", "Django"])
+        resume = _resume_json(skills=["Python"])
+        letter = "I build products using Python."
+        assert _foreign_skill_claims(_letter(letter), resume, jd) == []
+
+    def test_fuzzy_resume_match_not_flagged(self) -> None:
+        jd = _jd_json(required_skills=["SQL"])
+        resume = _resume_json(skills=["PostgreSQL"])
+        letter = "I write complex SQL queries."
+        assert _foreign_skill_claims(_letter(letter), resume, jd) == []
+
+    def test_soft_skill_prose_not_flagged(self) -> None:
+        jd = _jd_json(required_skills=["strong communication skills"])
+        resume = _resume_json(skills=["Python"])
+        letter = "I communicate effectively with stakeholders."
+        assert _foreign_skill_claims(_letter(letter), resume, jd) == []
+
+    def test_no_jd_skills_no_claims(self) -> None:
+        assert (
+            _foreign_skill_claims(_letter("anything"), _resume_json(), _jd_json()) == []
+        )
+
+
+class TestValidateNoFabricatedSkills:
+    def test_rejects_fabricated_skill(self) -> None:
+        jd = _jd_json(required_skills=["Django"])
+        resume = _resume_json(skills=["Python"])
+        letter = "I have deep Django experience."
+        assert not _validate_no_fabricated_skills(_letter(letter), resume, jd)
+
+    def test_accepts_resume_skills(self) -> None:
+        jd = _jd_json(required_skills=["Python"])
+        resume = _resume_json(skills=["Python"])
+        letter = "I have deep Python experience."
+        assert _validate_no_fabricated_skills(_letter(letter), resume, jd)
+
+    def test_accepts_when_no_candidates(self) -> None:
+        assert _validate_no_fabricated_skills(
+            _letter("anything"), _resume_json(), _jd_json()
+        )
 
 
 class TestLoadStrList:

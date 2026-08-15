@@ -50,7 +50,7 @@ If you prefer the OpenAI provider instead of local Ollama, set `MODEL_PROVIDER=o
 | `uv run python basic.py` | Single-agent smoke test. Runs one `SimpleAgent` chat call against Ollama (or OpenAI) in JSON mode and pretty-prints the response. |
 | `uv run python pipeline.py` | Runs `sample_run()`: builds the full runner from the environment (plus any model overrides persisted by the web API) and runs `run_resume_pipeline` on placeholder text. Shows the polished resume and cover letter on stdout. |
 | `uv run python test_real_files.py` | Live end-to-end integration test: runs the true 7-agent chain against `sample/jobs/3Pillar.txt` and `sample/resume/Peter-Letkeman-Resume.txt` (requires a running Ollama), then prints a per-check PASS/FAIL summary. |
-| `uv run pytest` | Deterministic unit suite (`tests/`, 558 tests across 26 files) — does **not** require a live LLM. |
+| `uv run pytest` | Deterministic unit suite (`tests/`, 573 tests across 26 files) — does **not** require a live LLM. |
 | `uv run uvicorn app.main:app --reload` | Runs the FastAPI web API (pipeline, tasks, files, outputs endpoints). |
 
 ### Running the full pipeline

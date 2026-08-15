@@ -91,7 +91,7 @@ Normalization is wired into **5 agents** (`client/agents/`):
 1. Edit **`client/skills/taxonomy.json`** — add the canonical name (key) and its variants
    under the appropriate category.
 2. No code change is required: `normalizer.py` rebuilds its index at import time.
-3. Add/update tests in **`tests/test_skill_normalizer.py`** (currently 15 tests covering
+3. Add/update tests in **`tests/test_skill_normalizer.py`** (currently 22 tests covering
    normalization, canonicalization, de-duplication, variant lookup, and matching).
 4. Re-run `uv run pytest` and `uv run ruff check .` / `uv run pyright`.
 

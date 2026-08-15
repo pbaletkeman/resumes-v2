@@ -65,6 +65,47 @@ class TestGetVariants:
         assert SkillNormalizer().get_variants("NotASkill") == []
 
 
+class TestKnownSkillsInText:
+    def test_extracts_technology_skills_from_phrase(self) -> None:
+        text = (
+            "experience with modern full stack technologies including "
+            "python django typescript react"
+        )
+        assert SkillNormalizer().known_skills_in_text(text) == [
+            "TypeScript",
+            "Python",
+            "React",
+            "Django",
+        ]
+
+    def test_whole_word_no_substring_match(self) -> None:
+        assert SkillNormalizer().known_skills_in_text("backends and data") == []
+
+    def test_excludes_soft_skills_by_default(self) -> None:
+        assert (
+            SkillNormalizer().known_skills_in_text("strong communication skills") == []
+        )
+
+    def test_include_soft_returns_soft_skills(self) -> None:
+        assert "Communication" in SkillNormalizer().known_skills_in_text(
+            "strong communication skills", include_soft=True
+        )
+
+    def test_variant_matches(self) -> None:
+        assert SkillNormalizer().known_skills_in_text("k8s and golang") == [
+            "Go",
+            "Kubernetes",
+        ]
+
+    def test_empty_text(self) -> None:
+        assert SkillNormalizer().known_skills_in_text("") == []
+
+    def test_dedupes_canonical(self) -> None:
+        assert SkillNormalizer().known_skills_in_text("python and python3") == [
+            "Python"
+        ]
+
+
 class TestMatchSkills:
     def test_matched_missing_extra(self) -> None:
         result = SkillNormalizer().match_skills(

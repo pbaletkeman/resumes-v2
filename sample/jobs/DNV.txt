@@ -1,0 +1,204 @@
+Sr. Software Engineer
+DNV
+3.8
+3.8 out of 5 stars
+Toronto, ON
+Hybrid work
+$130,000–$155,000 a year - Full-time
+&nbsp;
+Job details
+Here’s how the job details align with your profile.
+Pay
+
+$130,000–$155,000 a year
+Job type
+
+Full-time
+&nbsp;
+Location
+Toronto, ON
+&nbsp;
+Benefits
+Pulled from the full job description
+
+Paid time off
+Vision care
+Dental care
+Life insurance
+Employee assistance program
+Disability insurance
+Designated paid holidays
+RRSP match
+Flexible schedule
+&nbsp;
+Full job description
+Location:
+Toronto, ON, Canada
+Business:
+Energy Systems
+Position type:
+Full Time
+Contract type:
+Permanent Employee
+Job ID:
+7287
+
+Overview
+About us
+We are the independent expert in assurance and risk management. Driven by our purpose, to safeguard life, property, and the environment, we empower our customers and their stakeholders with facts and reliable insights so that critical decisions can be made with confidence.
+
+As a trusted voice for many of the world’s most successful organizations, we use our knowledge to advance safety and performance, set industry benchmarks, and inspire and invent solutions to tackle global transformations.
+
+About Energy Systems
+
+
+We help customers navigate the complex transition to a decarbonized and more sustainable energy future. We do this by assuring that energy systems work safely and effectively, using solutions that are increasingly digital. We also help industries and governments to navigate the many complex, interrelated transitions taking place globally and regionally, in the energy industry.
+About the role
+The Senior Software Engineer is responsible for designing, developing, testing, deploying, and supporting production-grade software products and shared platform capabilities within DNV’s Digital & Transformation organization. This role sits within the Application Engineering section and contributes to the development and modernization of scalable web applications that support digital delivery across Energy Systems.
+
+This role sits within the Digital & Transformation organization, helping to advance how DNV performs Due Diligence, Verification & Assurance, and Renewables Certification work across Energy Systems.
+
+This is not a project-based delivery or staff-augmentation role. Engineers are expected to develop deep product knowledge and remain accountable for the quality, maintainability, and operation of the software they build.
+
+Working in close partnership with Product leadership, Data & AI Engineering, Solution Engineering, Platform Reliability, Solution Architecture, and Platform Security & Compliance, this role helps bring application capabilities, data services, AI-enabled features, workflows, and APIs into one cohesive platform and product experience.
+
+The Senior Software Engineer designs, builds, tests, deploys, and supports scalable software across a modern full-stack, multi-cloud environment. The primary application stack includes Python, Django, TypeScript, React, and related web technologies, with cloud services spanning both AWS and Microsoft Azure. The role requires strong engineering fundamentals, practical cloud experience, and the ability to collaborate effectively across globally distributed teams.
+
+This role supports custom software development, application modernization, and integration with low-code or hybrid development environments, helping establish shared patterns, APIs, reusable components, and maintainable application architecture across the platform.
+
+This position can be located in our Toronto office, presenting a dynamic hybrid schedule where employees will typically spend three (3) days per week working from either a DNV office or client location/site. Further details regarding role-specific requirements will be shared during the interview process**
+
+What You'll Do
+
+Software Engineering & Delivery
+Design, develop, test, and maintain scalable application and platform capabilities using modern software engineering practices.
+Build cohesive product experiences across web applications, backend services, APIs, user interfaces, and platform integrations.
+Work directly with Product and Architecture stakeholders to shape requirements, evaluate technical approaches, and translate product direction into maintainable, production-ready software.
+Participate actively in code reviews, technical design discussions, estimation, delivery planning, and implementation decisions.
+Write clean, well-structured, testable, and maintainable code that supports long-term product quality and team velocity.
+Own product capabilities through design, implementation, deployment, monitoring, maintenance, and iterative improvement rather than treating delivery as complete when the initial feature is released.
+Full-Stack Application Development
+
+Develop modern full-stack product capabilities using Python, Django, TypeScript, React, and related frontend and backend technologies.
+Build responsive, reusable, and accessible frontend experiences using TypeScript and React, integrated with secure, scalable, and maintainable backend services and APIs built using Python and Django.
+Support application modernization efforts, including refactoring, technical debt reduction, framework upgrades, and migration from legacy patterns where appropriate.
+Develop application capabilities used for structured review workflows, document-heavy collaboration, issue tracking, customer interaction, reporting, and delivery of technical work products.
+Partner with Product and design stakeholders to ensure application functionality is intuitive, reliable, and aligned with user workflows.
+Modern Development & AI-Enabled Engineering
+
+Use AI-assisted development tools to accelerate coding, testing, documentation, refactoring, and engineering analysis.
+Apply strong engineering judgment when using LLM-enabled workflows, ensuring generated or assisted code meets standards for quality, security, maintainability, and performance.
+Contribute to reusable development patterns, documentation, and engineering practices that improve team velocity and consistency.
+Use AI-enabled tools where appropriate to support test generation, code review preparation, technical documentation, and developer productivity.
+Architecture, Platforms & Interoperability
+
+Develop APIs, backend services, frontend components, and integration patterns that support platform interoperability.
+Collaborate with Solution Architecture, Data & AI Engineering, Solution Engineering, and Platform Reliability to align technical decisions across the platform.
+Help integrate applications with data services, AI-enabled capabilities, workflow configurations, authentication patterns, and enterprise systems.
+Support the appropriate balance between custom application development, reusable platform services, low-code configuration, and API-enabled capabilities.
+Help modernize and integrate existing applications into a cohesive platform architecture.
+Contribute to modular application architecture and service boundaries across Python/Django applications, React frontend clients, APIs, shared services, data stores, and cloud-hosted capabilities.
+Data & AI Integration
+
+Integrate data-driven, search, agentic, and AI-enabled capabilities into production web applications using well-defined APIs and reusable application patterns.
+Collaborate with Data & AI Engineering on Azure AI Search indexes, retrieval pipelines, model and agent outputs, calculation services, data APIs, evaluation approaches, and user-facing AI experiences.
+Help ensure AI-enabled and data-driven features are implemented in ways that are reliable, testable, secure, and understandable to users.
+Build application interfaces and services that make data, AI outputs, workflow status, and platform capabilities accessible within the user experience.
+DevOps, Reliability & Security
+
+Contribute to source control and CI/CD pipelines, automated testing, deployment automation, environment management, monitoring, and incident readiness.
+Build software with strong attention to reliability, performance, availability, scalability, and operational support.
+Support observability practices including logging, monitoring, error handling, and production diagnostics.
+Follow secure development practices aligned with internal security standards, SOC 2 Type II, ISO 27001, and enterprise security expectations.
+Collaborate with Platform Reliability, Security, and Global Shared Services teams to support secure, reliable, and maintainable production systems.
+Collaboration & Technical Ownership
+
+Work effectively with Product, Solution Engineering, Data & AI Engineering, Platform Reliability, Architecture, Security, and regional teams in a globally distributed environment.
+Take ownership of assigned features, services, defects, and technical improvements from design through production support.
+Communicate technical tradeoffs clearly and contribute to pragmatic engineering decisions.
+Mentor less experienced engineers through code reviews, technical guidance, pairing, and shared engineering practices.
+Contribute to a culture of accountability, collaboration, continuous improvement, and delivery excellence.
+What we offer
+Generous paid time off (vacation, sick days, company holidays, personal days)
+Medical, Dental and Vision benefit plans available to all employees
+Special programs – Employee Assistance Program and accident and critical illness options for you and your family
+Workplace strategies for mental help resources available to all employees
+Registered Retirement Savings Plan (RRSP) with company match
+Company provided life insurance, short-term, and long-term disability benefits
+Education Assistance program
+Flexible work schedule with hybrid opportunities
+Consumer discounts and rewards through our BenefitsHub
+Advancement opportunities
+**Benefits vary based on position, tenure, location, and employee election**
+
+For British Columbia (Vancouver) and Ontario (Toronto): "DNV provides a reasonable compensation range for this role. The actual compensation is influenced by a wide array of factors, including but not limited to skill set, level of experience, and specific location. For the cities of Vancouver and Toronto, the range of starting pay for this role is $130,000 - $155,000.”
+
+DNV is a proud equal opportunity employer committed to building an inclusive and diverse workforce. All employment is decided on the basis of qualifications, merit, or business need, without regard to race, color, religion, age, sex, sexual orientation, gender identity, national origin, disability, or protected veteran status.
+
+About you
+What is Required
+
+Bachelor's or Master's degree in Computer Science, Engineering, Information Systems, or related field, or equivalent experience.
+5+ years of experience developing production software in application engineering, software engineering, platform engineering, or related technical roles.
+Strong experience developing production web applications using modern full-stack technologies.
+Strong production experience developing backend applications, APIs, and services using Python and Django.
+Experience designing and consuming REST APIs and building distributed or service-oriented application capabilities.
+Experience building, modernizing, or operating scalable web applications in production environments, especially applications that support complex workflows, collaboration, reporting, document review, or customer-facing delivery.
+Experience building APIs, backend services, frontend components, integrations, and application capabilities in production environments.
+Experience developing, deploying, and supporting cloud-hosted applications, with practical experience in AWS strongly preferred.
+Strong understanding of software design, testing, code quality, maintainability, security, and performance.
+Experience with CI/CD, automated testing, source control, code review, and modern software delivery practices.
+Demonstrated experience using AI-assisted development tools or LLM-enabled coding workflows to improve development productivity.
+Ability to collaborate with Product, Architecture, Security, Platform Reliability, and cross-functional stakeholders in a matrixed environment.
+Strong English communication skills and ability to work effectively across globally distributed teams.
+We conduct pre-employment background screening
+What is Preferred
+
+Experience in product-led or platform-based organizations.
+Experience with collaborative due diligence, document review, workflow, reporting, Q&A, risk management, or transaction delivery applications.
+Familiarity with low-code or hybrid development environments.
+Experience supporting interoperability across multiple systems or enterprise platforms.
+Familiarity with Microsoft Azure or experience working in a broader multi-cloud enterprise environment.
+Background in energy, infrastructure, renewables, assurance, certification, or other technically complex industries.
+Experience with multi-cloud environments spanning Azure and AWS.
+Experience modernizing legacy applications or integrating acquired software products into a broader enterprise platform.
+**Immigration-related employment benefits, for example visa sponsorship, are not available for this position**
+
+Benefits
+Please note, benefits may depend on your contract type, please confirm with your recruiter.
+
+Profit Share
+You’ll be part of our global profit share scheme that means we all share in our success as a business. If we profit, so do you. This will be part of our Total Compensation approach each year and depends on our year-end results.
+
+Insurance
+Taking care of you with travel, life, and accident insurance.
+
+Pension Schemes
+We care about your long-term financial security and prioritize pension and retirement benefits to reflect our caring values.
+
+Professional Development
+We believe in the 70/20/10 learning model, where 70% of your learning comes from performing your everyday tasks and working on different projects, new areas and initiatives to gain new skills. 20% from working with others and mentoring and the rest from formal education.
+
+Hybrid Working
+Adapting to the changing world of work around the world.
+
+Purpose-led organization
+You become part of a world-leading company where we know and live our purpose; to safeguard life, property, and the environment, with the opportunity to tackle global change through your work.
+
+Supportive and caring culture
+We offer opportunities to connect through social and professional networks. Our largest community CONNECT, organizes after-work events and informal meetings throughout the year.
+
+Attractive rewards
+We focus on work/life balance and offer employees flexible working hours and workplace, annual vacation allowance, competitive pension, insurance, and a global profit share scheme.
+
+
+Diversity, Equity and Inclusion
+At DNV, our commitment to Diversity, Equity, and Inclusion is not only an ethical choice, but also a business decision.
+
+Diversity, fairness, and a sense of belonging are a source of strength for our people, our business, and our customers, and help us to deliver on our purpose, vision, and values.
+
+
+Working here
+Since 1864 we’ve been dedicated to safeguarding life, property and the environment. Today we remain at the forefront of new technologies and techniques to help our customers transform for a more sustainable future.
+
+At DNV you can expect to deliver career and industry defining work. You’ll be given the time to build your network, the resources to support your development, and the freedom to satisfy your curiosity and desire to learn.

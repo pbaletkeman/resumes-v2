@@ -397,6 +397,7 @@ Post-validation (`_try_llm`) enforces via pure-string phases but never re-runs t
 - `_apply_company_name` — replaces placeholder tokens (`[Company Name]` etc.) and, when the letter names a company from the candidate's resume, substitutes the first wrong mention with the JD company.
 - `_apply_candidate_name` — replaces `[Your Name]` placeholders with the real candidate name.
 - `_check_skills` — advisory: logs when the letter mentions a skill absent from the resume.
+- `_validate_no_fabricated_skills` — **hard-reject**: rejects the letter when it claims a taxonomy-matched technology skill the resume does not back up (e.g. listing "Django" when the resume has none), forcing a retry then the data-driven fallback.
 - `_validate_length` — rejects only extreme outliers (<200 or >800 words); 200–450 and 600–800 accepted with a warning.
 - `_apply_contact_info` — appends the candidate's phone/email/LinkedIn/GitHub line when the letter lacks them.
 

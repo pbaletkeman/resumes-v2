@@ -241,17 +241,17 @@ uv run pytest --cov --cov-report=xml
 Artifacts: `.coverage` (data file) and `htmlcov/` (HTML report); both are
 git-ignored.
 
-Currently **558 tests across 26 files** (deterministic, no live LLM required):
+Currently **573 tests across 26 files** (deterministic, no live LLM required):
 
 - `tests/test_format_detector.py` — 46 tests (FormatDetector regex parsing)
 - `tests/test_jd_parsing.py` — 19 tests (JD parsing company_name extraction/sync)
 - `tests/test_resume_rewrite_validation.py` — 63 tests (rewrite post-validation + skill tailoring + fallback logging)
-- `tests/test_cover_letter_validation.py` — 109 tests (cover letter post-validation + fallback builder + fallback logging + contact-info post-processing)
+- `tests/test_cover_letter_validation.py` — 117 tests (cover letter post-validation + fallback builder + fallback logging + contact-info post-processing)
 - `tests/test_model_clients.py` — 11 tests (response_format + Structured Outputs plumbing)
 - `tests/test_json_utils.py` — 23 tests (shared parser + `load_json_safe` + JSON Schema helpers)
 - `tests/test_formatter.py` — 41 tests (format_* helpers)
 - `tests/test_renderer.py` — 66 tests (ResumeRenderer plaintext/markdown/docx/pdf/render_all + single/multi-template render_all + cover-letter DOCX/PDF + contact-line rendering + no-duplicate cover-letter signature + bulleted skills/bold header bullets + DOCX letter spacing)
-- `tests/test_skill_normalizer.py` — 15 tests (SkillNormalizer canonical taxonomy)
+- `tests/test_skill_normalizer.py` — 22 tests (SkillNormalizer canonical taxonomy)
 - `tests/test_agent_jd_parsing.py` — 7 tests (Agent 1 contract, mocked ModelClient)
 - `tests/test_agent_resume_parsing.py` — 9 tests (Agent 2 contract, mocked ModelClient)
 - `tests/test_agent_gap_analysis.py` — 7 tests (Agent 3 contract, mocked ModelClient)

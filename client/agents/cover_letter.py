@@ -16,6 +16,10 @@ Agent contract:
 - LLM attempt: one normal pass then one strict retry; any failure of the
   LLM call, JSON parse, Pydantic validation, or hard-reject validation
   guard fails that attempt.
+- Fabrication guard: the letter is rejected (forcing a retry then the
+  data-driven fallback) when it claims a taxonomy-matched technology skill
+  that is absent from the resume (``_validate_no_fabricated_skills``), so
+  the LLM cannot list skills the candidate never had.
 - Deterministic post-processors (never mutate in place; ``model_copy``):
   ``_apply_company_name`` fixes the JD company (placeholder tokens first,
   then a wrong resume company name) and ``_apply_candidate_name``
@@ -88,6 +92,7 @@ _STRICT_RULES = [
     "cover_letter must contain the full cover letter text",
     "Do not use words like current, now, presently, or currently",
     "Only include dates or timeframes if they are explicitly present in the resume",
+    "Only mention skills that appear in the resume",
     "No markdown, no explanation -- just the JSON object",
 ]
 
@@ -319,6 +324,9 @@ class CoverLetterAgent:
 
         _check_skills(result, resume_json, jd_json)
 
+        if not _validate_no_fabricated_skills(result, resume_json, jd_json):
+            return None
+
         if not _validate_length(result):
             logger.warning("Cover letter length outside extreme bounds -- rejecting")
             return None
@@ -535,19 +543,39 @@ def _check_company(result: CoverLetterOutput, jd_json: str) -> None:
 def _check_skills(result: CoverLetterOutput, resume_json: str, jd_json: str) -> None:
     """Warn if the letter mentions skills absent from the resume (advisory).
 
-    Candidate skill nouns come from the JD's required/preferred skills and
-    the resume's skill list.  A skill mentioned in the letter but missing
-    from the resume is flagged with a warning; nothing is rejected because
-    cover letter prose paraphrases freely.  Word boundaries keep short
-    tokens like "ai" from matching inside words like "aimed".
+    Candidate skill nouns come from the taxonomy-matching JD
+    required/preferred skills and the resume's skill list.  A skill
+    mentioned in the letter but missing from the resume is flagged with a
+    warning; nothing is rejected because cover letter prose paraphrases
+    freely.  Word boundaries keep short tokens like "ai" from matching
+    inside words like "aimed".
+    """
+    foreign = _foreign_skill_claims(result, resume_json, jd_json)
+    if foreign:
+        logger.warning(
+            "Cover letter mentions skills not in resume: %s",
+            ", ".join(foreign),
+        )
+
+
+def _foreign_skill_claims(
+    result: CoverLetterOutput, resume_json: str, jd_json: str
+) -> list[str]:
+    """Return skills the letter claims but the resume does not back up.
+
+    Candidate skill nouns are the canonical taxonomy skills found inside
+    the JD's required/preferred skill phrases (e.g. Django/TypeScript/React
+    in "experience with modern full stack technologies including python
+    django typescript react"), so individual fabricated technologies are
+    caught even when the JD parsing returns whole sentences.  A candidate
+    that is mentioned in the letter but is not present (fuzzy) in the
+    resume is a fabricated skill claim.
     """
     resume_skills = _load_str_list(resume_json, "skills")
-    jd_skills = _load_str_list(jd_json, "required_skills") + _load_str_list(
+    jd_phrases = _load_str_list(jd_json, "required_skills") + _load_str_list(
         jd_json, "preferred_skills"
     )
-    candidates = list(dict.fromkeys(jd_skills + resume_skills))
-    if not candidates:
-        return
+    candidates = _NORMALIZER.known_skills_in_text(" ".join(jd_phrases))
     letter_lower = result.cover_letter.lower()
     foreign: list[str] = []
     for skill in candidates:
@@ -555,11 +583,29 @@ def _check_skills(result: CoverLetterOutput, resume_json: str, jd_json: str) -> 
             continue
         if not _skill_in_list(skill, resume_skills):
             foreign.append(skill)
+    return foreign
+
+
+def _validate_no_fabricated_skills(
+    result: CoverLetterOutput, resume_json: str, jd_json: str
+) -> bool:
+    """Return False if the letter claims a skill the resume does not have.
+
+    Hard-reject guard: when the letter names a technology skill (matched
+    against the shared taxonomy) that is absent from the resume, the
+    attempt is rejected so ``run()`` retries with stricter rules or falls
+    back to the data-driven letter (which only cites overlapping skills).
+    This prevents the LLM from inventing skills the candidate never
+    claimed (e.g. listing "Django" as a skill when the resume has none).
+    """
+    foreign = _foreign_skill_claims(result, resume_json, jd_json)
     if foreign:
         logger.warning(
-            "Cover letter mentions skills not in resume: %s",
+            "Rejecting cover letter: claims skills not in resume: %s",
             ", ".join(foreign),
         )
+        return False
+    return True
 
 
 def _skill_mentioned(letter_lower: str, skill: str) -> bool:
@@ -589,7 +635,11 @@ def _skill_in_list(skill: str, skills: list[str]) -> bool:
             continue
         if norm == candidate_norm:
             return True
-        if len(norm) >= 3 and (norm in candidate_norm or candidate_norm in norm):
+        if (
+            len(norm) >= 3
+            and len(candidate_norm) >= 3
+            and (norm in candidate_norm or candidate_norm in norm)
+        ):
             return True
         if set(norm.split()) & set(candidate_norm.split()):
             return True
@@ -993,13 +1043,16 @@ def _join_skills(skills: list[str]) -> str:
 def _overlapping_skills(candidates: list[str], known: list[str]) -> list[str]:
     """Return candidates the resume already covers (fuzzy match).
 
-    Selected skills are canonicalized with the shared taxonomy so the
-    cover letter highlights standard skill names.
+    Candidate nouns are first reduced to discrete canonical taxonomy skills
+    (so a long JD phrase like "...including python django typescript react"
+    yields Python/Django/TypeScript/React instead of being echoed back
+    verbatim), then kept only when the resume actually covers them.  The
+    returned skills are canonicalized so the cover letter highlights
+    standard skill names and never claims a skill absent from the resume.
     """
+    nouns = _NORMALIZER.known_skills_in_text(" ".join(candidates))
     return [
-        _NORMALIZER.normalize(skill)
-        for skill in candidates
-        if _skill_in_list(skill, known)
+        _NORMALIZER.normalize(skill) for skill in nouns if _skill_in_list(skill, known)
     ]
 
 
